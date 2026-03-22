@@ -2,7 +2,7 @@ export const appConfig = {
   comuneName: import.meta.env.VITE_COMUNE_NAME || 'del territorio nazionale',
   dataBaseUrl:
     import.meta.env.VITE_DATA_BASE_URL ||
-    'https://anncsu-open.github.io/anncsu-viewer',
+    'https://raw.githubusercontent.com/anncsu-open/anncsu-viewer/main',
   dataReleaseUrl:
     import.meta.env.VITE_DATA_RELEASE_URL ||
     'https://github.com/anncsu-open/anncsu-viewer/releases/latest/download',
