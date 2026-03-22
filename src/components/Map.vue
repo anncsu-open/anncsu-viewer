@@ -9,18 +9,13 @@ import { useAppStore } from '@/store/app.store.ts'
 import { executeQuery } from '@/services/duckdb.ts'
 import { appConfig } from '@/config'
 
-const pagesBase =
+const dataBase =
   import.meta.env.MODE === 'production'
     ? appConfig.dataBaseUrl
-    : 'http://localhost:5173'
-
-const releaseBase =
-  import.meta.env.MODE === 'production'
-    ? appConfig.dataReleaseUrl
     : 'http://localhost:5173/data'
 
-const parquetFile = `'${pagesBase}/data/anncsu-indirizzi.parquet'`
-const pmtilesUrl = `pmtiles://${releaseBase}/anncsu-indirizzi.pmtiles`
+const parquetFile = `'${dataBase}/anncsu-indirizzi.parquet'`
+const pmtilesUrl = `pmtiles://${dataBase}/anncsu-indirizzi.pmtiles`
 
 type Bounds = [[number, number], [number, number]]
 
@@ -28,7 +23,7 @@ async function getBoundsFromPmtiles(): Promise<Bounds> {
   // Read bounds from PMTiles header
   try {
     const { PMTiles } = await import('pmtiles')
-    const url = `${releaseBase}/anncsu-indirizzi.pmtiles`
+    const url = `${dataBase}/anncsu-indirizzi.pmtiles`
     const pm = new PMTiles(url)
     const header = await pm.getHeader()
     return [

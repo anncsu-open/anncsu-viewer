@@ -31,33 +31,19 @@ jobs:
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Upload large files to release
+      - name: Install rclone
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          curl -fsSL https://rclone.org/install.sh | sudo bash
+
+      - name: Upload data to Cloudflare R2
         if: steps.changes.outputs.changed == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RCLONE_CONFIG_R2_TYPE: s3
+          RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+          RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          RCLONE_CONFIG_R2_ENDPOINT: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          RCLONE_CONFIG_R2_ACL: private
         run: |
-          DATE=$(date -u +%Y-%m-%d)
-          TAG="data-${DATE}"
-
-          # Delete existing release with same tag if present
-          gh release delete "$TAG" --yes 2>/dev/null || true
-          git tag -d "$TAG" 2>/dev/null || true
-          git push origin ":refs/tags/$TAG" 2>/dev/null || true
-
-          # Create new release with PMTiles and parquet as assets
-          gh release create "$TAG" \
-            --title "ANNCSU Data ${DATE}" \
-            --notes "Automated data update from ANNCSU open data portal." \
-            --latest \
-            data/anncsu-indirizzi.pmtiles \
-            data/anncsu-indirizzi.parquet
-
-      - name: Commit H3 tiles and metadata
-        if: steps.changes.outputs.changed == 'true'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          DATE=$(date -u +%Y-%m-%d)
-          git add data/tiles/ data/comuni.json data/comuni-h3.json
-          git commit -m "data: update ANNCSU H3 tiles and metadata ($DATE)"
-          git push
+          rclone copy data/ r2:anncsu-data/ --transfers=32 --checkers=32 -P
