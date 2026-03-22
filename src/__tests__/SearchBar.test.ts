@@ -102,7 +102,7 @@ describe('SearchBar', () => {
 
     store.setSearchFilter('VIA ROMA')
     await flushPromises()
-    expect(wrapper.find('button[title="Cancella ricerca"]').exists()).toBe(true)
+    expect(wrapper.find('button[title="Clear search"]').exists()).toBe(true)
   })
 
   it('filters addresses on searchFilter change', async () => {
@@ -160,7 +160,7 @@ describe('SearchBar', () => {
     expect(store.selectedCoordinates).not.toBeNull()
 
     // Clear
-    const clearBtn = wrapper.find('button[title="Cancella ricerca"]')
+    const clearBtn = wrapper.find('button[title="Clear search"]')
     await clearBtn.trigger('click')
 
     expect(store.searchFilter).toBe('')
@@ -182,7 +182,7 @@ describe('SearchBar', () => {
     expect(store.selectedCoordinates).toEqual([12.641, 42.376])
 
     // Clear should trigger resetView
-    const clearBtn = wrapper.find('button[title="Cancella ricerca"]')
+    const clearBtn = wrapper.find('button[title="Clear search"]')
     await clearBtn.trigger('click')
 
     expect(store.resetView).toBe(true)
