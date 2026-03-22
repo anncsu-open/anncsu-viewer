@@ -191,10 +191,44 @@ onMounted(async () => {
     })
   }
 
-  // Zoom sull'indirizzo selezionato
+  // Zoom sull'indirizzo selezionato con evidenziazione
   watch(selectedCoordinates, (coords) => {
+    // Rimuovi evidenziazione precedente
+    if (map.getLayer('selected-address-point')) {
+      map.removeLayer('selected-address-point')
+    }
+    if (map.getSource('selected-address')) {
+      map.removeSource('selected-address')
+    }
+
     if (coords) {
       map.flyTo({ center: coords, zoom: 18 })
+
+      // Aggiungi punto evidenziato arancione
+      map.addSource('selected-address', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              geometry: { type: 'Point', coordinates: coords },
+              properties: {},
+            },
+          ],
+        },
+      })
+      map.addLayer({
+        id: 'selected-address-point',
+        source: 'selected-address',
+        type: 'circle',
+        paint: {
+          'circle-radius': 12,
+          'circle-color': '#FF6B35',
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#ffffff',
+        },
+      })
     }
   })
 

@@ -58,6 +58,7 @@ vi.mock('@/services/layer', () => ({
 }))
 
 import { executeQuery } from '@/services/duckdb'
+import { useAppStore } from '@/store/app.store'
 import maplibregl from 'maplibre-gl'
 
 const mockedExecuteQuery = vi.mocked(executeQuery)
@@ -167,5 +168,111 @@ describe('Map', () => {
 
     const mapOpts = MockedMap.mock.calls[0]?.[0] as any
     expect(mapOpts.bounds).toEqual([[7.0, 36.0], [18.0, 47.0]])
+  })
+
+  it('adds a highlighted point layer when an address is selected', async () => {
+    const bbox: [number, number, number, number] = [6.70, 35.50, 18.51, 47.08]
+
+    mockedExecuteQuery.mockImplementation(async (query: string) => {
+      if (query.includes('parquet_kv_metadata')) {
+        return metadataResponse(makeGeoMetadata(bbox))
+      }
+      return undefined
+    })
+
+    const MapComponent = (await import('@/components/Map.vue')).default
+    const pinia = createPinia()
+    mount(MapComponent, { global: { plugins: [pinia] } })
+    await flushPromises()
+
+    const mapInstance = MockedMap.mock.results[0].value
+    const store = useAppStore(pinia)
+
+    // Select an address
+    store.setSelectedCoordinates([12.5, 42.0])
+    await flushPromises()
+
+    // Should add a source and layer for the highlighted point
+    expect(mapInstance.addSource).toHaveBeenCalledWith(
+      'selected-address',
+      expect.objectContaining({ type: 'geojson' }),
+    )
+    expect(mapInstance.addLayer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'selected-address-point',
+        source: 'selected-address',
+        type: 'circle',
+        paint: expect.objectContaining({
+          'circle-color': '#FF6B35',
+        }),
+      }),
+    )
+  })
+
+  it('removes the highlighted point when selectedCoordinates becomes null', async () => {
+    const bbox: [number, number, number, number] = [6.70, 35.50, 18.51, 47.08]
+
+    mockedExecuteQuery.mockImplementation(async (query: string) => {
+      if (query.includes('parquet_kv_metadata')) {
+        return metadataResponse(makeGeoMetadata(bbox))
+      }
+      return undefined
+    })
+
+    const MapComponent = (await import('@/components/Map.vue')).default
+    const pinia = createPinia()
+    mount(MapComponent, { global: { plugins: [pinia] } })
+    await flushPromises()
+
+    const mapInstance = MockedMap.mock.results[0].value
+    const store = useAppStore(pinia)
+
+    // Mock getLayer/getSource to return true (layer exists)
+    mapInstance.getLayer = vi.fn(() => true)
+    mapInstance.getSource = vi.fn(() => true)
+
+    // Select then deselect
+    store.setSelectedCoordinates([12.5, 42.0])
+    await flushPromises()
+
+    store.setSelectedCoordinates(null)
+    await flushPromises()
+
+    // Should remove the highlighted layer and source
+    expect(mapInstance.removeLayer).toHaveBeenCalledWith('selected-address-point')
+    expect(mapInstance.removeSource).toHaveBeenCalledWith('selected-address')
+  })
+
+  it('resets map view to default bounds when resetView is triggered', async () => {
+    const bbox: [number, number, number, number] = [6.70, 35.50, 18.51, 47.08]
+
+    mockedExecuteQuery.mockImplementation(async (query: string) => {
+      if (query.includes('parquet_kv_metadata')) {
+        return metadataResponse(makeGeoMetadata(bbox))
+      }
+      return undefined
+    })
+
+    const MapComponent = (await import('@/components/Map.vue')).default
+    const pinia = createPinia()
+    mount(MapComponent, { global: { plugins: [pinia] } })
+    await flushPromises()
+
+    const mapInstance = MockedMap.mock.results[0].value
+    const store = useAppStore(pinia)
+
+    // Select an address, then clear
+    store.setSelectedCoordinates([12.5, 42.0])
+    await flushPromises()
+
+    store.setSelectedCoordinates(null)
+    store.triggerResetView()
+    await flushPromises()
+
+    // Should call fitBounds with the default bounds
+    expect(mapInstance.fitBounds).toHaveBeenCalledWith(
+      [[6.70, 35.50], [18.51, 47.08]],
+      { padding: 20 },
+    )
   })
 })
