@@ -1,37 +1,44 @@
-# overture-duckdb-wasm
+# ANNCSU Viewer
 
-Demo about using [DuckDB](https://duckdb.org/) with WASM to leverage Overture Maps datasets processing.
+A web viewer for street addresses and house numbers from the Italian National Archive of Street Numbers and Urban Roads (ANNCSU). Data is processed directly in the browser using [DuckDB WASM](https://duckdb.org/).
 
-# Quick start
+## Quick start
+
 ```shell
 npm install
 npm run dev
 ```
 
-# Principles
-## Datasets
+## Configuration
 
-**Disclaimer** : DuckDB WASM [does not support HTTPFS extension](https://duckdb.org/docs/stable/clients/wasm/extensions.html#httpfs). Therefore you can't directly hint the official Overture Maps GeoParquet releases, which provide root level S3 file system entry (eg. `s3://overturemaps-us-west-2/release/2025-04-23.0/theme=places/type=place/*'` )
+The application is configurable via Vite environment variables.
 
-A subset of Overture Maps datasets has been downloaded in the `/public` folder.  
-- `saltlake-division_area.parquet`
-- `saltlake-place.parquet`
+### Environment variables
 
-This is _places_ and _division areas_ data for **Salt Lake City**, Utah.
+| Variable | Description | Default |
+|---|---|---|
+| `VITE_COMUNE_NAME` | Municipality name displayed in the header and info panel | `del territorio nazionale` |
+| `VITE_DATA_BASE_URL` | Base URL for parquet data files in production | `https://anncsu-open.github.io/anncsu-viewer` |
+| `VITE_APP_MODE` | Deployment mode: `nazionale` (PMTiles + GeoParquet) or `comunale` (GeoParquet only) | `nazionale` |
 
-It has been downloaded from the [Overture Maps](https://overturemaps.org/) project with the [Python CLI](https://docs.overturemaps.org/getting-data/overturemaps-py/) project.
+Create a `.env` file in the project root:
+
 ```shell
-overturemaps download --bbox=-113.230591,39.913950,-110.505981,41.689322 -f geoparquet -o /data/saltlake-division_area.parquet --type=division_area
-overturemaps download --bbox=-113.230591,39.913950,-110.505981,41.689322 -f geoparquet -o /data/saltlake-place.parquet --type=place
+VITE_COMUNE_NAME=del Comune di Vacone
 ```
 
-## Web application
-The demo provides a textarea to enter SQL queries. Those queries will be executed in the frontend with DuckDB WASM. They are performed on the local GeoParquet files (Salt Lake subset).
+Or pass the variable at build time:
 
-2 important points:
-- in the query, the text `FROM places` and `FROM division_area` are replaced with the correct duckDB syntax to load the GeoParquet files.
-- the frontend expects the result to have at least 2 attributes
-  - `count` as an integer
-  - `geometry` as GeoJSON geometry. 
+```shell
+VITE_COMUNE_NAME="del Comune di Vacone" npm run build
+```
 
-The application transforms the result into a GeoJSON FeatureCollection and displays it on the map.
+## Test
+
+```shell
+npx vitest run
+```
+
+## Credits
+
+This project is derived from [overture-duckdb-wasm](https://github.com/fgravin/overture-duckdb-wasm) by Florent Gravin, released under the MIT license.

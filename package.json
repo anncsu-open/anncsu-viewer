@@ -1,5 +1,5 @@
 {
-  "name": "overture-duckdb-wasm",
+  "name": "anncsu-viewer",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -10,33 +10,39 @@
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
     "lint": "eslint . --fix",
-    "format": "prettier --write src/"
+    "format": "prettier --write src/",
+    "test": "vitest",
+    "test:run": "vitest run"
   },
   "dependencies": {
-    "@duckdb/duckdb-wasm": "^1.29.1-dev132.0",
-    "@tailwindcss/vite": "^4.1.6",
-    "maplibre-gl": "^5.5.0",
-    "pinia": "^3.0.1",
-    "tailwindcss": "^4.1.6",
-    "vue": "^3.5.13"
+    "@duckdb/duckdb-wasm": "^1.32.0",
+    "@tailwindcss/vite": "^4.2.2",
+    "maplibre-gl": "^5.21.0",
+    "pinia": "^3.0.4",
+    "pmtiles": "^4.4.0",
+    "tailwindcss": "^4.2.2",
+    "vue": "^3.5.30"
   },
   "devDependencies": {
-    "@tsconfig/node22": "^22.0.1",
+    "@tsconfig/node22": "^22.0.5",
     "@types/geojson": "^7946.0.16",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-vue": "^5.2.3",
     "@vue/eslint-config-prettier": "^10.2.0",
-    "@vue/eslint-config-typescript": "^14.5.0",
+    "@vue/eslint-config-typescript": "^14.7.0",
+    "@vue/test-utils": "^2.4.6",
     "@vue/tsconfig": "^0.7.0",
     "eslint": "^9.22.0",
-    "eslint-plugin-vue": "~10.0.0",
-    "jiti": "^2.4.2",
+    "eslint-plugin-vue": "~10.8.0",
+    "happy-dom": "^17.4.4",
+    "jiti": "^2.6.1",
     "npm-run-all2": "^7.0.2",
-    "prettier": "3.5.3",
-    "prettier-plugin-tailwindcss": "^0.6.11",
+    "prettier": "3.8.1",
+    "prettier-plugin-tailwindcss": "^0.7.2",
     "typescript": "~5.8.0",
     "vite": "^6.2.4",
     "vite-plugin-vue-devtools": "^7.7.2",
+    "vitest": "^3.2.1",
     "vue-tsc": "^2.2.8"
   }
 }

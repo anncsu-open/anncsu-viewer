@@ -9,6 +9,8 @@ export async function addGeoJsonLayerAndReturnLegend(map: Map, query = '') {
 
   if (!data) return
 
+  console.log('Data returned:', data)
+
   const counts = data.features.map((f: Feature) => f.properties.count)
   const max = Math.max(...counts)
   const min = Math.min(...counts)
@@ -25,24 +27,52 @@ export async function addGeoJsonLayerAndReturnLegend(map: Map, query = '') {
     colorGradient[0] = 0
   }
 
+  // Rimuovi layer esistenti
   if (map.getLayer('places-area')) {
     map.removeLayer('places-area')
+  }
+  if (map.getLayer('places-points')) {
+    map.removeLayer('places-points')
+  }
+  if (map.getSource('places-area-sources')) {
     map.removeSource('places-area-sources')
   }
+
+  // Aggiungi source
   map.addSource('places-area-sources', {
     type: 'geojson',
     data,
   })
-  map.addLayer({
-    id: 'places-area',
-    type: 'fill',
-    source: 'places-area-sources',
-    paint: {
-      'fill-color': ['interpolate', ['linear'], ['get', 'count'], ...colorGradient],
-      'fill-outline-color': 'grey',
-      'fill-opacity': 0.8,
-    },
-  })
+
+  // Determina il tipo di geometria
+  const firstGeometry = data.features[0]?.geometry?.type
+
+  if (firstGeometry === 'Point') {
+    // Layer per punti (luoghi di interesse)
+    map.addLayer({
+      id: 'places-points',
+      type: 'circle',
+      source: 'places-area-sources',
+      paint: {
+        'circle-radius': 6,
+        'circle-color': '#4c9b82',
+        'circle-stroke-width': 2,
+        'circle-stroke-color': '#ffffff',
+      },
+    })
+  } else {
+    // Layer per poligoni (H3 grid o aree)
+    map.addLayer({
+      id: 'places-area',
+      type: 'fill',
+      source: 'places-area-sources',
+      paint: {
+        'fill-color': ['interpolate', ['linear'], ['get', 'count'], ...colorGradient],
+        'fill-outline-color': 'grey',
+        'fill-opacity': 0.8,
+      },
+    })
+  }
 
   return colorGradient
 }

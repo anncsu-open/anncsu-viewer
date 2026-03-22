@@ -1,6 +1,12 @@
 @import 'tailwindcss';
 
+@theme {
+  --font-titillium: 'Titillium Web', sans-serif;
+  --font-lora: 'Lora', serif;
+}
+
 html,
 body {
   color: var(--color-gray-800);
+  font-family: var(--font-titillium);
 }

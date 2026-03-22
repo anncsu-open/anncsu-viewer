@@ -1,1 +1,4 @@
 * text=auto eol=lf
+data/*.parquet filter=lfs diff=lfs merge=lfs -text
+data/*.pmtiles filter=lfs diff=lfs merge=lfs -text
+data/tiles/**/*.parquet filter=lfs diff=lfs merge=lfs -text

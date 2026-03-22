@@ -2,10 +2,10 @@ name: Deploy Vue.js application
 
 env:
   ACTIONS_ALLOW_UNSECURE_COMMANDS: true
-  
+
 on:
   push:
-    branches: ["main"]
+    branches: ['main']
 
   workflow_dispatch:
 
@@ -15,11 +15,10 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
+  group: 'pages'
   cancel-in-progress: false
 
 jobs:
-
   build:
     runs-on: ubuntu-latest
     steps:
@@ -35,14 +34,14 @@ jobs:
         id: pages
         uses: actions/configure-pages@v5
       - name: Install Node.js dependencies
-        run: "[[ -f package-lock.json || -f npm-shrinkwrap.json ]] && npm ci || true"
+        run: '[[ -f package-lock.json || -f npm-shrinkwrap.json ]] && npm ci || true'
       - name: Build
-        run: npm run build-only -- --base=/overture-duckdb-wasm/
+        run: npm run build-only -- --base=/anncsu-viewer/
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
-          
+
   deploy:
     environment:
       name: github-pages

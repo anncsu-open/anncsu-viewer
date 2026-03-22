@@ -42,3 +42,16 @@ SELECT name, ST_AsGeoJSON(area_geom) as geometry,
 FROM areas
        LEFT JOIN schools ON ST_Contains(area_geom, place_geom)
 GROUP BY area_geom, name`
+
+export const vaconeAddressesQuery = `SELECT
+  ST_AsGeoJSON(geometry) as geometry,
+  ODONIMO || ' ' || COALESCE(CAST(CIVICO AS VARCHAR), '') || COALESCE(' ' || ESPONENTE, '') as name,
+  1 as count
+FROM addresses`
+
+export const vaconePlacesQuery = `SELECT
+  ST_AsGeoJSON(geometry) as geometry,
+  names.primary as name,
+  categories.primary as category,
+  1 as count
+FROM places`
