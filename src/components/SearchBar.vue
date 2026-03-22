@@ -97,9 +97,23 @@ async function loadComuni() {
 function searchComuni(search: string): ComuneEntry[] {
   if (search.length < 2) return []
   const upper = search.toUpperCase()
-  return comuniList.value
-    .filter((c) => c.nome.toUpperCase().includes(upper))
-    .slice(0, 10)
+  const filtered = comuniList.value.filter((c) => c.nome.toUpperCase().includes(upper))
+
+  // Rank by similarity: exact match first, then starts-with, then Jaccard
+  filtered.sort((a, b) => {
+    const aUpper = a.nome.toUpperCase()
+    const bUpper = b.nome.toUpperCase()
+    const aExact = aUpper === upper
+    const bExact = bUpper === upper
+    if (aExact !== bExact) return aExact ? -1 : 1
+    const aStarts = aUpper.startsWith(upper)
+    const bStarts = bUpper.startsWith(upper)
+    if (aStarts !== bStarts) return aStarts ? -1 : 1
+    // Shorter names rank higher (closer match)
+    return a.nome.length - b.nome.length
+  })
+
+  return filtered.slice(0, 10)
 }
 
 async function loadH3Tiles(h3Cells: string[]): Promise<ArrayBuffer[]> {

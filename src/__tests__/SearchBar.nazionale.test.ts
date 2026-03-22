@@ -27,6 +27,9 @@ const mockedExecuteQueryWithBuffers = vi.mocked(executeQueryWithBuffers)
 
 // Mock comuni-h3.json fetch response
 const mockComuni = [
+  { codice_istat: '019068', nome_comune: 'Romano di Lombardia', h3_cells: ['851fb440fffffff'] },
+  { codice_istat: '024083', nome_comune: 'Romagnano Sesia', h3_cells: ['851fb441fffffff'] },
+  { codice_istat: '010050', nome_comune: 'Romagano', h3_cells: ['851fb442fffffff'] },
   { codice_istat: '058091', nome_comune: 'Roma', h3_cells: ['851fb467fffffff'] },
   { codice_istat: '057072', nome_comune: 'Vacone', h3_cells: ['851fb44ffffffff'] },
   { codice_istat: '056059', nome_comune: 'Viterbo', h3_cells: ['851fb443fffffff'] },
@@ -89,6 +92,21 @@ describe('SearchBar (nazionale mode - unified search)', () => {
 
     const input = wrapper.find('[data-testid="unified-search-input"]')
     expect(input.exists()).toBe(true)
+  })
+
+  it('ranks exact comune match first when searching "Roma"', async () => {
+    const wrapper = mount(SearchBar, { global: { plugins: [pinia] } })
+    await flushPromises()
+
+    const input = wrapper.find('[data-testid="unified-search-input"]')
+    await input.setValue('Roma')
+    await flushPromises()
+
+    const suggestions = wrapper.findAll('[data-testid="comune-suggestion"]')
+    expect(suggestions.length).toBeGreaterThan(1)
+    // "Roma" should be first, before "Romano di Lombardia", "Romagnano Sesia", etc.
+    expect(suggestions[0].text()).toContain('Roma')
+    expect(suggestions[0].text()).not.toContain('Romano')
   })
 
   it('shows comune suggestions when typing a comune name', async () => {
