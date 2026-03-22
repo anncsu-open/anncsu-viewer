@@ -10,12 +10,12 @@ import type { Feature, Point } from 'geojson'
 const store = useAppStore()
 const { searchFilter } = storeToRefs(store)
 
-const parquetSource =
+const pagesBase =
   import.meta.env.MODE === 'production'
     ? appConfig.dataBaseUrl
     : 'http://localhost:5173'
 
-const addressesParquet = `read_parquet('${parquetSource}/data/anncsu-indirizzi.parquet')`
+const addressesParquet = `read_parquet('${pagesBase}/data/anncsu-indirizzi.parquet')`
 
 interface AddressEntry {
   name: string
@@ -68,7 +68,7 @@ function transformQuery(filter?: string, codiceIstat?: string): string {
 
 async function loadComuni() {
   try {
-    const response = await fetch(`${parquetSource}/data/comuni-h3.json`)
+    const response = await fetch(`${pagesBase}/data/comuni-h3.json`)
     const data: { codice_istat: string; nome_comune: string; h3_cells: string[] }[] = await response.json()
     comuniList.value = data.map((d) => ({
       nome: d.nome_comune,
@@ -98,7 +98,7 @@ async function loadH3Tiles(h3Cells: string[]): Promise<ArrayBuffer[]> {
   const buffers: ArrayBuffer[] = []
   for (const cell of h3Cells) {
     try {
-      const url = `${parquetSource}/data/tiles/h3_cell=${cell}/${cell}.parquet`
+      const url = `${pagesBase}/data/tiles/h3_cell=${cell}/${cell}.parquet`
       const response = await fetch(url)
       if (response.ok) {
         buffers.push(await response.arrayBuffer())
