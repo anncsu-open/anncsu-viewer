@@ -16,9 +16,13 @@ import { appConfig } from '@/config'
           Cerca e visualizza sulla mappa gli <span class="font-bold">indirizzi con numero civico</span> del territorio comunale.
         </li>
         <li v-if="appConfig.isNazionale" class="mb-2 ml-5">
-          Seleziona un <span class="font-bold">comune</span> per caricare gli indirizzi disponibili sul territorio.
+          Digita il nome di un <span class="font-bold">comune</span> nella barra di ricerca per selezionarlo e visualizzare gli indirizzi disponibili.
         </li>
-        <li class="mb-2 ml-5">
+        <li v-if="appConfig.isNazionale" class="mb-2 ml-5">
+          In alternativa, scrivi direttamente <span class="font-bold">comune e indirizzo</span> separati da virgola
+          (es. <span class="italic">Roma, Via Appia 1</span>) per una ricerca rapida.
+        </li>
+        <li v-if="!appConfig.isNazionale" class="mb-2 ml-5">
           Usa la <span class="font-bold">barra di ricerca</span> sopra la mappa per cercare un indirizzo
           specifico con autocompletamento.
         </li>

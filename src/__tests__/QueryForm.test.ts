@@ -19,6 +19,16 @@ describe('QueryForm (info panel)', () => {
     expect(wrapper.text()).toContain('barra di ricerca')
   })
 
+  it('shows combined search hint only in nazionale mode', () => {
+    const wrapper = mount(QueryForm)
+    if (appConfig.isNazionale) {
+      expect(wrapper.text()).toContain('comune e indirizzo')
+      expect(wrapper.text()).toContain('separati da virgola')
+    } else {
+      expect(wrapper.text()).not.toContain('separati da virgola')
+    }
+  })
+
   it('mentions clearing search to reset view', () => {
     const wrapper = mount(QueryForm)
     expect(wrapper.text()).toContain('azzerare la ricerca')
@@ -38,12 +48,12 @@ describe('QueryForm (info panel)', () => {
     expect(card.exists()).toBe(true)
   })
 
-  it('shows comune selection hint only in nazionale mode', () => {
+  it('shows comune search hint only in nazionale mode', () => {
     const wrapper = mount(QueryForm)
     if (appConfig.isNazionale) {
-      expect(wrapper.text()).toContain('Seleziona un comune')
+      expect(wrapper.text()).toContain('Digita il nome di un comune')
     } else {
-      expect(wrapper.text()).not.toContain('Seleziona un comune')
+      expect(wrapper.text()).not.toContain('Digita il nome di un comune')
     }
   })
 })
