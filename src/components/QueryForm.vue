@@ -15,6 +15,9 @@ import { appConfig } from '@/config'
         <li class="mb-2 ml-5">
           Cerca e visualizza sulla mappa gli <span class="font-bold">indirizzi con numero civico</span> del territorio comunale.
         </li>
+        <li v-if="appConfig.isNazionale" class="mb-2 ml-5">
+          Seleziona un <span class="font-bold">comune</span> per caricare gli indirizzi disponibili sul territorio.
+        </li>
         <li class="mb-2 ml-5">
           Usa la <span class="font-bold">barra di ricerca</span> sopra la mappa per cercare un indirizzo
           specifico con autocompletamento.

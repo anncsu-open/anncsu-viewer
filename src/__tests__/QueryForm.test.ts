@@ -37,4 +37,13 @@ describe('QueryForm (info panel)', () => {
     const card = wrapper.find('.border-t-4')
     expect(card.exists()).toBe(true)
   })
+
+  it('shows comune selection hint only in nazionale mode', () => {
+    const wrapper = mount(QueryForm)
+    if (appConfig.isNazionale) {
+      expect(wrapper.text()).toContain('Seleziona un comune')
+    } else {
+      expect(wrapper.text()).not.toContain('Seleziona un comune')
+    }
+  })
 })
