@@ -135,7 +135,7 @@ onMounted(async () => {
     closeOnClick: false,
   })
 
-  // Popup per aree (poligoni)
+  // Popup for areas (polygons)
   map.on('mousemove', 'places-area', (e) => {
     map.getCanvas().style.cursor = 'pointer'
     const description = `
@@ -151,7 +151,7 @@ onMounted(async () => {
     popup.remove()
   })
 
-  // Popup per punti
+  // Popup for points
   map.on('mousemove', 'places-points', (e) => {
     map.getCanvas().style.cursor = 'pointer'
     const props = e.features[0].properties
@@ -191,9 +191,9 @@ onMounted(async () => {
     })
   }
 
-  // Zoom sull'indirizzo selezionato con evidenziazione
+  // Zoom to selected address with highlight
   watch(selectedCoordinates, (coords) => {
-    // Rimuovi evidenziazione precedente
+    // Remove previous highlight
     if (map.getLayer('selected-address-point')) {
       map.removeLayer('selected-address-point')
     }
@@ -204,7 +204,7 @@ onMounted(async () => {
     if (coords) {
       map.flyTo({ center: coords, zoom: 18 })
 
-      // Aggiungi punto evidenziato arancione
+      // Add highlighted orange point
       map.addSource('selected-address', {
         type: 'geojson',
         data: {
@@ -232,7 +232,7 @@ onMounted(async () => {
     }
   })
 
-  // Ripristina vista di default
+  // Reset to default view
   watch(resetView, (shouldReset) => {
     if (shouldReset) {
       map.fitBounds(defaultBounds, { padding: 20 })

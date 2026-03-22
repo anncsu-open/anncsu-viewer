@@ -27,7 +27,7 @@ export async function addGeoJsonLayerAndReturnLegend(map: Map, query = '') {
     colorGradient[0] = 0
   }
 
-  // Rimuovi layer esistenti
+  // Remove existing layers
   if (map.getLayer('places-area')) {
     map.removeLayer('places-area')
   }
@@ -38,17 +38,17 @@ export async function addGeoJsonLayerAndReturnLegend(map: Map, query = '') {
     map.removeSource('places-area-sources')
   }
 
-  // Aggiungi source
+  // Add source
   map.addSource('places-area-sources', {
     type: 'geojson',
     data,
   })
 
-  // Determina il tipo di geometria
+  // Determine geometry type
   const firstGeometry = data.features[0]?.geometry?.type
 
   if (firstGeometry === 'Point') {
-    // Layer per punti (luoghi di interesse)
+    // Layer for points (places of interest)
     map.addLayer({
       id: 'places-points',
       type: 'circle',
@@ -61,7 +61,7 @@ export async function addGeoJsonLayerAndReturnLegend(map: Map, query = '') {
       },
     })
   } else {
-    // Layer per poligoni (H3 grid o aree)
+    // Layer for polygons (H3 grid or areas)
     map.addLayer({
       id: 'places-area',
       type: 'fill',

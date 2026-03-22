@@ -4,6 +4,7 @@ import { useAppStore } from '@/store/app.store.ts'
 import { storeToRefs } from 'pinia'
 import { anncsuAddressesQuery } from '@/services/queries.ts'
 import { executeQuery, executeQueryWithBuffers } from '@/services/duckdb.ts'
+import { searchAddresses } from '@/services/search.ts'
 import { appConfig } from '@/config'
 import type { Feature, Point } from 'geojson'
 
@@ -222,13 +223,10 @@ watch(comuneSearch, (newValue) => {
   searchComuni(newValue)
 })
 
-// Filtra gli indirizzi in base alla ricerca
+// Filter addresses with multi-term matching + Jaccard similarity ranking
 watch(searchFilter, (newValue) => {
-  if (newValue.length > 0) {
-    const search = newValue.toUpperCase()
-    filteredAddresses.value = addressList.value
-      .filter((entry) => entry.name.toUpperCase().includes(search))
-      .slice(0, 10)
+  if (newValue.length >= 2) {
+    filteredAddresses.value = searchAddresses(addressList.value, newValue, 10)
     showAutocomplete.value = filteredAddresses.value.length > 0
   } else {
     showAutocomplete.value = false
