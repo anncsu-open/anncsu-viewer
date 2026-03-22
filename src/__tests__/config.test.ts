@@ -46,7 +46,7 @@ describe('appConfig', () => {
     vi.stubEnv('VITE_DATA_BASE_URL', '')
     vi.resetModules()
     const { appConfig } = await import('@/config')
-    expect(appConfig.dataBaseUrl).toBe('https://anncsu-open.github.io/anncsu-viewer')
+    expect(appConfig.dataBaseUrl).toBe('https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev')
     vi.unstubAllEnvs()
   })
 

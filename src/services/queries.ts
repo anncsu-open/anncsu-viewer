@@ -43,13 +43,13 @@ FROM areas
        LEFT JOIN schools ON ST_Contains(area_geom, place_geom)
 GROUP BY area_geom, name`
 
-export const vaconeAddressesQuery = `SELECT
+export const anncsuAddressesQuery = `SELECT
   ST_AsGeoJSON(geometry) as geometry,
   ODONIMO || ' ' || COALESCE(CAST(CIVICO AS VARCHAR), '') || COALESCE(' ' || ESPONENTE, '') as name,
   1 as count
 FROM addresses`
 
-export const vaconePlacesQuery = `SELECT
+export const anncsuPlacesQuery = `SELECT
   ST_AsGeoJSON(geometry) as geometry,
   names.primary as name,
   categories.primary as category,

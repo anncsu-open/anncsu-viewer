@@ -2,7 +2,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { useAppStore } from '@/store/app.store.ts'
 import { storeToRefs } from 'pinia'
-import { vaconeAddressesQuery } from '@/services/queries.ts'
+import { anncsuAddressesQuery } from '@/services/queries.ts'
 import { executeQuery, executeQueryWithBuffers } from '@/services/duckdb.ts'
 import { appConfig } from '@/config'
 import type { Feature, Point } from 'geojson'
@@ -50,20 +50,20 @@ function transformQuery(filter?: string, codiceIstat?: string): string {
       whereClause += ` AND CODICE_ISTAT = '${codiceIstat}'`
     }
 
-    return vaconeAddressesQuery.replace(
+    return anncsuAddressesQuery.replace(
       'FROM addresses',
       `FROM (SELECT * FROM ${addressesParquet} WHERE ${whereClause}) as addresses`,
     )
   }
 
   if (codiceIstat) {
-    return vaconeAddressesQuery.replace(
+    return anncsuAddressesQuery.replace(
       'FROM addresses',
       `FROM (SELECT * FROM ${addressesParquet} WHERE CODICE_ISTAT = '${codiceIstat}') as addresses`,
     )
   }
 
-  return vaconeAddressesQuery.replace('FROM addresses', `FROM ${addressesParquet} as addresses`)
+  return anncsuAddressesQuery.replace('FROM addresses', `FROM ${addressesParquet} as addresses`)
 }
 
 async function loadComuni() {
@@ -130,7 +130,7 @@ async function selectComune(comune: ComuneEntry) {
     const tileNames = comune.h3Cells.map((_, i) => `tile_${i}.parquet`)
     const unionQuery = tileNames.map((name) => `SELECT * FROM read_parquet('${name}')`).join(' UNION ALL ')
 
-    const loadQuery = vaconeAddressesQuery.replace(
+    const loadQuery = anncsuAddressesQuery.replace(
       'FROM addresses',
       `FROM (${unionQuery}) as addresses WHERE CODICE_ISTAT = '${comune.codiceIstat}'`,
     )
@@ -179,7 +179,7 @@ onMounted(async () => {
   store.setQuery(transformQuery())
 
   try {
-    const loadQuery = vaconeAddressesQuery.replace(
+    const loadQuery = anncsuAddressesQuery.replace(
       'FROM addresses',
       `FROM ${addressesParquet} as addresses`,
     )

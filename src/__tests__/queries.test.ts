@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   h3DistributionQuery,
   spatialAggregationQuery,
-  vaconeAddressesQuery,
-  vaconePlacesQuery,
+  anncsuAddressesQuery,
+  anncsuPlacesQuery,
 } from '@/services/queries'
 
 describe('SQL queries', () => {
@@ -20,31 +20,31 @@ describe('SQL queries', () => {
     expect(spatialAggregationQuery).toContain('CAST(count(place_geom) as INT) as count')
   })
 
-  it('vaconeAddressesQuery selects addresses with name', () => {
-    expect(vaconeAddressesQuery).toContain('FROM addresses')
-    expect(vaconeAddressesQuery).toContain('ODONIMO')
-    expect(vaconeAddressesQuery).toContain('CIVICO')
-    expect(vaconeAddressesQuery).toContain('as name')
-    expect(vaconeAddressesQuery).toContain('1 as count')
-    expect(vaconeAddressesQuery).toContain('ST_AsGeoJSON(geometry) as geometry')
+  it('anncsuAddressesQuery selects addresses with name', () => {
+    expect(anncsuAddressesQuery).toContain('FROM addresses')
+    expect(anncsuAddressesQuery).toContain('ODONIMO')
+    expect(anncsuAddressesQuery).toContain('CIVICO')
+    expect(anncsuAddressesQuery).toContain('as name')
+    expect(anncsuAddressesQuery).toContain('1 as count')
+    expect(anncsuAddressesQuery).toContain('ST_AsGeoJSON(geometry) as geometry')
   })
 
-  it('vaconePlacesQuery selects places with name and category', () => {
-    expect(vaconePlacesQuery).toContain('FROM places')
-    expect(vaconePlacesQuery).toContain('names.primary as name')
-    expect(vaconePlacesQuery).toContain('categories.primary as category')
-    expect(vaconePlacesQuery).toContain('1 as count')
+  it('anncsuPlacesQuery selects places with name and category', () => {
+    expect(anncsuPlacesQuery).toContain('FROM places')
+    expect(anncsuPlacesQuery).toContain('names.primary as name')
+    expect(anncsuPlacesQuery).toContain('categories.primary as category')
+    expect(anncsuPlacesQuery).toContain('1 as count')
   })
 
   it('all queries include a geometry column', () => {
-    const queries = [h3DistributionQuery, spatialAggregationQuery, vaconeAddressesQuery, vaconePlacesQuery]
+    const queries = [h3DistributionQuery, spatialAggregationQuery, anncsuAddressesQuery, anncsuPlacesQuery]
     for (const q of queries) {
       expect(q.toLowerCase()).toContain('geometry')
     }
   })
 
   it('all queries include a count column', () => {
-    const queries = [h3DistributionQuery, spatialAggregationQuery, vaconeAddressesQuery, vaconePlacesQuery]
+    const queries = [h3DistributionQuery, spatialAggregationQuery, anncsuAddressesQuery, anncsuPlacesQuery]
     for (const q of queries) {
       expect(q.toLowerCase()).toContain('count')
     }
