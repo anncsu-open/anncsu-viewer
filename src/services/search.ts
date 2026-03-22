@@ -1,3 +1,63 @@
+interface CacheEntry<T> {
+  value: T
+  timestamp: number
+}
+
+/**
+ * LRU cache with TTL expiration.
+ * Keys are normalized (lowercased, trimmed) for consistent lookups.
+ */
+export class SearchCache<T> {
+  private cache = new Map<string, CacheEntry<T>>()
+  private maxSize: number
+  private ttlMs: number
+
+  constructor({ maxSize = 100, ttlMs = 5 * 60 * 1000 }: { maxSize?: number; ttlMs?: number } = {}) {
+    this.maxSize = maxSize
+    this.ttlMs = ttlMs
+  }
+
+  private normalizeKey(key: string): string {
+    return key.toLowerCase().trim()
+  }
+
+  get(key: string): T | undefined {
+    const k = this.normalizeKey(key)
+    const entry = this.cache.get(k)
+    if (!entry) return undefined
+
+    if (Date.now() - entry.timestamp > this.ttlMs) {
+      this.cache.delete(k)
+      return undefined
+    }
+
+    // Refresh position (LRU): delete and re-insert to move to end
+    this.cache.delete(k)
+    this.cache.set(k, entry)
+
+    return entry.value
+  }
+
+  set(key: string, value: T): void {
+    const k = this.normalizeKey(key)
+
+    // Delete first if exists (to refresh position)
+    this.cache.delete(k)
+
+    // Evict oldest if at capacity
+    if (this.cache.size >= this.maxSize) {
+      const oldestKey = this.cache.keys().next().value
+      if (oldestKey) this.cache.delete(oldestKey)
+    }
+
+    this.cache.set(k, { value, timestamp: Date.now() })
+  }
+
+  clear(): void {
+    this.cache.clear()
+  }
+}
+
 interface AddressEntry {
   name: string
   coordinates: [number, number]

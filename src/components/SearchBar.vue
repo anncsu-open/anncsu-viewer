@@ -4,7 +4,7 @@ import { useAppStore } from '@/store/app.store.ts'
 import { storeToRefs } from 'pinia'
 import { anncsuAddressesQuery } from '@/services/queries.ts'
 import { executeQuery, executeQueryWithBuffers } from '@/services/duckdb.ts'
-import { searchAddresses } from '@/services/search.ts'
+import { searchAddresses, SearchCache } from '@/services/search.ts'
 import { appConfig } from '@/config'
 import type { Feature, Point } from 'geojson'
 
@@ -32,6 +32,7 @@ interface ComuneEntry {
 const addressList = ref<AddressEntry[]>([])
 const filteredAddresses = ref<AddressEntry[]>([])
 const showAutocomplete = ref(false)
+const searchCache = new SearchCache<AddressEntry[]>()
 
 // Nazionale mode state
 const comuneSearch = ref('')
@@ -165,6 +166,7 @@ function clearComune() {
   addressList.value = []
   filteredAddresses.value = []
   showComuneAutocomplete.value = false
+  searchCache.clear()
   onClear()
 }
 
@@ -223,10 +225,17 @@ watch(comuneSearch, (newValue) => {
   searchComuni(newValue)
 })
 
-// Filter addresses with multi-term matching + Jaccard similarity ranking
+// Filter addresses with multi-term matching + Jaccard similarity ranking (LRU cached)
 watch(searchFilter, (newValue) => {
   if (newValue.length >= 2) {
-    filteredAddresses.value = searchAddresses(addressList.value, newValue, 10)
+    const cached = searchCache.get(newValue)
+    if (cached) {
+      filteredAddresses.value = cached
+    } else {
+      const results = searchAddresses(addressList.value, newValue, 10)
+      searchCache.set(newValue, results)
+      filteredAddresses.value = results
+    }
     showAutocomplete.value = filteredAddresses.value.length > 0
   } else {
     showAutocomplete.value = false

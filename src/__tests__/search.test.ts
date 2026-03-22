@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { searchAddresses, jaccardSimilarity } from '@/services/search'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { searchAddresses, jaccardSimilarity, SearchCache } from '@/services/search'
 
 const addresses = [
   { name: 'VIA ROMA 1', coordinates: [12.5, 42.0] as [number, number] },
@@ -96,5 +96,76 @@ describe('searchAddresses', () => {
       const firstOtherIndex = results.indexOf(otherResults[0])
       expect(lastRomaIndex).toBeLessThan(firstOtherIndex)
     }
+  })
+})
+
+describe('SearchCache', () => {
+  let cache: SearchCache<string[]>
+
+  beforeEach(() => {
+    cache = new SearchCache({ maxSize: 3, ttlMs: 5 * 60 * 1000 })
+  })
+
+  it('stores and retrieves a cached value', () => {
+    cache.set('key1', ['a', 'b'])
+    expect(cache.get('key1')).toEqual(['a', 'b'])
+  })
+
+  it('returns undefined for missing keys', () => {
+    expect(cache.get('nonexistent')).toBeUndefined()
+  })
+
+  it('evicts oldest entry when maxSize is exceeded', () => {
+    cache.set('key1', ['a'])
+    cache.set('key2', ['b'])
+    cache.set('key3', ['c'])
+    cache.set('key4', ['d']) // should evict key1
+
+    expect(cache.get('key1')).toBeUndefined()
+    expect(cache.get('key2')).toEqual(['b'])
+    expect(cache.get('key4')).toEqual(['d'])
+  })
+
+  it('returns undefined for expired entries', () => {
+    const shortTtlCache = new SearchCache<string[]>({ maxSize: 10, ttlMs: 50 })
+    shortTtlCache.set('key1', ['a'])
+
+    vi.useFakeTimers()
+    vi.advanceTimersByTime(100)
+
+    expect(shortTtlCache.get('key1')).toBeUndefined()
+
+    vi.useRealTimers()
+  })
+
+  it('refreshes position on get (LRU behavior)', () => {
+    cache.set('key1', ['a'])
+    cache.set('key2', ['b'])
+    cache.set('key3', ['c'])
+
+    // Access key1 to make it most recently used
+    cache.get('key1')
+
+    // Add key4 — should evict key2 (oldest unused), not key1
+    cache.set('key4', ['d'])
+
+    expect(cache.get('key1')).toEqual(['a'])
+    expect(cache.get('key2')).toBeUndefined()
+    expect(cache.get('key3')).toEqual(['c'])
+    expect(cache.get('key4')).toEqual(['d'])
+  })
+
+  it('clear removes all entries', () => {
+    cache.set('key1', ['a'])
+    cache.set('key2', ['b'])
+    cache.clear()
+
+    expect(cache.get('key1')).toBeUndefined()
+    expect(cache.get('key2')).toBeUndefined()
+  })
+
+  it('normalizes keys (case insensitive, trimmed)', () => {
+    cache.set('  Via Roma  ', ['a'])
+    expect(cache.get('via roma')).toEqual(['a'])
   })
 })
