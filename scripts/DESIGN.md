@@ -2,17 +2,57 @@
 
 ## Overview
 
-Automated pipeline to download, convert, and version the ANNCSU Italian address dataset as GeoParquet.
+Automated pipeline to download, convert, partition, and host the ANNCSU Italian address dataset (~14M addresses) as GeoParquet, PMTiles, and H3 tiles. Data is served from Cloudflare R2 and consumed entirely in the browser via DuckDB WASM and MapLibre GL.
 
 ## Data Source
 
 - **URL**: `https://anncsu.open.agenziaentrate.gov.it/age-inspire/opendata/anncsu/getds.php?INDIR_ITA`
 - **Format**: ZIP archive containing a single CSV file
 - **CSV naming convention**: `INDIR_ITA_YYYYMMDD.csv` (date embedded in filename)
-- **Size**: ~274 MB (compressed zip - March 2026), ~18 columns per row
+- **Size**: ~274 MB (compressed zip), ~14M rows, ~18 columns per row
 - **Schema**: Defined at `https://www.anncsu.gov.it/.allegati/metadata_indirizzario.json`
 - **Coordinate system**: ETRF2000 (lon/lat in decimal degrees)
 - **Key coordinate fields**: `COORD_X_COMUNE` (longitude), `COORD_Y_COMUNE` (latitude)
+- **Note**: coordinates use comma as decimal separator (Italian locale)
+
+## Architecture
+
+### Deployment modes
+
+The application supports two modes configured via `VITE_APP_MODE`:
+
+| | Nazionale | Comunale |
+|---|---|---|
+| **Map visualization** | PMTiles (vector tiles, range requests) | DuckDB WASM → GeoJSON → MapLibre |
+| **Address search** | H3 tiles loaded on demand per comune | Single GeoParquet loaded entirely |
+| **Search UX** | Unified field: comune + address | Direct address search |
+| **Data size** | ~14M addresses, ~1.5 GB total | Small (single comune) |
+
+### Data hosting — Cloudflare R2
+
+All data files are hosted on a public Cloudflare R2 bucket.
+
+**Why R2** (after trying alternatives):
+- **GitHub Pages**: doesn't serve Git LFS files (returns pointer bytes instead of content)
+- **GitHub Releases**: double-redirect (302→302→200) with signed temporary URLs breaks PMTiles range requests (each request gets a different URL)
+- **raw.githubusercontent.com**: works but has rate limits
+- **Cloudflare R2**: stable URLs, CORS support, range requests, free egress, no rate limits
+
+**Configuration:**
+- Bucket: `anncsu-data`
+- Public URL: `https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev`
+- CORS: allows `https://anncsu-open.github.io` + `http://localhost:5173`, `Range` header required
+- Upload: `rclone` with `--transfers=32` for parallel uploads
+
+### Files on R2
+
+| File | Size | Purpose |
+|---|---|---|
+| `anncsu-indirizzi.parquet` | ~679 MB | Full GeoParquet (comunale mode, pipeline source) |
+| `anncsu-indirizzi.pmtiles` | ~214 MB | PMTiles vector tiles (nazionale map visualization) |
+| `comuni.json` | ~small | ISTAT municipality lookup (codice_istat → nome_comune) |
+| `comuni-h3.json` | ~479 KB | Municipality → H3 cells mapping (nazionale search) |
+| `tiles/h3_cell=<id>/<id>.parquet` | ~500 KB each | ~1400 H3 tile parquets (nazionale search) |
 
 ## Freshness Detection Strategy
 
@@ -44,7 +84,13 @@ The ANNCSU server does not provide a `Last-Modified` header, and `HEAD` requests
 ## Conversion Pipeline
 
 ```
-ZIP (remote) → CSV (extracted) → DuckDB (in-memory) → Parquet → GeoParquet
+ZIP (remote)
+  → CSV (extracted)
+    → DuckDB (in-memory, JOIN with comuni.json)
+      → GeoParquet (bbox + Hilbert sorting)
+        → PMTiles (via gpio-pmtiles)
+        → H3 tiles (via geoparquet-io partition_by_h3)
+          → Cloudflare R2 (via rclone)
 ```
 
 ### Steps
@@ -52,61 +98,136 @@ ZIP (remote) → CSV (extracted) → DuckDB (in-memory) → Parquet → GeoParqu
 1. **Download** full zip archive via HTTP GET
 2. **Extract** CSV to temporary file in `data/`
 3. **Load into DuckDB** with `read_csv`, filtering rows with valid coordinates
-4. **Create point geometries** using `ST_Point(longitude, latitude)` via DuckDB spatial extension
-5. **Export as Parquet** with ZSTD compression
-6. **Enhance with geoparquet-io**: add bbox metadata and Hilbert spatial sorting
-7. **Clean up** temporary CSV
+4. **JOIN with `comuni.json`** to add `NOME_COMUNE` column
+5. **Create point geometries** using `ST_Point(longitude, latitude)` via DuckDB spatial extension
+6. **Export as Parquet** with ZSTD compression
+7. **Enhance with geoparquet-io**: add bbox metadata and Hilbert spatial sorting
+8. **Convert to PMTiles** via `gpio-pmtiles` for map visualization
+9. **Partition into H3 tiles** via `geoparquet-io` `partition_by_h3()` at resolution 5
+10. **Clean up** temporary CSV
 
 ### DuckDB schema
 
 All original columns are preserved, plus:
-- `longitude` (DOUBLE) — cast from `COORD_X_COMUNE`
-- `latitude` (DOUBLE) — cast from `COORD_Y_COMUNE`
+- `NOME_COMUNE` (VARCHAR) — from JOIN with `comuni.json`
+- `longitude` (DOUBLE) — cast from `COORD_X_COMUNE` (comma → dot decimal separator)
+- `latitude` (DOUBLE) — cast from `COORD_Y_COMUNE` (comma → dot decimal separator)
 - `geometry` (GEOMETRY) — point created from lon/lat
 
 Rows without coordinates are excluded (`WHERE COORD_X_COMUNE IS NOT NULL AND COORD_Y_COMUNE IS NOT NULL`).
 
-## Output
+## H3 Tiling Strategy
 
-- **File**: `data/anncsu-indirizzi.parquet`
-- **Format**: GeoParquet with bbox metadata and Hilbert curve spatial sorting
-- **Compression**: ZSTD
+### Purpose
+
+DuckDB WASM in the browser cannot load the full 679 MB parquet file (malloc fails at ~2 GB). H3 tiles partition the data into ~1400 small files (~500 KB each) that can be loaded on demand.
+
+### How it works
+
+1. `geoparquet-io` partitions the GeoParquet by H3 cell at resolution 5 (~250 km² hexagons)
+2. `comuni-h3.json` maps each `CODICE_ISTAT` to its H3 cells
+3. When a user selects a comune, the frontend downloads only the relevant tiles (typically 1-3 tiles)
+4. DuckDB WASM loads the tiles as buffers and queries them with `CODICE_ISTAT` filter
+
+### Frontend flow (nazionale mode)
+
+```
+User types "Vacone" → selects from autocomplete
+  → frontend reads comuni-h3.json → finds H3 cells for Vacone
+    → fetches tile parquets from R2
+      → registers as DuckDB buffers
+        → SQL query with CODICE_ISTAT filter
+          → address list for autocomplete
+```
+
+### Pre-fetch optimization
+
+When the user types a combined query ("Vacone, Via Roma"), the frontend:
+1. Detects the comma separator and recognizes the comune
+2. Starts downloading H3 tiles **in background** while the user types the address
+3. Shows an address preview under the suggestion once tiles are loaded
+4. On click, the address list is ready immediately
+
+## Out-of-Bounds Detection
+
+### Problem
+
+Some ANNCSU addresses have coordinates that fall outside their declared municipality boundaries. For example, an address with `CODICE_ISTAT` of Roccafiorita appearing at coordinates in Frascati (hundreds of km away). See [issue #1](https://github.com/anncsu-open/anncsu-viewer/issues/1).
+
+### Approach — H3-based validation
+
+During ingestion, each address is validated against the H3 cell index of its declared municipality:
+
+1. Compute the H3 cell (resolution 5) for the address coordinates
+2. Look up the expected H3 cells for the address's `CODICE_ISTAT` from `comuni-h3.json`
+3. If the address's H3 cell is **not** in the municipality's cell list → flag as `out_of_bounds`
+
+### Deliberate approximation
+
+H3 cells at resolution 5 cover ~250 km² hexagonal areas. This means:
+
+- **Large inconsistencies are reliably detected** — an address hundreds of km from its municipality will always be in a different H3 cell
+- **Small boundary discrepancies are not flagged** — an address a few hundred meters outside the municipal border may still fall in a shared H3 cell
+- **This is intentional** — the goal is to catch data quality issues that are clearly wrong (misplaced coordinates, swapped municipalities), not to enforce precise administrative boundaries
+
+For precise boundary validation, a future enhancement could use ISTAT municipality polygons with `ST_Contains`. The H3 approach is a lightweight first pass that requires no additional data downloads.
+
+### Output
+
+Flagged addresses get an `out_of_bounds` boolean column in the parquet. The frontend can:
+- Display them with a different color/icon on the map
+- Filter them out of search results
+- Show a warning in the popup
+
+## Output Files
+
+| File | Format | Purpose |
+|---|---|---|
+| `anncsu-indirizzi.parquet` | GeoParquet (ZSTD, bbox, Hilbert sorted) | Full dataset, comunale mode source |
+| `anncsu-indirizzi.pmtiles` | PMTiles (vector tiles) | Nazionale map visualization |
+| `comuni.json` | JSON array | ISTAT municipality lookup |
+| `comuni-h3.json` | JSON array | Municipality → H3 cell mapping |
+| `tiles/h3_cell=<id>/<id>.parquet` | GeoParquet | H3 partitioned tiles for search |
 
 ## Versioning Strategy
 
-The GeoParquet file is committed directly to the git repository in the `data/` directory.
+Data files are hosted on Cloudflare R2 (not in git). Only metadata files (`comuni.json`, `comuni-h3.json`) and the LFS-tracked parquet/PMTiles are in the repository.
 
-### Git commit flow (GitHub Action)
+### GitHub Action flow
 
-1. Run the update script
-2. If the file changed, stage `data/anncsu-indirizzi.parquet`
-3. Commit with message: `data: update ANNCSU dataset (YYYY-MM-DD)` where the date comes from the CSV filename
-4. Push to the repository
-
-### Considerations
-
-- **File size**: The parquet file with ZSTD compression should be significantly smaller than the raw CSV (~274 MB zip). If it exceeds GitHub's 100 MB limit, Git LFS should be configured for `data/*.parquet`.
-- **History growth**: Each update replaces the file, so git history will grow. Periodic shallow clones or LFS mitigate this.
-- **Branch**: Commits go to `main` directly (data-only change, no code impact).
+1. Run `update_data.py`
+2. If data changed, upload all files to R2 via `rclone --transfers=32`
+3. No git commit needed for data (R2 is the source of truth)
 
 ## Script Execution
 
-The script uses PEP 723 inline metadata for self-contained dependencies:
+Scripts use PEP 723 inline metadata for self-contained dependencies, runnable via `uv`:
 
 ```shell
-uv run scripts/update_data.py
+uv run scripts/update_data.py        # Full pipeline: download → convert → partition
+uv run scripts/generate_comuni.py    # Generate ISTAT municipality lookup
+uv run scripts/generate_comuni_h3.py # Map municipalities to H3 cells
 ```
 
-Dependencies are resolved automatically by `uv`:
+Dependencies resolved automatically by `uv`:
 - `duckdb` — CSV loading, spatial extension, parquet export
-- `geoparquet-io` — bbox metadata and spatial sorting
+- `geoparquet-io` — bbox metadata, spatial sorting, H3 partitioning
+- `gpio-pmtiles` — GeoParquet to PMTiles conversion
 - `httpx` — HTTP client with range request support
 
 ## GitHub Action Schedule
 
 ```yaml
 schedule:
-  - cron: '0 6 * * *'  # Every day at 06:00 UTC
+  - cron: '0 6 * * 1'  # Every Monday at 06:00 UTC
 ```
 
-The freshness check only downloads ~64 KB (zip tail) to detect changes. The full download (~274 MB) only happens when the dataset has actually been updated. This makes a daily schedule lightweight and ensures the data is kept as fresh as possible.
+The freshness check downloads only ~64 KB (zip tail) to detect changes. The full download (~274 MB) and conversion only happens when the dataset has been updated. Weekly schedule balances freshness with resource usage.
+
+### Required secrets
+
+| Secret | Purpose |
+|---|---|
+| `R2_ACCESS_KEY_ID` | Cloudflare R2 API access |
+| `R2_SECRET_ACCESS_KEY` | Cloudflare R2 API secret |
+| `CLOUDFLARE_ACCOUNT_ID` | R2 endpoint URL |
