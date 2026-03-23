@@ -46,4 +46,10 @@ jobs:
           RCLONE_CONFIG_R2_ENDPOINT: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
           RCLONE_CONFIG_R2_ACL: private
         run: |
-          rclone copy data/ r2:anncsu-data/ --transfers=32 --checkers=32 -P
+          # Upload single files (overwrite if changed)
+          rclone copy data/anncsu-indirizzi.parquet r2:anncsu-data/ -P
+          rclone copy data/anncsu-indirizzi.pmtiles r2:anncsu-data/ -P
+          rclone copy data/comuni.json r2:anncsu-data/ -P
+          rclone copy data/comuni-h3.json r2:anncsu-data/ -P
+          # Sync tiles directory (removes orphaned H3 cells)
+          rclone sync data/tiles/ r2:anncsu-data/tiles/ --transfers=32 --checkers=32 -P

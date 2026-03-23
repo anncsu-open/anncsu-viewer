@@ -5,12 +5,14 @@
 #     "gpio-pmtiles",
 #     "duckdb>=1.2.0",
 #     "httpx",
+#     "typer",
 # ]
 # ///
 """Download ANNCSU Italian address dataset and convert to GeoParquet.
 
 Usage:
     uv run scripts/update_data.py
+    uv run scripts/update_data.py --force   # skip freshness check
 
 The script downloads the full Italian address CSV from the ANNCSU open data
 portal, loads it into DuckDB, creates point geometries from coordinates,
@@ -30,6 +32,7 @@ from pathlib import Path
 
 import duckdb
 import httpx
+import typer
 
 ANNCSU_URL = (
     "https://anncsu.open.agenziaentrate.gov.it"
@@ -40,6 +43,9 @@ OUTPUT_FILE = OUTPUT_DIR / "anncsu-indirizzi.parquet"
 PMTILES_FILE = OUTPUT_DIR / "anncsu-indirizzi.pmtiles"
 TILES_DIR = OUTPUT_DIR / "tiles"
 COMUNI_FILE = OUTPUT_DIR / "comuni.json"
+COMUNI_H3_FILE = OUTPUT_DIR / "comuni-h3.json"
+BOUNDARIES_FILE = OUTPUT_DIR / "istat-boundaries.parquet"
+H3_RESOLUTION = 5
 H3_RESOLUTION = 5
 TAIL_SIZE = 65536
 
@@ -135,6 +141,7 @@ def csv_to_parquet(csv_path: Path) -> Path:
     print("Loading CSV into DuckDB ...")
     con = duckdb.connect()
     con.execute("INSTALL spatial; LOAD spatial;")
+    con.execute("INSTALL h3 FROM community; LOAD h3;")
 
     # Load comuni lookup table from JSON array
     con.execute(f"""
@@ -186,6 +193,39 @@ def csv_to_parquet(csv_path: Path) -> Path:
     row_count = con.execute("SELECT COUNT(*) FROM addresses").fetchone()[0]
     print(f"Loaded {row_count:,} addresses with coordinates")
 
+    # Flag out-of-bounds addresses using ISTAT municipal boundaries
+    if BOUNDARIES_FILE.exists():
+        print("Flagging out-of-bounds addresses using ISTAT boundaries ...")
+        con.execute(f"""
+            CREATE TABLE boundaries AS
+            SELECT codice_istat, geometry
+            FROM read_parquet('{BOUNDARIES_FILE}')
+        """)
+
+        con.execute("""
+            CREATE TABLE addresses_validated AS
+            SELECT
+                a.*,
+                CASE
+                    WHEN b.geometry IS NULL THEN NULL
+                    WHEN ST_Contains(b.geometry, a.geometry) THEN false
+                    ELSE true
+                END AS out_of_bounds
+            FROM addresses a
+            LEFT JOIN boundaries b ON a.CODICE_ISTAT = b.codice_istat
+        """)
+
+        con.execute("DROP TABLE addresses")
+        con.execute("ALTER TABLE addresses_validated RENAME TO addresses")
+
+        oob_count = con.execute(
+            "SELECT COUNT(*) FROM addresses WHERE out_of_bounds = true"
+        ).fetchone()[0]
+        total = con.execute("SELECT COUNT(*) FROM addresses").fetchone()[0]
+        print(f"Flagged {oob_count:,} out-of-bounds addresses out of {total:,}")
+    else:
+        print(f"Warning: {BOUNDARIES_FILE} not found, skipping out-of-bounds detection")
+
     print(f"Writing Parquet to {OUTPUT_FILE} ...")
     con.execute(f"""
         COPY addresses TO '{OUTPUT_FILE}'
@@ -227,11 +267,13 @@ def convert_to_pmtiles(parquet_path: Path) -> Path:
     from gpio_pmtiles import create_pmtiles_from_geoparquet
 
     print(f"Converting to PMTiles: {PMTILES_FILE} ...")
+    if PMTILES_FILE.exists():
+        PMTILES_FILE.unlink()
     create_pmtiles_from_geoparquet(
         str(parquet_path),
         str(PMTILES_FILE),
         layer="addresses",
-        include_cols="ODONIMO,CIVICO,ESPONENTE,CODICE_ISTAT,NOME_COMUNE",
+        include_cols="ODONIMO,CIVICO,ESPONENTE,CODICE_ISTAT,NOME_COMUNE,out_of_bounds",
         verbose=True,
     )
     size_mb = PMTILES_FILE.stat().st_size / (1024 * 1024)
@@ -239,10 +281,12 @@ def convert_to_pmtiles(parquet_path: Path) -> Path:
     return PMTILES_FILE
 
 
-def main() -> None:
+def main(
+    force: bool = typer.Option(False, "--force", help="Skip freshness check and force re-download"),
+) -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    if not is_update_needed():
+    if not force and not is_update_needed():
         return
 
     csv_path = download_and_extract()
@@ -265,4 +309,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    typer.run(main)

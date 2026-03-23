@@ -122,7 +122,12 @@ onMounted(async () => {
         'source-layer': 'addresses',
         paint: {
           'circle-radius': ['interpolate', ['linear'], ['zoom'], 6, 2, 12, 5, 18, 10],
-          'circle-color': '#4c9b82',
+          'circle-color': [
+            'case',
+            ['==', ['get', 'out_of_bounds'], true],
+            '#E63946',
+            '#4c9b82',
+          ],
           'circle-stroke-width': 1,
           'circle-stroke-color': '#ffffff',
         },
@@ -163,6 +168,7 @@ onMounted(async () => {
           <div class="font-bold">${address}</div>
           ${props.NOME_COMUNE ? `<div class="text-gray-600">${props.NOME_COMUNE}</div>` : ''}
           ${props.category ? `<div class="text-gray-600">${props.category}</div>` : ''}
+          ${props.out_of_bounds ? `<div class="mt-1 text-xs font-semibold text-red-600">⚠ Coordinate fuori dal territorio comunale</div>` : ''}
       </div>
     `
     popup.setLngLat(e.lngLat).setHTML(description).addTo(map)
