@@ -463,7 +463,7 @@ function onClear() {
 </script>
 
 <template>
-  <div class="absolute left-1/2 top-4 z-20 w-[28rem] -translate-x-1/2 transform">
+  <div class="absolute left-1/2 top-4 z-20 w-[calc(100%-2rem)] max-w-[28rem] -translate-x-1/2 transform">
     <div class="relative flex flex-col gap-1 rounded bg-white p-4 shadow-lg ring-1 ring-gray-200">
       <!-- Nazionale mode: unified search -->
       <template v-if="appConfig.isNazionale">
