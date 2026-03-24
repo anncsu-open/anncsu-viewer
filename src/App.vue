@@ -16,16 +16,18 @@ const { legend, sidebarOpen } = storeToRefs(store)
     <header>
       <Header />
     </header>
-    <div class="flex grow flex-col md:flex-row">
-      <aside v-if="sidebarOpen" class="md:w-120">
-        <QueryForm></QueryForm>
-      </aside>
-      <main class="relative grow">
-        <SearchBar />
+    <div class="relative flex grow flex-col md:flex-row">
+      <!-- Sidebar overlay (mobile) / inline (desktop) -->
+      <aside
+        v-if="sidebarOpen"
+        class="fixed inset-0 top-16 z-30 overflow-y-auto bg-white md:relative md:inset-auto md:z-auto md:w-120"
+      >
+        <!-- Close button inside panel -->
         <button
+          data-testid="close-panel"
           @click="store.toggleSidebar()"
-          class="absolute left-4 top-4 z-20 rounded bg-white px-3 py-2 shadow-lg hover:bg-gray-100"
-          :title="sidebarOpen ? 'Chiudi pannello' : 'Apri pannello'"
+          class="absolute right-4 top-4 z-10 rounded-full bg-white p-2 shadow-md transition-colors hover:bg-gray-100 md:hidden"
+          title="Close panel"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -33,22 +35,23 @@ const { legend, sidebarOpen } = storeToRefs(store)
             viewBox="0 0 24 24"
             stroke-width="1.5"
             stroke="currentColor"
-            class="h-6 w-6"
+            class="h-5 w-5"
           >
-            <path
-              v-if="sidebarOpen"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M6 18L18 6M6 6l12 12"
-            />
-            <path
-              v-else
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
-            />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
+        <QueryForm></QueryForm>
+      </aside>
+
+      <!-- Backdrop overlay on mobile -->
+      <div
+        v-if="sidebarOpen"
+        class="fixed inset-0 top-16 z-20 bg-black/30 md:hidden"
+        @click="store.toggleSidebar()"
+      ></div>
+
+      <main class="relative grow">
+        <SearchBar />
         <Map></Map>
       </main>
     </div>

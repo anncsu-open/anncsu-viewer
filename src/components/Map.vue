@@ -105,7 +105,7 @@ onMounted(async () => {
     fitBoundsOptions: { padding: 20 },
     bearing: 0,
   })
-  map.addControl(new maplibregl.NavigationControl())
+  map.addControl(new maplibregl.NavigationControl(), 'bottom-right')
 
   // In nazionale mode, add PMTiles vector source for map visualization
   if (appConfig.isNazionale) {

@@ -6,7 +6,9 @@ export const useAppStore = defineStore('app', () => {
   const queryLoading: Ref<boolean> = ref(false)
   const queryError: Ref<boolean> = ref(false)
   const legend: Ref<(string | number)[]> = ref([])
-  const sidebarOpen: Ref<boolean> = ref(true)
+  const sidebarOpen: Ref<boolean> = ref(
+    typeof window !== 'undefined' ? window.innerWidth >= 768 : true,
+  )
   const searchFilter: Ref<string> = ref('')
   const querySubmitted: Ref<boolean> = ref(false)
   const selectedCoordinates: Ref<[number, number] | null> = ref(null)

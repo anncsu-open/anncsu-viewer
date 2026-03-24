@@ -109,30 +109,104 @@ describe('Responsive layout', () => {
   })
 
   describe('App layout', () => {
-    it('sidebar has responsive width', async () => {
+    it('sidebar is an overlay on mobile (fixed/absolute positioning)', async () => {
       const wrapper = mount(App, { global: { plugins: [createPinia()] } })
       await flushPromises()
 
       const aside = wrapper.find('aside')
       if (aside.exists()) {
         const classes = aside.classes()
-        // Should have mobile-first width (full or auto) and md: breakpoint
-        const hasResponsiveWidth = classes.some((c) => c.startsWith('md:'))
-        expect(hasResponsiveWidth).toBe(true)
+        // On mobile: overlay (fixed or absolute), on desktop: inline (md:relative or md:static)
+        const hasOverlayPosition = classes.some(
+          (c) => c === 'fixed' || c === 'absolute',
+        )
+        expect(hasOverlayPosition).toBe(true)
       }
     })
 
-    it('sidebar toggle button does not overlap search bar on mobile', async () => {
+    it('sidebar has a close button inside it', async () => {
       const wrapper = mount(App, { global: { plugins: [createPinia()] } })
       await flushPromises()
 
-      // Toggle button should be at bottom or have different positioning on mobile
-      const toggleBtn = wrapper.find('button[title]')
-      expect(toggleBtn.exists()).toBe(true)
+      const aside = wrapper.find('aside')
+      if (aside.exists()) {
+        const closeBtn = aside.find('[data-testid="close-panel"]')
+        expect(closeBtn.exists()).toBe(true)
+      }
+    })
 
-      // SearchBar should be centered, toggle should not collide
-      const searchBar = wrapper.findComponent(SearchBar)
-      expect(searchBar.exists()).toBe(true)
+    it('sidebar is closed by default on mobile (window.innerWidth < 768)', async () => {
+      // Simulate mobile viewport
+      const original = window.innerWidth
+      Object.defineProperty(window, 'innerWidth', { value: 375, writable: true, configurable: true })
+
+      vi.resetModules()
+      const { createPinia: createPinia2, setActivePinia: setActivePinia2 } = await import('pinia')
+      const pinia = createPinia2()
+      setActivePinia2(pinia)
+      const { useAppStore } = await import('@/store/app.store')
+      const store = useAppStore()
+
+      expect(store.sidebarOpen).toBe(false)
+
+      // Restore
+      Object.defineProperty(window, 'innerWidth', { value: original, writable: true, configurable: true })
+    })
+
+    it('burger button is in the header', async () => {
+      const wrapper = mount(App, { global: { plugins: [createPinia()] } })
+      await flushPromises()
+
+      const header = wrapper.find('header')
+      const burgerBtn = header.find('[data-testid="open-panel"]')
+      expect(burgerBtn.exists()).toBe(true)
+    })
+
+    it('clicking close button inside panel closes it', async () => {
+      const wrapper = mount(App, { global: { plugins: [createPinia()] } })
+      await flushPromises()
+
+      const store = (await import('@/store/app.store')).useAppStore()
+      store.sidebarOpen = true
+      await flushPromises()
+
+      const aside = wrapper.find('aside')
+      const closeBtn = aside.find('[data-testid="close-panel"]')
+      await closeBtn.trigger('click')
+      await flushPromises()
+
+      expect(store.sidebarOpen).toBe(false)
+    })
+
+    it('sidebar has scrollable content with overflow', async () => {
+      const wrapper = mount(App, { global: { plugins: [createPinia()] } })
+      await flushPromises()
+
+      const store = (await import('@/store/app.store')).useAppStore()
+      store.sidebarOpen = true
+      await flushPromises()
+
+      const aside = wrapper.find('aside')
+      if (aside.exists()) {
+        const classes = aside.classes()
+        const hasOverflow = classes.some(
+          (c) => c === 'overflow-y-auto' || c === 'overflow-auto',
+        )
+        expect(hasOverflow).toBe(true)
+      }
+    })
+  })
+
+  describe('Header', () => {
+    it('title text scales down on small screens', async () => {
+      const { default: Header } = await import('@/components/Header.vue')
+      const wrapper = mount(Header, { global: { plugins: [createPinia()] } })
+
+      const title = wrapper.find('span')
+      const classes = title.classes()
+      // Should have responsive text size (text-lg on mobile, text-2xl on md+)
+      const hasResponsiveText = classes.some((c) => c.startsWith('md:text-') || c.startsWith('lg:text-'))
+      expect(hasResponsiveText).toBe(true)
     })
   })
 })
