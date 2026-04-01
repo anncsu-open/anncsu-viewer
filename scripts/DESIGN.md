@@ -169,6 +169,22 @@ ISTAT publishes non-generalized administrative boundary shapefiles annually:
 - **Format**: Shapefile (EPSG:32632 UTM32N), converted to GeoParquet (WGS84) by `generate_boundaries.py`
 - **Coverage**: ~7,900 municipalities with precise polygon boundaries
 
+### Boundary topology fix
+
+The raw ISTAT boundaries have two topological defects ([issue #2](https://github.com/anncsu-open/anncsu-viewer/issues/2)):
+
+1. **5 invalid polygons** (Acquaviva delle Fonti, Rutigliano, Sannicandro di Bari, Santa Ninfa, Bronte)
+2. **6 genuine gaps** between adjacent municipalities (up to ~110m), where no other municipality covers the space between them
+
+`generate_boundaries.py` applies two post-processing steps after CRS transformation:
+
+1. **`shapely.make_valid()`** on all invalid polygons
+2. **`shapely.snap()`** on each gap pair with `tolerance = gap * 1.5`, then `make_valid()` again
+
+One marine gap (Arzachena–La Maddalena, 154m) is excluded as it represents sea between islands.
+
+The diagnostic query in `scripts/find_gaps.sql` can be used to verify gap closure.
+
 ### Previous approach considered
 
 An H3-based approach was initially considered (checking if the address's H3 cell at resolution 5 was in the expected cell list for the municipality). However, this failed because `comuni-h3.json` is derived from the same potentially-incorrect address data, so misplaced addresses pollute the cell list. ISTAT boundaries are an independent authoritative source.

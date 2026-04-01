@@ -129,3 +129,53 @@ class TestBoundariesParquet:
             WHERE codice_istat = '083071'
         """).fetchone()
         assert result[0] is False, "Frascati coordinates should NOT be inside Roccafiorita"
+
+    def test_all_polygons_are_valid(self, db):
+        """All boundary polygons must be geometrically valid."""
+        invalid = db.execute(f"""
+            SELECT codice_istat, nome_comune
+            FROM read_parquet('{BOUNDARIES_FILE}')
+            WHERE NOT ST_IsValid(geometry)
+        """).fetchall()
+        assert invalid == [], f"Invalid polygons found: {invalid}"
+
+    def test_no_genuine_gaps_between_adjacent_municipalities(self, db):
+        """Adjacent municipalities must not have topological gaps between them.
+
+        A genuine gap is a pair of municipalities that are close (within 0.002 deg)
+        but don't touch/intersect, AND no other municipality covers the midpoint
+        of the gap. The only expected exception is Arzachena-La Maddalena (islands).
+        """
+        gaps = db.execute(f"""
+            WITH bounds AS (
+                SELECT codice_istat, nome_comune, geometry
+                FROM read_parquet('{BOUNDARIES_FILE}')
+            ),
+            candidates AS (
+                SELECT
+                    a.codice_istat AS istat_a, a.nome_comune AS name_a,
+                    b.codice_istat AS istat_b, b.nome_comune AS name_b,
+                    ROUND(ST_Distance(a.geometry, b.geometry)::DOUBLE * 111000, 2) AS gap_m,
+                    ST_Centroid(ST_ShortestLine(a.geometry, b.geometry)) AS midpoint
+                FROM bounds a, bounds b
+                WHERE a.codice_istat < b.codice_istat
+                  AND ST_DWithin(a.geometry, b.geometry, 0.002)
+                  AND ST_Distance(a.geometry, b.geometry) > 0.000001
+                  AND NOT ST_Touches(a.geometry, b.geometry)
+                  AND NOT ST_Overlaps(a.geometry, b.geometry)
+                  AND NOT ST_Intersects(a.geometry, b.geometry)
+            )
+            SELECT c.istat_a, c.name_a, c.istat_b, c.name_b, c.gap_m
+            FROM candidates c
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM bounds o
+                WHERE o.codice_istat != c.istat_a
+                  AND o.codice_istat != c.istat_b
+                  AND ST_Contains(o.geometry, c.midpoint)
+            )
+            -- Exclude marine gap: Arzachena-La Maddalena (islands)
+            AND NOT (c.istat_a = '090006' AND c.istat_b = '090035')
+            ORDER BY c.gap_m DESC
+        """).fetchall()
+        assert gaps == [], f"Genuine topological gaps found: {gaps}"
