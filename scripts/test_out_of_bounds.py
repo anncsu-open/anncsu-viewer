@@ -35,16 +35,29 @@ def db():
     return con
 
 
+OOB_THRESHOLD_M = 110
+
+
 def flag_out_of_bounds(con) -> None:
-    """Add out_of_bounds column to addresses using ST_Contains with boundaries."""
-    con.execute("""
+    """Add oob_distance_m and out_of_bounds columns using ST_Contains with boundaries.
+
+    - oob_distance_m: distance in meters from the boundary (NULL if inside)
+    - out_of_bounds: true only if oob_distance_m > OOB_THRESHOLD_M
+    """
+    con.execute(f"""
         CREATE TABLE addresses_validated AS
         SELECT
             a.*,
             CASE
                 WHEN b.geometry IS NULL THEN NULL
+                WHEN ST_Contains(b.geometry, a.geometry) THEN NULL
+                ELSE ROUND(ST_Distance(b.geometry, a.geometry)::DOUBLE * 111000, 2)
+            END AS oob_distance_m,
+            CASE
+                WHEN b.geometry IS NULL THEN NULL
                 WHEN ST_Contains(b.geometry, a.geometry) THEN false
-                ELSE true
+                WHEN ST_Distance(b.geometry, a.geometry)::DOUBLE * 111000 > {OOB_THRESHOLD_M} THEN true
+                ELSE false
             END AS out_of_bounds
         FROM addresses a
         LEFT JOIN boundaries b ON a.CODICE_ISTAT = b.codice_istat
@@ -126,8 +139,59 @@ class TestOutOfBoundsDetection:
         # VIA TEST 1 — Unknown comune → NULL
         assert results[3] == ("VIA TEST", 1, None)
 
-    def test_out_of_bounds_column_exists(self, db):
-        """The out_of_bounds column should be present."""
+    def test_address_just_outside_boundary_is_not_flagged(self, db):
+        """An address just outside its boundary (< 110m) should not be flagged.
+
+        Comune A box edge is at lon=12.05. Point at 12.0505 is ~55m outside.
+        """
+        db.execute("""
+            CREATE TABLE addresses AS
+            SELECT '001001' AS CODICE_ISTAT, 'Comune A' AS NOME_COMUNE,
+                   'VIA CONFINE' AS ODONIMO, 1 AS CIVICO,
+                   12.0505 AS longitude, 42.0 AS latitude,
+                   ST_Point(12.0505, 42.0) AS geometry
+        """)
+
+        flag_out_of_bounds(db)
+        result = db.execute(
+            "SELECT out_of_bounds, oob_distance_m FROM addresses"
+        ).fetchone()
+        assert result[0] is False, "Address within 110m of boundary should not be flagged"
+        assert result[1] is not None, "oob_distance_m should be populated"
+        assert result[1] > 0, "oob_distance_m should be positive"
+        assert result[1] < 110, f"oob_distance_m should be < 110m, got {result[1]}"
+
+    def test_oob_distance_is_null_for_inside_address(self, db):
+        """An address inside its boundary should have NULL oob_distance_m."""
+        db.execute("""
+            CREATE TABLE addresses AS
+            SELECT '001001' AS CODICE_ISTAT, 'Comune A' AS NOME_COMUNE,
+                   'VIA ROMA' AS ODONIMO, 1 AS CIVICO,
+                   12.0 AS longitude, 42.0 AS latitude,
+                   ST_Point(12.0, 42.0) AS geometry
+        """)
+
+        flag_out_of_bounds(db)
+        result = db.execute("SELECT oob_distance_m FROM addresses").fetchone()
+        assert result[0] is None
+
+    def test_oob_distance_populated_for_outside_address(self, db):
+        """An address outside its boundary should have a positive oob_distance_m."""
+        db.execute("""
+            CREATE TABLE addresses AS
+            SELECT '002002' AS CODICE_ISTAT, 'Comune B' AS NOME_COMUNE,
+                   'VIA FONTANA' AS ODONIMO, 7 AS CIVICO,
+                   12.0 AS longitude, 42.0 AS latitude,
+                   ST_Point(12.0, 42.0) AS geometry
+        """)
+
+        flag_out_of_bounds(db)
+        result = db.execute("SELECT oob_distance_m FROM addresses").fetchone()
+        assert result[0] is not None
+        assert result[0] > 0
+
+    def test_out_of_bounds_and_oob_distance_columns_exist(self, db):
+        """Both out_of_bounds and oob_distance_m columns should be present."""
         db.execute("""
             CREATE TABLE addresses AS
             SELECT '001001' AS CODICE_ISTAT, 'Comune A' AS NOME_COMUNE,
@@ -144,6 +208,7 @@ class TestOutOfBoundsDetection:
             ).fetchall()
         ]
         assert "out_of_bounds" in columns
+        assert "oob_distance_m" in columns
 
     def test_preserves_all_original_columns(self, db):
         """The validation should preserve all original columns."""

@@ -202,14 +202,24 @@ def csv_to_parquet(csv_path: Path) -> Path:
             FROM read_parquet('{BOUNDARIES_FILE}')
         """)
 
-        con.execute("""
+        # Threshold in meters: addresses outside their boundary but within
+        # this distance are not flagged as out-of-bounds (geocoding tolerance).
+        oob_threshold_m = 110
+
+        con.execute(f"""
             CREATE TABLE addresses_validated AS
             SELECT
                 a.*,
                 CASE
                     WHEN b.geometry IS NULL THEN NULL
+                    WHEN ST_Contains(b.geometry, a.geometry) THEN NULL
+                    ELSE ROUND(ST_Distance(b.geometry, a.geometry)::DOUBLE * 111000, 2)
+                END AS oob_distance_m,
+                CASE
+                    WHEN b.geometry IS NULL THEN NULL
                     WHEN ST_Contains(b.geometry, a.geometry) THEN false
-                    ELSE true
+                    WHEN ST_Distance(b.geometry, a.geometry)::DOUBLE * 111000 > {oob_threshold_m} THEN true
+                    ELSE false
                 END AS out_of_bounds
             FROM addresses a
             LEFT JOIN boundaries b ON a.CODICE_ISTAT = b.codice_istat
@@ -273,7 +283,7 @@ def convert_to_pmtiles(parquet_path: Path) -> Path:
         str(parquet_path),
         str(PMTILES_FILE),
         layer="addresses",
-        include_cols="ODONIMO,CIVICO,ESPONENTE,CODICE_ISTAT,NOME_COMUNE,out_of_bounds",
+        include_cols="ODONIMO,CIVICO,ESPONENTE,CODICE_ISTAT,NOME_COMUNE,oob_distance_m,out_of_bounds",
         verbose=True,
     )
     size_mb = PMTILES_FILE.stat().st_size / (1024 * 1024)
