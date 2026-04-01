@@ -125,19 +125,18 @@ describe('Map (nazionale mode)', () => {
     expect(colorStr).toContain('#4c9b82') // green for valid
   })
 
-  it('shows out-of-bounds warning in popup', async () => {
+  it('shows out-of-bounds warning with distance in popup', async () => {
     const MapComponent = (await import('@/components/Map.vue')).default
     mount(MapComponent, { global: { plugins: [createPinia()] } })
     await flushPromises()
 
-    // Get the mousemove handler for places-points
     const loadHandler = mockMapInstance._onHandlers['load']
     loadHandler()
 
     const mousemoveHandler = mockMapInstance._onHandlers['mousemove:places-points']
     expect(mousemoveHandler).toBeDefined()
 
-    // Simulate hovering over an out-of-bounds point
+    // Simulate hovering over an out-of-bounds point with distance
     const mockEvent = {
       features: [{
         properties: {
@@ -146,6 +145,7 @@ describe('Map (nazionale mode)', () => {
           ESPONENTE: null,
           NOME_COMUNE: 'Roccafiorita',
           out_of_bounds: true,
+          oob_distance_m: 5978.0,
         },
       }],
       lngLat: { lng: 12.681, lat: 41.806 },
@@ -153,12 +153,79 @@ describe('Map (nazionale mode)', () => {
 
     mousemoveHandler(mockEvent)
 
-    // Check that popup HTML contains a warning
     const popupInstance = vi.mocked(
       (await import('maplibre-gl')).default.Popup
     ).mock.results[0].value
     const setHTMLCall = popupInstance.setHTML.mock.calls[0][0]
     expect(setHTMLCall).toContain('VIA FONTANA')
-    expect(setHTMLCall).toContain('fuori dal territorio comunale')
+    expect(setHTMLCall).toContain('Fuori confine comunale')
+    expect(setHTMLCall).toContain('5978m')
+  })
+
+  it('shows out-of-bounds warning without distance when oob_distance_m is missing', async () => {
+    const MapComponent = (await import('@/components/Map.vue')).default
+    mount(MapComponent, { global: { plugins: [createPinia()] } })
+    await flushPromises()
+
+    const loadHandler = mockMapInstance._onHandlers['load']
+    loadHandler()
+
+    const mousemoveHandler = mockMapInstance._onHandlers['mousemove:places-points']
+
+    const mockEvent = {
+      features: [{
+        properties: {
+          ODONIMO: 'VIA TEST',
+          CIVICO: '1',
+          ESPONENTE: null,
+          NOME_COMUNE: 'Test',
+          out_of_bounds: true,
+        },
+      }],
+      lngLat: { lng: 12.0, lat: 42.0 },
+    }
+
+    mousemoveHandler(mockEvent)
+
+    const popupInstance = vi.mocked(
+      (await import('maplibre-gl')).default.Popup
+    ).mock.results[0].value
+    const setHTMLCall = popupInstance.setHTML.mock.calls[0][0]
+    expect(setHTMLCall).toContain('Fuori confine comunale')
+    expect(setHTMLCall).not.toContain('NaN')
+  })
+
+  it('does not show out-of-bounds warning for valid addresses', async () => {
+    const MapComponent = (await import('@/components/Map.vue')).default
+    mount(MapComponent, { global: { plugins: [createPinia()] } })
+    await flushPromises()
+
+    const loadHandler = mockMapInstance._onHandlers['load']
+    loadHandler()
+
+    const mousemoveHandler = mockMapInstance._onHandlers['mousemove:places-points']
+
+    const mockEvent = {
+      features: [{
+        properties: {
+          ODONIMO: 'VIA ROMA',
+          CIVICO: '1',
+          ESPONENTE: null,
+          NOME_COMUNE: 'Roma',
+          out_of_bounds: false,
+          oob_distance_m: null,
+        },
+      }],
+      lngLat: { lng: 12.49, lat: 41.89 },
+    }
+
+    mousemoveHandler(mockEvent)
+
+    const popupInstance = vi.mocked(
+      (await import('maplibre-gl')).default.Popup
+    ).mock.results[0].value
+    const setHTMLCall = popupInstance.setHTML.mock.calls[0][0]
+    expect(setHTMLCall).toContain('VIA ROMA')
+    expect(setHTMLCall).not.toContain('Fuori confine comunale')
   })
 })

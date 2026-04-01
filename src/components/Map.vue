@@ -168,7 +168,7 @@ onMounted(async () => {
           <div class="font-bold">${address}</div>
           ${props.NOME_COMUNE ? `<div class="text-gray-600">${props.NOME_COMUNE}</div>` : ''}
           ${props.category ? `<div class="text-gray-600">${props.category}</div>` : ''}
-          ${props.out_of_bounds ? `<div class="mt-1 text-xs font-semibold text-red-600">⚠ Fuori confine comunale (~${Math.round(props.oob_distance_m)}m)</div>` : ''}
+          ${props.out_of_bounds ? `<div class="mt-1 text-xs font-semibold text-red-600">⚠ Fuori confine comunale${props.oob_distance_m ? ` (~${Math.round(Number(props.oob_distance_m))}m)` : ''}</div>` : ''}
       </div>
     `
     popup.setLngLat(e.lngLat).setHTML(description).addTo(map)
