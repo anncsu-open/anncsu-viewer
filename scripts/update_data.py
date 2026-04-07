@@ -154,17 +154,32 @@ def download_and_extract() -> Path:
     print(f"Downloading from {ANNCSU_URL} ...")
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            response = httpx.get(ANNCSU_URL, follow_redirects=True, timeout=DOWNLOAD_TIMEOUT)
-            response.raise_for_status()
+            data = io.BytesIO()
+            with httpx.stream(
+                "GET", ANNCSU_URL, follow_redirects=True, timeout=DOWNLOAD_TIMEOUT
+            ) as resp:
+                resp.raise_for_status()
+                total = int(resp.headers.get("content-length", 0))
+                downloaded = 0
+                for chunk in resp.iter_bytes(chunk_size=1024 * 1024):
+                    data.write(chunk)
+                    downloaded += len(chunk)
+                    mb = downloaded / (1024 * 1024)
+                    if total:
+                        pct = downloaded * 100 / total
+                        print(f"  {mb:.0f} MB / {total / (1024 * 1024):.0f} MB ({pct:.0f}%)")
+                    else:
+                        print(f"  {mb:.0f} MB downloaded ...")
             break
         except (httpx.HTTPStatusError, httpx.TransportError) as exc:
             if attempt == MAX_RETRIES:
                 raise SystemExit(f"Download failed after {MAX_RETRIES} attempts: {exc}") from exc
             print(f"Attempt {attempt}/{MAX_RETRIES} failed ({exc}), retrying in {RETRY_WAIT}s ...")
             time.sleep(RETRY_WAIT)
-    print(f"Downloaded {len(response.content) / (1024 * 1024):.1f} MB")
+    print(f"Downloaded {downloaded / (1024 * 1024):.1f} MB")
 
-    with zipfile.ZipFile(io.BytesIO(response.content)) as zf:
+    data.seek(0)
+    with zipfile.ZipFile(data) as zf:
         csv_names = [n for n in zf.namelist() if n.lower().endswith(".csv")]
         if not csv_names:
             raise RuntimeError(f"No CSV found in zip. Contents: {zf.namelist()}")
