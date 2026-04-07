@@ -28,45 +28,49 @@ from update_data import (
 
 
 class TestCheckServerAvailable:
-    """Tests for _check_server_available() early-exit on server errors."""
+    """Tests for _check_server_available() early-exit on server errors.
+
+    Uses GET with Range: bytes=0-0 (not HEAD) because the Akamai CDN
+    in front of the ANNCSU portal blocks HEAD requests.
+    """
 
     @respx.mock
     def test_exits_on_403_forbidden(self):
         """Should raise SystemExit when server returns 403."""
-        respx.head(ANNCSU_URL).mock(return_value=httpx.Response(403))
+        respx.get(ANNCSU_URL).mock(return_value=httpx.Response(403))
         with pytest.raises(SystemExit, match="403 Forbidden"):
             _check_server_available()
 
     @respx.mock
     def test_exits_on_500_server_error(self):
         """Should raise SystemExit when server returns 500."""
-        respx.head(ANNCSU_URL).mock(return_value=httpx.Response(500))
+        respx.get(ANNCSU_URL).mock(return_value=httpx.Response(500))
         with pytest.raises(SystemExit, match="HTTP 500"):
             _check_server_available()
 
     @respx.mock
     def test_exits_on_connection_error(self):
         """Should raise SystemExit when server is unreachable."""
-        respx.head(ANNCSU_URL).mock(side_effect=httpx.ConnectError("Connection refused"))
+        respx.get(ANNCSU_URL).mock(side_effect=httpx.ConnectError("Connection refused"))
         with pytest.raises(SystemExit, match="unreachable"):
             _check_server_available()
 
     @respx.mock
     def test_passes_on_200(self):
         """Should not raise when server returns 200."""
-        respx.head(ANNCSU_URL).mock(return_value=httpx.Response(200))
+        respx.get(ANNCSU_URL).mock(return_value=httpx.Response(200))
         _check_server_available()  # should not raise
 
     @respx.mock
     def test_passes_on_206_partial(self):
         """Should not raise when server returns 206 (range requests supported)."""
-        respx.head(ANNCSU_URL).mock(return_value=httpx.Response(206))
+        respx.get(ANNCSU_URL).mock(return_value=httpx.Response(206))
         _check_server_available()  # should not raise
 
     @respx.mock
     def test_passes_on_302_redirect(self):
         """Should not raise on redirect (httpx follows redirects)."""
-        respx.head(ANNCSU_URL).mock(return_value=httpx.Response(200))
+        respx.get(ANNCSU_URL).mock(return_value=httpx.Response(200))
         _check_server_available()  # should not raise
 
 

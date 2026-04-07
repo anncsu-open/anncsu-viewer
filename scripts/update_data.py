@@ -54,10 +54,19 @@ RETRY_WAIT = 30
 
 
 def _check_server_available() -> None:
-    """Raise early if the ANNCSU server is not reachable or returns an error."""
+    """Raise early if the ANNCSU server is not reachable or returns an error.
+
+    Uses a single-byte GET range request instead of HEAD because the
+    Akamai CDN in front of the ANNCSU portal blocks HEAD requests with 403.
+    """
     print("Checking ANNCSU server availability ...")
     try:
-        response = httpx.head(ANNCSU_URL, follow_redirects=True, timeout=30)
+        response = httpx.get(
+            ANNCSU_URL,
+            headers={"Range": "bytes=0-0"},
+            follow_redirects=True,
+            timeout=30,
+        )
     except httpx.TransportError as exc:
         raise SystemExit(f"ANNCSU server unreachable: {exc}") from exc
     if response.status_code == 403:
