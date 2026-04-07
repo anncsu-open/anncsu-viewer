@@ -25,7 +25,6 @@ with the last commit date of the existing GeoParquet file.
 
 import io
 import re
-import subprocess
 import time
 import zipfile
 from datetime import datetime, timezone
@@ -46,6 +45,7 @@ TILES_DIR = OUTPUT_DIR / "tiles"
 COMUNI_FILE = OUTPUT_DIR / "comuni.json"
 COMUNI_H3_FILE = OUTPUT_DIR / "comuni-h3.json"
 BOUNDARIES_FILE = OUTPUT_DIR / "istat-boundaries.parquet"
+MARKER_FILE = OUTPUT_DIR / ".last_remote_date"
 H3_RESOLUTION = 5
 TAIL_SIZE = 65536
 DOWNLOAD_TIMEOUT = 600
@@ -110,37 +110,35 @@ def get_remote_date() -> datetime | None:
     return remote_date
 
 
-def get_last_commit_date() -> datetime | None:
-    """Get the last commit date for the output GeoParquet file."""
-    if not OUTPUT_FILE.exists():
+def get_local_date() -> datetime | None:
+    """Read the last downloaded dataset date from the marker file."""
+    if not MARKER_FILE.exists():
         return None
 
     try:
-        result = subprocess.run(
-            ["git", "log", "-1", "--format=%aI", "--", str(OUTPUT_FILE)],
-            capture_output=True,
-            text=True,
-            cwd=OUTPUT_DIR.parent,
-        )
-        if result.returncode == 0 and result.stdout.strip():
-            commit_date = datetime.fromisoformat(result.stdout.strip())
-            print(f"Last commit date for data: {commit_date.date()}")
-            return commit_date
-    except FileNotFoundError:
-        pass
-
-    return None
+        date_str = MARKER_FILE.read_text().strip()
+        local_date = datetime.strptime(date_str, "%Y%m%d").replace(tzinfo=timezone.utc)
+        print(f"Last downloaded dataset date: {local_date.date()}")
+        return local_date
+    except (ValueError, OSError):
+        return None
 
 
-def is_update_needed() -> bool:
+def save_remote_date(remote_date: datetime) -> None:
+    """Persist the remote dataset date to the marker file after a successful download."""
+    MARKER_FILE.write_text(remote_date.strftime("%Y%m%d"))
+
+
+def is_update_needed(remote_date: datetime | None = None) -> bool:
     """Check if the remote dataset is newer than the local one."""
-    remote_date = get_remote_date()
+    if remote_date is None:
+        remote_date = get_remote_date()
     if remote_date is None:
         return True
 
-    local_date = get_last_commit_date()
+    local_date = get_local_date()
     if local_date is None:
-        print("No existing data found, will download")
+        print("No marker file found, will download")
         return True
 
     if remote_date > local_date:
@@ -343,7 +341,9 @@ def main(
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     _check_server_available()
 
-    if not force and not is_update_needed():
+    remote_date = get_remote_date()
+
+    if not force and not is_update_needed(remote_date):
         return
 
     csv_path = download_and_extract()
@@ -357,6 +357,10 @@ def main(
         if csv_path.exists():
             csv_path.unlink()
             print("Cleaned up temporary CSV")
+
+    if remote_date is not None:
+        save_remote_date(remote_date)
+        print(f"Saved dataset date marker: {remote_date.date()}")
 
     size_mb = parquet_path.stat().st_size / (1024 * 1024)
     print(f"Done! GeoParquet: {parquet_path} ({size_mb:.1f} MB)")

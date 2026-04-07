@@ -16,14 +16,20 @@ Usage:
     uv run --with httpx --with pytest --with respx --with typer -- pytest scripts/test_update_data.py -v
 """
 
+from datetime import datetime, timezone
+from pathlib import Path
+from unittest.mock import patch
+
 import httpx
 import pytest
 import respx
 
 from update_data import (
     ANNCSU_URL,
+    MARKER_FILE,
     _check_server_available,
     get_remote_date,
+    is_update_needed,
 )
 
 
@@ -109,3 +115,47 @@ class TestGetRemoteDate:
         respx.get(ANNCSU_URL).mock(return_value=httpx.Response(206, content=content))
         result = get_remote_date()
         assert result is None
+
+
+class TestIsUpdateNeeded:
+    """Tests for is_update_needed() using a marker file to track the last
+    downloaded dataset date, instead of relying on git commit dates.
+
+    The git commit date can be misleading: if someone commits the parquet
+    on April 7 with data from April 1, git log says April 7 but the data
+    is stale. A marker file records the actual remote dataset date.
+    """
+
+    def test_update_needed_when_remote_is_newer_than_marker(self, tmp_path):
+        """Remote dataset (Apr 6) is newer than marker (Apr 1) → update needed."""
+        marker = tmp_path / ".last_remote_date"
+        marker.write_text("20260401")
+
+        remote = datetime(2026, 4, 6, tzinfo=timezone.utc)
+        with patch("update_data.MARKER_FILE", marker):
+            assert is_update_needed(remote) is True
+
+    def test_no_update_when_remote_matches_marker(self, tmp_path):
+        """Remote dataset (Apr 6) matches marker (Apr 6) → no update."""
+        marker = tmp_path / ".last_remote_date"
+        marker.write_text("20260406")
+
+        remote = datetime(2026, 4, 6, tzinfo=timezone.utc)
+        with patch("update_data.MARKER_FILE", marker):
+            assert is_update_needed(remote) is False
+
+    def test_update_needed_when_no_marker_exists(self, tmp_path):
+        """No marker file → first run, update needed."""
+        marker = tmp_path / ".last_remote_date"  # does not exist
+
+        remote = datetime(2026, 4, 6, tzinfo=timezone.utc)
+        with patch("update_data.MARKER_FILE", marker):
+            assert is_update_needed(remote) is True
+
+    def test_update_needed_when_remote_date_unknown(self, tmp_path):
+        """Cannot determine remote date → update to be safe."""
+        marker = tmp_path / ".last_remote_date"
+        marker.write_text("20260401")
+
+        with patch("update_data.MARKER_FILE", marker):
+            assert is_update_needed(None) is True
