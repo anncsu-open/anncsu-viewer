@@ -25,6 +25,7 @@ with the last commit date of the existing GeoParquet file.
 
 import io
 import re
+import shutil
 import time
 import zipfile
 from datetime import datetime, timezone
@@ -51,6 +52,17 @@ TAIL_SIZE = 65536
 DOWNLOAD_TIMEOUT = 600
 MAX_RETRIES = 3
 RETRY_WAIT = 30
+
+
+def _check_tippecanoe() -> None:
+    """Raise early if tippecanoe is not installed."""
+    if shutil.which("tippecanoe") is None:
+        raise SystemExit(
+            "tippecanoe not found in PATH. Install it before running:\n"
+            "  macOS:  brew install tippecanoe\n"
+            "  Ubuntu: sudo apt-get install tippecanoe"
+        )
+    print("tippecanoe is available")
 
 
 def _check_server_available() -> None:
@@ -364,6 +376,7 @@ def main(
     force: bool = typer.Option(False, "--force", help="Skip freshness check and force re-download"),
 ) -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    _check_tippecanoe()
     _check_server_available()
 
     remote_date = get_remote_date()

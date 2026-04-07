@@ -28,6 +28,7 @@ from update_data import (
     ANNCSU_URL,
     MARKER_FILE,
     _check_server_available,
+    _check_tippecanoe,
     get_remote_date,
     is_update_needed,
 )
@@ -159,3 +160,18 @@ class TestIsUpdateNeeded:
 
         with patch("update_data.MARKER_FILE", marker):
             assert is_update_needed(None) is True
+
+
+class TestCheckTippecanoe:
+    """Tests for _check_tippecanoe() fail-fast when tippecanoe is missing."""
+
+    def test_exits_when_tippecanoe_not_in_path(self):
+        """Should raise SystemExit when tippecanoe is not found."""
+        with patch("shutil.which", return_value=None):
+            with pytest.raises(SystemExit, match="tippecanoe"):
+                _check_tippecanoe()
+
+    def test_passes_when_tippecanoe_is_available(self):
+        """Should not raise when tippecanoe is in PATH."""
+        with patch("shutil.which", return_value="/usr/local/bin/tippecanoe"):
+            _check_tippecanoe()  # should not raise
