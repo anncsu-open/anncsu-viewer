@@ -317,6 +317,52 @@ def csv_to_parquet(csv_path: Path) -> Path:
     return OUTPUT_FILE
 
 
+def generate_comuni_h3(parquet_path: Path, output_path: Path | None = None) -> Path:
+    """Generate comuni-h3.json mapping each comune to its H3 cells.
+
+    Reads the GeoParquet and computes which H3 resolution-5 cells contain
+    addresses for each comune. Used by the frontend to load the right tiles.
+    """
+    if output_path is None:
+        output_path = COMUNI_H3_FILE
+
+    import json
+
+    print("Computing H3 cells per comune ...")
+    con = duckdb.connect()
+    con.execute("INSTALL spatial; LOAD spatial;")
+    con.execute("INSTALL h3 FROM community; LOAD h3;")
+
+    result = con.execute(f"""
+        SELECT
+            CODICE_ISTAT,
+            NOME_COMUNE,
+            list(DISTINCT h3_latlng_to_cell(latitude, longitude, {H3_RESOLUTION})::BIGINT) as h3_cells
+        FROM read_parquet('{parquet_path}')
+        WHERE NOME_COMUNE IS NOT NULL
+          AND latitude IS NOT NULL
+          AND longitude IS NOT NULL
+        GROUP BY CODICE_ISTAT, NOME_COMUNE
+        ORDER BY CODICE_ISTAT
+    """).fetchall()
+    con.close()
+
+    comuni_h3 = []
+    for codice_istat, nome_comune, h3_cells in result:
+        hex_cells = [hex(c)[2:] for c in h3_cells]
+        comuni_h3.append({
+            "codice_istat": codice_istat,
+            "nome_comune": nome_comune,
+            "h3_cells": hex_cells,
+        })
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(comuni_h3, f, ensure_ascii=False)
+
+    print(f"Written {len(comuni_h3)} comuni to {output_path}")
+    return output_path
+
+
 def enhance_with_geoparquet(parquet_path: Path) -> None:
     """Add bbox and spatial sorting using geoparquet-io.
 
@@ -389,6 +435,7 @@ def main(
     try:
         parquet_path = csv_to_parquet(csv_path)
         enhance_with_geoparquet(parquet_path)
+        generate_comuni_h3(parquet_path)
         convert_to_pmtiles(parquet_path)
         partition_h3_tiles(parquet_path)
     finally:

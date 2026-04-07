@@ -29,6 +29,7 @@ from update_data import (
     MARKER_FILE,
     _check_server_available,
     _check_tippecanoe,
+    generate_comuni_h3,
     get_remote_date,
     is_update_needed,
 )
@@ -175,3 +176,90 @@ class TestCheckTippecanoe:
         """Should not raise when tippecanoe is in PATH."""
         with patch("shutil.which", return_value="/usr/local/bin/tippecanoe"):
             _check_tippecanoe()  # should not raise
+
+
+class TestGenerateComuniH3:
+    """Tests for generate_comuni_h3() producing a correct mapping
+    from each comune to ALL its H3 cells."""
+
+    def test_includes_all_h3_cells_for_a_comune(self, tmp_path):
+        """A comune with addresses in multiple H3 cells must list all of them."""
+        import duckdb
+
+        parquet = tmp_path / "test.parquet"
+        output = tmp_path / "comuni-h3.json"
+
+        con = duckdb.connect()
+        con.execute("INSTALL spatial; LOAD spatial;")
+        con.execute("INSTALL h3 FROM community; LOAD h3;")
+
+        # Create addresses for Scanno in two distinct H3 cells
+        # Cell 1: center of Scanno (41.90, 13.88)
+        # Cell 2: outskirts (41.93, 13.85) — different H3 res-5 cell
+        con.execute(f"""
+            COPY (
+                SELECT * FROM (VALUES
+                    ('066093', 'Scanno', 'VIA ROMA', 1, 13.88, 41.90,
+                     ST_Point(13.88, 41.90)),
+                    ('066093', 'Scanno', 'VIA NAPOLI', 2, 13.88, 41.90,
+                     ST_Point(13.88, 41.90)),
+                    ('066093', 'Scanno', 'VIA LAGO', 1, 13.85, 41.93,
+                     ST_Point(13.85, 41.93))
+                ) AS t(CODICE_ISTAT, NOME_COMUNE, ODONIMO, CIVICO,
+                       longitude, latitude, geometry)
+            ) TO '{parquet}' (FORMAT PARQUET)
+        """)
+
+        # Get expected H3 cells
+        expected_cells = set()
+        for lat, lon in [(41.90, 13.88), (41.93, 13.85)]:
+            cell = con.execute(
+                f"SELECT h3_h3_to_string(h3_latlng_to_cell({lat}, {lon}, 5))"
+            ).fetchone()[0]
+            expected_cells.add(cell)
+        con.close()
+
+        generate_comuni_h3(parquet, output)
+
+        import json
+        with open(output) as f:
+            data = json.load(f)
+
+        scanno = [c for c in data if c["nome_comune"] == "Scanno"]
+        assert len(scanno) == 1
+        actual_cells = set(scanno[0]["h3_cells"])
+        assert actual_cells == expected_cells, (
+            f"Expected cells {expected_cells}, got {actual_cells}"
+        )
+
+    def test_output_contains_all_comuni(self, tmp_path):
+        """Every comune with addresses should appear in the output."""
+        import duckdb
+
+        parquet = tmp_path / "test.parquet"
+        output = tmp_path / "comuni-h3.json"
+
+        con = duckdb.connect()
+        con.execute("INSTALL spatial; LOAD spatial;")
+        con.execute(f"""
+            COPY (
+                SELECT * FROM (VALUES
+                    ('066093', 'Scanno', 'VIA ROMA', 1, 13.88, 41.90,
+                     ST_Point(13.88, 41.90)),
+                    ('058091', 'Roma', 'VIA VENETO', 1, 12.49, 41.90,
+                     ST_Point(12.49, 41.90))
+                ) AS t(CODICE_ISTAT, NOME_COMUNE, ODONIMO, CIVICO,
+                       longitude, latitude, geometry)
+            ) TO '{parquet}' (FORMAT PARQUET)
+        """)
+        con.close()
+
+        generate_comuni_h3(parquet, output)
+
+        import json
+        with open(output) as f:
+            data = json.load(f)
+
+        nomi = {c["nome_comune"] for c in data}
+        assert "Scanno" in nomi
+        assert "Roma" in nomi
