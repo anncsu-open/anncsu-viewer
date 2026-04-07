@@ -306,14 +306,24 @@ def csv_to_parquet(csv_path: Path) -> Path:
 
 
 def enhance_with_geoparquet(parquet_path: Path) -> None:
-    """Add bbox and spatial sorting using geoparquet-io."""
+    """Add bbox and spatial sorting using geoparquet-io.
+
+    Uses two passes with a disk flush in between to keep peak memory
+    under ~5.5 GB (single-pass peaks at ~11 GB on 18M rows, which
+    exceeds the 7 GB available on GitHub Actions runners).
+    """
+    import gc
+
     import geoparquet_io as gpio
 
-    print("Adding bbox and spatial sorting ...")
-    gpio.read(str(parquet_path)) \
-        .add_bbox() \
-        .sort_hilbert() \
-        .write(str(parquet_path))
+    print("Adding bbox ...")
+    gpio.read(str(parquet_path)).add_bbox().write(str(parquet_path))
+    gc.collect()
+
+    print("Spatial sorting (Hilbert) ...")
+    gpio.read(str(parquet_path)).sort_hilbert().write(str(parquet_path))
+    gc.collect()
+
     print("GeoParquet enhancement complete")
 
 
