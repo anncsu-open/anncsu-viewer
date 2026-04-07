@@ -26,6 +26,7 @@ with the last commit date of the existing GeoParquet file.
 import io
 import re
 import subprocess
+import time
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -46,20 +47,48 @@ COMUNI_FILE = OUTPUT_DIR / "comuni.json"
 COMUNI_H3_FILE = OUTPUT_DIR / "comuni-h3.json"
 BOUNDARIES_FILE = OUTPUT_DIR / "istat-boundaries.parquet"
 H3_RESOLUTION = 5
-H3_RESOLUTION = 5
 TAIL_SIZE = 65536
+DOWNLOAD_TIMEOUT = 600
+MAX_RETRIES = 3
+RETRY_WAIT = 30
+
+
+def _check_server_available() -> None:
+    """Raise early if the ANNCSU server is not reachable or returns an error."""
+    print("Checking ANNCSU server availability ...")
+    try:
+        response = httpx.head(ANNCSU_URL, follow_redirects=True, timeout=30)
+    except httpx.TransportError as exc:
+        raise SystemExit(f"ANNCSU server unreachable: {exc}") from exc
+    if response.status_code == 403:
+        raise SystemExit(
+            f"ANNCSU server returned 403 Forbidden — the service may be "
+            f"temporarily unavailable. Retry later."
+        )
+    if response.status_code >= 400:
+        raise SystemExit(
+            f"ANNCSU server returned HTTP {response.status_code}. Retry later."
+        )
+    print("Server is available")
 
 
 def get_remote_date() -> datetime | None:
     """Fetch the zip tail to extract the CSV date from its filename."""
     print("Checking remote dataset date ...")
-    response = httpx.get(
-        ANNCSU_URL,
-        headers={"Range": f"bytes=-{TAIL_SIZE}"},
-        follow_redirects=True,
-        timeout=60,
-    )
-    response.raise_for_status()
+    try:
+        response = httpx.get(
+            ANNCSU_URL,
+            headers={"Range": f"bytes=-{TAIL_SIZE}"},
+            follow_redirects=True,
+            timeout=60,
+        )
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        print(f"Warning: could not fetch remote date (HTTP {exc.response.status_code})")
+        return None
+    except httpx.TransportError as exc:
+        print(f"Warning: could not fetch remote date ({exc})")
+        return None
 
     matches = re.findall(rb"INDIR_ITA_(\d{8})\.csv", response.content)
     if not matches:
@@ -116,8 +145,16 @@ def is_update_needed() -> bool:
 def download_and_extract() -> Path:
     """Download the ANNCSU zip and extract the CSV."""
     print(f"Downloading from {ANNCSU_URL} ...")
-    response = httpx.get(ANNCSU_URL, follow_redirects=True, timeout=600)
-    response.raise_for_status()
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            response = httpx.get(ANNCSU_URL, follow_redirects=True, timeout=DOWNLOAD_TIMEOUT)
+            response.raise_for_status()
+            break
+        except (httpx.HTTPStatusError, httpx.TransportError) as exc:
+            if attempt == MAX_RETRIES:
+                raise SystemExit(f"Download failed after {MAX_RETRIES} attempts: {exc}") from exc
+            print(f"Attempt {attempt}/{MAX_RETRIES} failed ({exc}), retrying in {RETRY_WAIT}s ...")
+            time.sleep(RETRY_WAIT)
     print(f"Downloaded {len(response.content) / (1024 * 1024):.1f} MB")
 
     with zipfile.ZipFile(io.BytesIO(response.content)) as zf:
@@ -295,6 +332,7 @@ def main(
     force: bool = typer.Option(False, "--force", help="Skip freshness check and force re-download"),
 ) -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    _check_server_available()
 
     if not force and not is_update_needed():
         return
