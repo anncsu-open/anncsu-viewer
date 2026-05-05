@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#     "duckdb>=1.2.0",
+#     "duckdb>=1.5.2",
 #     "pytest",
 # ]
 # ///

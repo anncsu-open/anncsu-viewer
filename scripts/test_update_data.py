@@ -1,8 +1,8 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#     "duckdb>=1.2.0",
-#     "geoparquet-io>=1.0.0b2",
+#     "duckdb>=1.5.2",
+#     "geoparquet-io>=1.1.1",
 #     "gpio-pmtiles",
 #     "httpx",
 #     "pytest",
@@ -29,6 +29,8 @@ from update_data import (
     MARKER_FILE,
     _check_server_available,
     _check_tippecanoe,
+    _validate_row_count,
+    csv_to_parquet,
     generate_comuni_h3,
     get_remote_date,
     is_update_needed,
@@ -263,3 +265,194 @@ class TestGenerateComuniH3:
         nomi = {c["nome_comune"] for c in data}
         assert "Scanno" in nomi
         assert "Roma" in nomi
+
+
+CSV_HEADER = (
+    "CODICE_COMUNE;CODICE_ISTAT;PROGRESSIVO_NAZIONALE;CODICE_COMUNALE;"
+    "ODONIMO;LOCALITA';DIZIONE_LINGUA1;DIZIONE_LINGUA2;PROGRESSIVO_ACCESSO;"
+    "CODICE_COMUNALE_ACCESSO;CIVICO;ESPONENTE;SPECIFICITA;METRICO;"
+    "PROGRESSIVO_SNC;COORD_X_COMUNE;COORD_Y_COMUNE;QUOTA;METODO\n"
+)
+
+
+def _write_csv(csv_path: Path, rows: list[str]) -> None:
+    """Write a CSV with the canonical ANNCSU header and the given data rows."""
+    csv_path.write_text(CSV_HEADER + "".join(r + "\n" for r in rows))
+
+
+def _make_parquet(parquet_path: Path, num_rows: int) -> None:
+    """Create a trivial parquet file with the requested number of rows."""
+    import duckdb
+
+    con = duckdb.connect()
+    con.execute(
+        f"COPY (SELECT range AS x FROM range({num_rows})) "
+        f"TO '{parquet_path}' (FORMAT PARQUET)"
+    )
+    con.close()
+
+
+class TestValidateRowCount:
+    """Tests for _validate_row_count() row-count sanity check.
+
+    Catches silent row drops between CSV and parquet. The historic cause was
+    DuckDB inferring BIGINT for QUOTA / CODICE_COMUNALE_ACCESSO and dropping
+    rows whose values didn't fit (decimal quotes, alphanumeric Belfiore codes)
+    when used together with ignore_errors=true.
+    """
+
+    def test_passes_when_counts_match(self, tmp_path):
+        csv_path = tmp_path / "input.csv"
+        _write_csv(csv_path, [
+            "001001;010001;1;001001;VIA A;;;;1;001001;1;;;;0;7,684;45,066;200;1",
+            "001001;010001;2;001001;VIA B;;;;1;001001;2;;;;0;7,684;45,066;100;1",
+        ])
+        parquet_path = tmp_path / "out.parquet"
+        _make_parquet(parquet_path, 2)
+        _validate_row_count(csv_path, parquet_path)  # should not raise
+
+    def test_raises_on_count_mismatch(self, tmp_path):
+        csv_path = tmp_path / "input.csv"
+        _write_csv(csv_path, [
+            "001001;010001;1;001001;VIA A;;;;1;001001;1;;;;0;7,684;45,066;200;1",
+            "001001;010001;2;001001;VIA B;;;;1;001001;2;;;;0;7,684;45,066;100;1",
+            "001001;010001;3;001001;VIA C;;;;1;001001;3;;;;0;7,684;45,066;300;1",
+        ])
+        parquet_path = tmp_path / "out.parquet"
+        _make_parquet(parquet_path, 2)
+        with pytest.raises(RuntimeError, match="Row count mismatch"):
+            _validate_row_count(csv_path, parquet_path)
+
+    def test_excludes_rows_without_coordinates(self, tmp_path):
+        """Rows with empty COORD_X/Y are excluded from the CSV count."""
+        csv_path = tmp_path / "input.csv"
+        _write_csv(csv_path, [
+            "001001;010001;1;001001;VIA A;;;;1;001001;1;;;;0;7,684;45,066;200;1",
+            # no coordinates → not counted
+            "001001;010001;2;001001;VIA B;;;;1;001001;2;;;;0;;;200;1",
+            "001001;010001;3;001001;VIA C;;;;1;001001;3;;;;0;7,684;45,066;100;1",
+        ])
+        parquet_path = tmp_path / "out.parquet"
+        _make_parquet(parquet_path, 2)  # only 2 rows had coords
+        _validate_row_count(csv_path, parquet_path)  # should not raise
+
+    def test_passes_when_decimal_quota_is_present(self, tmp_path):
+        """The validator counts CSV rows in a way that survives decimal QUOTA values.
+
+        If the validator inferred QUOTA as BIGINT, the row "QUOTA=58,77" would
+        be silently dropped from the CSV count and a real divergence in the
+        parquet would go unnoticed.
+        """
+        csv_path = tmp_path / "input.csv"
+        _write_csv(csv_path, [
+            "001001;010001;1;001001;VIA A;;;;1;001001;1;;;;0;7,684;45,066;200;1",
+            "001001;010001;2;001001;VIA B;;;;1;001001;2;;;;0;7,684;45,066;58,77;1",
+        ])
+        parquet_path = tmp_path / "out.parquet"
+        _make_parquet(parquet_path, 2)
+        _validate_row_count(csv_path, parquet_path)  # should not raise
+
+    def test_passes_when_alphanumeric_codice_accesso_is_present(self, tmp_path):
+        """The validator must count rows with alphanumeric CODICE_COMUNALE_ACCESSO."""
+        csv_path = tmp_path / "input.csv"
+        _write_csv(csv_path, [
+            "001001;010001;1;001001;VIA A;;;;1;001001;1;;;;0;7,684;45,066;200;1",
+            "001001;010001;2;001001;VIA B;;;;2;G282;2;;;;0;7,684;45,066;100;1",
+        ])
+        parquet_path = tmp_path / "out.parquet"
+        _make_parquet(parquet_path, 2)
+        _validate_row_count(csv_path, parquet_path)  # should not raise
+
+
+class TestCsvToParquet:
+    """End-to-end tests for csv_to_parquet() ensuring no silent row drops.
+
+    Regression coverage for a bug where ~2.4% of rows were dropped because
+    DuckDB inferred QUOTA / CODICE_COMUNALE_ACCESSO as BIGINT and then,
+    combined with ignore_errors=true, skipped rows whose values didn't fit.
+    """
+
+    def _setup_paths(self, tmp_path, monkeypatch) -> Path:
+        comuni_path = tmp_path / "comuni.json"
+        comuni_path.write_text(
+            '[{"codice_istat": "010001", "nome_comune": "TestComune"}]'
+        )
+        output_path = tmp_path / "output.parquet"
+        monkeypatch.setattr("update_data.OUTPUT_FILE", output_path)
+        monkeypatch.setattr("update_data.COMUNI_FILE", comuni_path)
+        # Skip the optional out-of-bounds enrichment step.
+        monkeypatch.setattr(
+            "update_data.BOUNDARIES_FILE", tmp_path / "no_boundaries.parquet"
+        )
+        return output_path
+
+    def test_preserves_rows_with_decimal_quota(self, tmp_path, monkeypatch):
+        """Rows whose QUOTA value is a decimal ('58,77') must not be dropped."""
+        import duckdb
+
+        csv_path = tmp_path / "input.csv"
+        _write_csv(csv_path, [
+            # First two rows have integer QUOTA — would let auto_detect infer BIGINT
+            "001001;010001;1;001001;VIA A;;;;1;001001;1;;;;0;7,684;45,066;200;1",
+            "001001;010001;2;001001;VIA B;;;;1;001001;2;;;;0;7,684;45,066;100;1",
+            # Decimal QUOTA — historic regression: this row was silently dropped
+            "001001;010001;3;001001;VIA C;;;;1;001001;3;;;;0;7,684;45,066;58,77;1",
+        ])
+        output_path = self._setup_paths(tmp_path, monkeypatch)
+
+        csv_to_parquet(csv_path)
+
+        con = duckdb.connect()
+        count = con.execute(
+            f"SELECT COUNT(*) FROM read_parquet('{output_path}')"
+        ).fetchone()[0]
+        con.close()
+        assert count == 3, f"Expected 3 rows, got {count} (decimal QUOTA dropped?)"
+
+    def test_preserves_rows_with_alphanumeric_codice_accesso(
+        self, tmp_path, monkeypatch
+    ):
+        """Rows with alphanumeric CODICE_COMUNALE_ACCESSO ('G282') must not be dropped."""
+        import duckdb
+
+        csv_path = tmp_path / "input.csv"
+        _write_csv(csv_path, [
+            "001001;010001;1;001001;VIA A;;;;1;001001;1;;;;0;7,684;45,066;200;1",
+            "001001;010001;2;001001;VIA B;;;;2;001002;2;;;;0;7,684;45,066;100;1",
+            # Belfiore-style code — historic regression: silently dropped
+            "001001;010001;3;001001;VIA C;;;;3;G282;3;;;;0;7,684;45,066;300;1",
+        ])
+        output_path = self._setup_paths(tmp_path, monkeypatch)
+
+        csv_to_parquet(csv_path)
+
+        con = duckdb.connect()
+        count = con.execute(
+            f"SELECT COUNT(*) FROM read_parquet('{output_path}')"
+        ).fetchone()[0]
+        con.close()
+        assert count == 3, (
+            f"Expected 3 rows, got {count} (alphanumeric CODICE_COMUNALE_ACCESSO dropped?)"
+        )
+
+    def test_drops_only_rows_without_coordinates(self, tmp_path, monkeypatch):
+        """Only rows without COORD_X/Y should be filtered; everything else stays."""
+        import duckdb
+
+        csv_path = tmp_path / "input.csv"
+        _write_csv(csv_path, [
+            "001001;010001;1;001001;VIA A;;;;1;001001;1;;;;0;7,684;45,066;200;1",
+            # Empty coordinates → must be filtered
+            "001001;010001;2;001001;VIA B;;;;1;001001;2;;;;0;;;100;1",
+            "001001;010001;3;001001;VIA C;;;;1;001001;3;;;;0;7,684;45,066;100;1",
+        ])
+        output_path = self._setup_paths(tmp_path, monkeypatch)
+
+        csv_to_parquet(csv_path)
+
+        con = duckdb.connect()
+        count = con.execute(
+            f"SELECT COUNT(*) FROM read_parquet('{output_path}')"
+        ).fetchone()[0]
+        con.close()
+        assert count == 2, f"Expected 2 rows (one without coords), got {count}"

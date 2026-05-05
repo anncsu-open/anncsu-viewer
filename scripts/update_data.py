@@ -1,9 +1,9 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#     "geoparquet-io>=1.0.0b2",
+#     "geoparquet-io>=1.1.1",
 #     "gpio-pmtiles",
-#     "duckdb>=1.2.0",
+#     "duckdb>=1.5.2",
 #     "httpx",
 #     "typer",
 # ]
@@ -52,6 +52,12 @@ TAIL_SIZE = 65536
 DOWNLOAD_TIMEOUT = 600
 MAX_RETRIES = 3
 RETRY_WAIT = 30
+
+# Columns the CSV sampler infers as BIGINT but that contain non-integer values
+# downstream (decimal quotes for QUOTA, alphanumeric Belfiore codes for
+# CODICE_COMUNALE_ACCESSO). Forcing them to VARCHAR avoids ~2.4% of rows being
+# silently dropped via ignore_errors=true at materialization.
+CSV_FORCED_VARCHAR = {"QUOTA": "VARCHAR", "CODICE_COMUNALE_ACCESSO": "VARCHAR"}
 
 
 def _check_tippecanoe() -> None:
@@ -201,6 +207,48 @@ def download_and_extract() -> Path:
         return OUTPUT_DIR / csv_name
 
 
+def _csv_types_clause() -> str:
+    """Format CSV_FORCED_VARCHAR as a DuckDB ``types={...}`` clause."""
+    entries = ", ".join(f"'{k}': '{v}'" for k, v in CSV_FORCED_VARCHAR.items())
+    return f"types={{{entries}}}"
+
+
+def _validate_row_count(csv_path: Path, parquet_path: Path) -> None:
+    """Raise if the parquet has fewer rows than the CSV rows with coordinates.
+
+    Sanity check that catches silent drops between input and output. The
+    CSV count uses the same type overrides as ``csv_to_parquet`` so that
+    the validator itself doesn't suffer from the bug it's meant to detect.
+    """
+    con = duckdb.connect()
+    csv_count = con.execute(f"""
+        SELECT COUNT(*)
+        FROM read_csv(
+            '{csv_path}',
+            header=true,
+            auto_detect=true,
+            ignore_errors=true,
+            {_csv_types_clause()}
+        )
+        WHERE COORD_X_COMUNE IS NOT NULL
+          AND COORD_Y_COMUNE IS NOT NULL
+    """).fetchone()[0]
+    parquet_count = con.execute(
+        f"SELECT COUNT(*) FROM read_parquet('{parquet_path}')"
+    ).fetchone()[0]
+    con.close()
+
+    if csv_count != parquet_count:
+        delta = csv_count - parquet_count
+        raise RuntimeError(
+            f"Row count mismatch: CSV has {csv_count:,} rows with coordinates "
+            f"but parquet has {parquet_count:,} ({delta:+,} delta). "
+            f"This usually means a column type mismatch caused "
+            f"ignore_errors=true to silently skip rows."
+        )
+    print(f"Row count check OK: {parquet_count:,} rows in CSV and parquet")
+
+
 def csv_to_parquet(csv_path: Path) -> Path:
     """Load CSV into DuckDB, join with comuni, create geometries, and export as Parquet."""
     if not COMUNI_FILE.exists():
@@ -254,7 +302,8 @@ def csv_to_parquet(csv_path: Path) -> Path:
             '{csv_path}',
             header=true,
             auto_detect=true,
-            ignore_errors=true
+            ignore_errors=true,
+            {_csv_types_clause()}
         ) a
         LEFT JOIN comuni c ON a.CODICE_ISTAT = c.codice_istat
         WHERE a.COORD_X_COMUNE IS NOT NULL
@@ -314,6 +363,8 @@ def csv_to_parquet(csv_path: Path) -> Path:
     """)
 
     con.close()
+
+    _validate_row_count(csv_path, OUTPUT_FILE)
     return OUTPUT_FILE
 
 
