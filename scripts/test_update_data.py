@@ -29,7 +29,9 @@ from update_data import (
     MARKER_FILE,
     _check_server_available,
     _check_tippecanoe,
+    _clean_tiles_dir,
     _validate_row_count,
+    _validate_tile_row_count,
     csv_to_parquet,
     generate_comuni_h3,
     get_remote_date,
@@ -456,3 +458,67 @@ class TestCsvToParquet:
         ).fetchone()[0]
         con.close()
         assert count == 2, f"Expected 2 rows (one without coords), got {count}"
+
+
+class TestCleanTilesDir:
+    """Tests for _clean_tiles_dir() removing stale files before re-partitioning.
+
+    Regression coverage for a bug where geoparquet-io 1.1.1's partition_by_h3
+    silently kept pre-existing files in the destination directory, leaving
+    stale tiles from previous runs alongside the freshly written ones.
+    """
+
+    def test_removes_existing_files(self, tmp_path):
+        tiles_dir = tmp_path / "tiles"
+        (tiles_dir / "h3_cell=stale").mkdir(parents=True)
+        stale_file = tiles_dir / "h3_cell=stale" / "stale.parquet"
+        stale_file.write_bytes(b"old data")
+
+        _clean_tiles_dir(tiles_dir)
+
+        assert tiles_dir.exists(), "Tiles dir should be re-created"
+        assert list(tiles_dir.glob("**/*")) == [], "Tiles dir should be empty"
+
+    def test_creates_missing_dir(self, tmp_path):
+        tiles_dir = tmp_path / "nonexistent" / "tiles"
+        assert not tiles_dir.exists()
+
+        _clean_tiles_dir(tiles_dir)
+
+        assert tiles_dir.exists()
+
+
+class TestValidateTileRowCount:
+    """Tests for _validate_tile_row_count() catching tile/parquet drift."""
+
+    def _make_parquet(self, path: Path, n_rows: int) -> None:
+        import duckdb
+        con = duckdb.connect()
+        con.execute(
+            f"COPY (SELECT range AS x FROM range({n_rows})) "
+            f"TO '{path}' (FORMAT PARQUET)"
+        )
+        con.close()
+
+    def test_passes_when_sum_of_tiles_matches_parquet(self, tmp_path):
+        parquet_path = tmp_path / "input.parquet"
+        self._make_parquet(parquet_path, 10)
+
+        tiles_dir = tmp_path / "tiles"
+        (tiles_dir / "h3_cell=a").mkdir(parents=True)
+        (tiles_dir / "h3_cell=b").mkdir(parents=True)
+        self._make_parquet(tiles_dir / "h3_cell=a" / "a.parquet", 6)
+        self._make_parquet(tiles_dir / "h3_cell=b" / "b.parquet", 4)
+
+        _validate_tile_row_count(parquet_path, tiles_dir)  # 6 + 4 == 10
+
+    def test_raises_on_count_mismatch(self, tmp_path):
+        parquet_path = tmp_path / "input.parquet"
+        self._make_parquet(parquet_path, 10)
+
+        tiles_dir = tmp_path / "tiles"
+        (tiles_dir / "h3_cell=a").mkdir(parents=True)
+        self._make_parquet(tiles_dir / "h3_cell=a" / "a.parquet", 5)
+
+        with pytest.raises(RuntimeError, match="Tile row count mismatch"):
+            _validate_tile_row_count(parquet_path, tiles_dir)

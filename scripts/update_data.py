@@ -436,17 +436,53 @@ def enhance_with_geoparquet(parquet_path: Path) -> None:
     print("GeoParquet enhancement complete")
 
 
+def _clean_tiles_dir(tiles_dir: Path) -> None:
+    """Wipe the tiles directory before partitioning.
+
+    geoparquet-io 1.1.1's partition_by_h3 does not overwrite existing files
+    in the destination, so without this step tiles silently retain stale
+    data from previous runs (alongside any newly written ones).
+    """
+    if tiles_dir.exists():
+        shutil.rmtree(tiles_dir)
+    tiles_dir.mkdir(parents=True, exist_ok=True)
+
+
+def _validate_tile_row_count(parquet_path: Path, tiles_dir: Path) -> None:
+    """Raise if total rows across H3 tiles don't match the source parquet."""
+    con = duckdb.connect()
+    parquet_count = con.execute(
+        f"SELECT COUNT(*) FROM read_parquet('{parquet_path}')"
+    ).fetchone()[0]
+    tiles_count = con.execute(
+        f"SELECT COUNT(*) FROM read_parquet('{tiles_dir}/**/*.parquet')"
+    ).fetchone()[0]
+    con.close()
+
+    if parquet_count != tiles_count:
+        delta = parquet_count - tiles_count
+        raise RuntimeError(
+            f"Tile row count mismatch: parquet has {parquet_count:,} rows "
+            f"but tiles have {tiles_count:,} ({delta:+,} delta). "
+            f"This usually means partition_by_h3 left stale files in place."
+        )
+    print(f"Tile row count check OK: {parquet_count:,} rows in parquet and tiles")
+
+
 def partition_h3_tiles(parquet_path: Path) -> Path:
     """Partition GeoParquet into H3 tiles for nazionale search."""
     import geoparquet_io as gpio
 
     print(f"Partitioning into H3 tiles (resolution {H3_RESOLUTION}) ...")
+    _clean_tiles_dir(TILES_DIR)
     gpio.read(str(parquet_path)) \
         .add_h3(resolution=H3_RESOLUTION) \
         .partition_by_h3(str(TILES_DIR), resolution=H3_RESOLUTION)
 
     tile_count = len(list(TILES_DIR.glob("**/*.parquet")))
     print(f"Created {tile_count} H3 tiles in {TILES_DIR}")
+
+    _validate_tile_row_count(parquet_path, TILES_DIR)
     return TILES_DIR
 
 
