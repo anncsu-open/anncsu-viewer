@@ -33,6 +33,7 @@ from update_data import (
     _validate_row_count,
     _validate_tile_row_count,
     csv_to_parquet,
+    enhance_parquet,
     generate_comuni_h3,
     get_remote_date,
     is_update_needed,
@@ -522,3 +523,178 @@ class TestValidateTileRowCount:
 
         with pytest.raises(RuntimeError, match="Tile row count mismatch"):
             _validate_tile_row_count(parquet_path, tiles_dir)
+
+
+class TestEnhanceParquet:
+    """Tests for enhance_parquet() — DuckDB-native add_bbox + Hilbert sort.
+
+    Replaces geoparquet-io 1.1.1's add_bbox + sort_hilbert. Those operations
+    loaded the entire table into memory, peaking near 6 GB on 20M rows and
+    reliably killing GitHub-hosted runners. The DuckDB version streams the
+    sort to disk so RAM stays bounded regardless of table size.
+
+    These tests pin the contract so the replacement is verifiably equivalent
+    to the geoparquet-io output the rest of the pipeline depends on.
+    """
+
+    def _write_input(self, path: Path, points: list[tuple[float, float]]) -> None:
+        """Write a small parquet matching the schema csv_to_parquet outputs.
+
+        Includes a few non-geometry columns so we can assert they survive.
+        Casts coordinates to DOUBLE to match the production schema (otherwise
+        DuckDB infers DECIMAL from numeric literals).
+        """
+        import duckdb
+
+        rows = ",".join(
+            f"('C{i:04d}', 'Comune{i}', "
+            f"CAST({lon} AS DOUBLE), CAST({lat} AS DOUBLE), "
+            f"ST_Point(CAST({lon} AS DOUBLE), CAST({lat} AS DOUBLE)))"
+            for i, (lon, lat) in enumerate(points)
+        )
+        con = duckdb.connect()
+        con.execute("INSTALL spatial; LOAD spatial;")
+        con.execute(f"""
+            COPY (
+                SELECT * FROM (VALUES {rows}) AS t(
+                    CODICE_ISTAT, NOME_COMUNE, longitude, latitude, geometry
+                )
+            ) TO '{path}' (FORMAT PARQUET)
+        """)
+        con.close()
+
+    def _read_rows(self, path: Path, columns: str = "*") -> list[tuple]:
+        import duckdb
+        con = duckdb.connect()
+        con.execute("INSTALL spatial; LOAD spatial;")
+        rows = con.execute(
+            f"SELECT {columns} FROM read_parquet('{path}')"
+        ).fetchall()
+        con.close()
+        return rows
+
+    def test_preserves_row_count(self, tmp_path):
+        p = tmp_path / "in.parquet"
+        self._write_input(p, [(12.0, 42.0), (9.0, 45.0), (15.0, 38.0)])
+        enhance_parquet(p)
+        assert len(self._read_rows(p)) == 3
+
+    def test_adds_bbox_struct_column(self, tmp_path):
+        p = tmp_path / "in.parquet"
+        self._write_input(p, [(12.0, 42.0)])
+        enhance_parquet(p)
+        import duckdb
+        con = duckdb.connect()
+        cols = con.execute(
+            f"DESCRIBE SELECT * FROM read_parquet('{p}')"
+        ).fetchall()
+        con.close()
+        bbox_rows = [c for c in cols if c[0] == "bbox"]
+        assert len(bbox_rows) == 1, f"Expected exactly one bbox column, got cols={cols}"
+        bbox_type = bbox_rows[0][1].lower()
+        for field in ("xmin", "ymin", "xmax", "ymax"):
+            assert field in bbox_type, f"bbox struct missing {field}: {bbox_type}"
+
+    def test_bbox_for_point_equals_lon_lat_for_all_four_fields(self, tmp_path):
+        p = tmp_path / "in.parquet"
+        self._write_input(p, [(12.5, 41.9)])
+        enhance_parquet(p)
+        import duckdb
+        row = duckdb.connect().execute(f"""
+            SELECT longitude, latitude,
+                   bbox.xmin, bbox.ymin, bbox.xmax, bbox.ymax
+            FROM read_parquet('{p}')
+        """).fetchone()
+        lon, lat, xmin, ymin, xmax, ymax = row
+        assert xmin == lon and xmax == lon, f"bbox xmin/xmax should equal longitude={lon}"
+        assert ymin == lat and ymax == lat, f"bbox ymin/ymax should equal latitude={lat}"
+
+    def test_preserves_original_columns(self, tmp_path):
+        p = tmp_path / "in.parquet"
+        self._write_input(p, [(12.0, 42.0), (9.0, 45.0)])
+        enhance_parquet(p)
+        import duckdb
+        col_names = {
+            row[0] for row in duckdb.connect().execute(
+                f"DESCRIBE SELECT * FROM read_parquet('{p}')"
+            ).fetchall()
+        }
+        for required in (
+            "CODICE_ISTAT", "NOME_COMUNE", "longitude", "latitude", "geometry"
+        ):
+            assert required in col_names, (
+                f"Original column {required!r} dropped by enhance_parquet "
+                f"(remaining: {col_names})"
+            )
+
+    def test_output_is_hilbert_sorted(self, tmp_path):
+        """Rows must be reordered by Hilbert curve so spatial neighbours sit
+        next to each other on disk. Verified by total Euclidean traversal:
+        a Hilbert-sorted path is much shorter than a random shuffle."""
+        import random
+
+        p = tmp_path / "in.parquet"
+        rng = random.Random(42)
+        # 200 random points across Italy
+        points = [(rng.uniform(7, 18), rng.uniform(36, 47)) for _ in range(200)]
+        self._write_input(p, points)
+
+        enhance_parquet(p)
+
+        sorted_rows = self._read_rows(p, "longitude, latitude")
+
+        def total_dist(seq):
+            return sum(
+                ((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5
+                for a, b in zip(seq, seq[1:])
+            )
+
+        sorted_dist = total_dist(sorted_rows)
+        random_dist = total_dist(points)
+        assert sorted_dist < random_dist * 0.5, (
+            f"Expected Hilbert sort to roughly halve traversal distance: "
+            f"sorted={sorted_dist:.2f} random={random_dist:.2f}"
+        )
+
+    def test_output_partitionable_by_h3(self, tmp_path):
+        """Integration check: the enhanced parquet must remain consumable by
+        geoparquet-io's partition_by_h3, which is the next stage of the
+        pipeline (partition_h3_tiles).
+
+        Uses enough rows to clear geoparquet-io's "tiny partitions" minimum
+        (>=100 rows/partition by default).
+        """
+        import random
+
+        import geoparquet_io as gpio
+
+        p = tmp_path / "in.parquet"
+        rng = random.Random(0)
+        # 300 points clustered around Roma — collapse to a single H3 res-5 cell
+        # so geoparquet-io's row-per-partition floor is satisfied.
+        points = [
+            (12.49 + rng.uniform(-0.001, 0.001), 41.90 + rng.uniform(-0.001, 0.001))
+            for _ in range(300)
+        ]
+        self._write_input(p, points)
+        enhance_parquet(p)
+
+        out_dir = tmp_path / "tiles"
+        out_dir.mkdir()
+        gpio.read(str(p)) \
+            .add_h3(resolution=5) \
+            .partition_by_h3(str(out_dir), resolution=5)
+
+        files = list(out_dir.glob("**/*.parquet"))
+        assert len(files) >= 1, "partition_by_h3 should produce at least one tile"
+
+    def test_does_not_duplicate_or_drop_rows(self, tmp_path):
+        """The set of (longitude, latitude) pairs is preserved exactly."""
+        p = tmp_path / "in.parquet"
+        points = [(12.0 + i * 0.1, 42.0 + i * 0.1) for i in range(50)]
+        self._write_input(p, points)
+
+        enhance_parquet(p)
+
+        rows = self._read_rows(p, "longitude, latitude")
+        assert sorted(rows) == sorted(points)

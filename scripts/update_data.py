@@ -414,26 +414,63 @@ def generate_comuni_h3(parquet_path: Path, output_path: Path | None = None) -> P
     return output_path
 
 
-def enhance_with_geoparquet(parquet_path: Path) -> None:
-    """Add bbox and spatial sorting using geoparquet-io.
+def enhance_parquet(parquet_path: Path) -> None:
+    """Add a GeoParquet bbox column and Hilbert-sort the rows in place.
 
-    Uses two passes with a disk flush in between to keep peak memory
-    under ~5.5 GB (single-pass peaks at ~11 GB on 18M rows, which
-    exceeds the 7 GB available on GitHub Actions runners).
+    DuckDB-native replacement for geoparquet-io's add_bbox + sort_hilbert.
+    Streams the sort to disk (memory_limit + spill_to_disk) instead of
+    materialising the whole table in memory, which reliably OOMed the
+    GitHub-hosted runner (16 GB) on 20M rows.
     """
-    import gc
+    print("Enhancing parquet (bbox + Hilbert sort) ...", flush=True)
+    con = duckdb.connect()
+    con.execute("INSTALL spatial; LOAD spatial;")
 
-    import geoparquet_io as gpio
+    # Bound DuckDB memory so the sort spills to disk instead of OOMing the
+    # runner. 4 GB leaves headroom for tippecanoe and the partitioning step.
+    con.execute("SET memory_limit='4GB'")
+    con.execute("SET preserve_insertion_order=false")
 
-    print("Adding bbox ...")
-    gpio.read(str(parquet_path)).add_bbox().write(str(parquet_path))
-    gc.collect()
+    # First pass: compute global extent for the Hilbert curve bounds.
+    extent = con.execute(f"""
+        SELECT MIN(longitude), MIN(latitude),
+               MAX(longitude), MAX(latitude)
+        FROM read_parquet('{parquet_path}')
+    """).fetchone()
+    if extent[0] is None:
+        con.close()
+        return
+    xmin, ymin, xmax, ymax = extent
+    print(
+        f"  extent: lon [{xmin:.4f}, {xmax:.4f}], "
+        f"lat [{ymin:.4f}, {ymax:.4f}]",
+        flush=True,
+    )
 
-    print("Spatial sorting (Hilbert) ...")
-    gpio.read(str(parquet_path)).sort_hilbert().write(str(parquet_path))
-    gc.collect()
+    # Second pass: stream into a temp file, atomic-rename on success.
+    tmp_path = parquet_path.with_suffix(parquet_path.suffix + ".tmp")
+    if tmp_path.exists():
+        tmp_path.unlink()
 
-    print("GeoParquet enhancement complete")
+    con.execute(f"""
+        COPY (
+            SELECT
+                * EXCLUDE (geometry),
+                {{'xmin': longitude, 'ymin': latitude,
+                  'xmax': longitude, 'ymax': latitude}} AS bbox,
+                geometry
+            FROM read_parquet('{parquet_path}')
+            ORDER BY ST_Hilbert(
+                longitude, latitude,
+                {{'min_x': {xmin}, 'min_y': {ymin},
+                  'max_x': {xmax}, 'max_y': {ymax}}}::BOX_2D
+            )
+        ) TO '{tmp_path}' (FORMAT PARQUET, COMPRESSION ZSTD)
+    """)
+    con.close()
+
+    shutil.move(str(tmp_path), str(parquet_path))
+    print("Parquet enhancement complete", flush=True)
 
 
 def _clean_tiles_dir(tiles_dir: Path) -> None:
@@ -521,7 +558,7 @@ def main(
 
     try:
         parquet_path = csv_to_parquet(csv_path)
-        enhance_with_geoparquet(parquet_path)
+        enhance_parquet(parquet_path)
         generate_comuni_h3(parquet_path)
         convert_to_pmtiles(parquet_path)
         partition_h3_tiles(parquet_path)
