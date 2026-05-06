@@ -22,10 +22,78 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v4
 
+      - name: Install rclone (early, for live log shipping)
+        run: curl -fsSL https://rclone.org/install.sh | sudo bash
+
       - name: Run update script
-        run: uv run scripts/update_data.py
         env:
           PYTHONUNBUFFERED: "1"
+          RCLONE_CONFIG_R2_TYPE: s3
+          RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+          RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          RCLONE_CONFIG_R2_ENDPOINT: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          RCLONE_CONFIG_R2_ACL: private
+        run: |
+          LOG=/tmp/update_data.log
+
+          # Background heartbeat: prints memory + disk + load every 15s.
+          # Goal: when the runner dies mid-run (logs are usually lost), see
+          # the last heartbeat to confirm whether it was OOM, disk-full, or
+          # a stalled silent stage.
+          (
+            while true; do
+              ts=$(date +%H:%M:%S)
+              mem=$(free -m | awk '/^Mem:/{printf "mem used=%dMi avail=%dMi (%.0f%% used of %dMi)", $3, $7, ($3*100)/$2, $2}')
+              disk=$(df -h /home/runner/work | awk 'NR==2 {printf "disk used=%s avail=%s", $3, $4}')
+              load=$(uptime | sed 's/.*load average://')
+              echo "[$ts] [$mem] [$disk] [load=$load]"
+              sleep 15
+            done
+          ) &
+          MON_PID=$!
+
+          # External live log shipper: ships /tmp/update_data.log to R2 every
+          # 30s. Survives even if the runner is killed entirely (artifact
+          # upload step wouldn't run in that case), so we can post-mortem
+          # by fetching the file from R2.
+          (
+            while sleep 30; do
+              [ -f "$LOG" ] && rclone copyto "$LOG" \
+                "r2:anncsu-data/_debug/update_data-${{ github.run_id }}.log" \
+                --no-traverse 2>/dev/null || true
+            done
+          ) &
+          SHIP_PID=$!
+
+          # Tee stdout/stderr to a workspace file so both the artifact upload
+          # and the R2 shipper can preserve the log even if the script fails.
+          set +e
+          stdbuf -oL -eL uv run scripts/update_data.py 2>&1 | tee "$LOG"
+          EXIT=${PIPESTATUS[0]}
+
+          kill "$MON_PID" "$SHIP_PID" 2>/dev/null || true
+
+          echo "=== FINAL STATE ==="
+          free -m
+          df -h /home/runner/work
+          ps -ax -o pid,rss,vsz,comm | sort -k 2 -rn | head -5
+
+          # Final ship of the complete log
+          rclone copyto "$LOG" \
+            "r2:anncsu-data/_debug/update_data-${{ github.run_id }}.log" \
+            --no-traverse 2>/dev/null || true
+
+          exit "$EXIT"
+
+      - name: Upload script logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: update-data-log
+          path: /tmp/update_data.log
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Check for changes
         id: changes
@@ -44,11 +112,6 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "Update ANNCSU data"
           git push
-
-      - name: Install rclone
-        if: steps.changes.outputs.changed == 'true'
-        run: |
-          curl -fsSL https://rclone.org/install.sh | sudo bash
 
       - name: Upload data to Cloudflare R2
         if: steps.changes.outputs.changed == 'true'
