@@ -5,6 +5,14 @@ Tutti gli accessi esterni censiti in ANNCSU in un unico file GeoParquet, ordinat
 Aggiornato al 15 settembre 2026, con 20.731.065 indirizzi. I dati si
 vedono sulla mappa nel [visualizzatore web](https://anncsu-open.github.io/anncsu-viewer/).
 
+> **Nota sulla visualizzazione.** Nel Portolan Browser, come in STAC Browser
+> da cui deriva, l'estensione temporale di questa collection compare come
+> "fino ad ora" senza la data di inizio in tutte le lingue dell'interfaccia
+> diverse dall'inglese. È un difetto del browser, non del catalogo:
+> l'intervallo dichiarato in `extent.temporal` inizia il 15 settembre 2026
+> ed è aperto, e si legge per intero con l'interfaccia in inglese o nel JSON
+> tramite Source.
+
 ## Come si legge
 
 Il file è un GeoParquet leggibile via HTTP con DuckDB, GDAL, GeoPandas o qualunque lettore Parquet. Le righe sono ordinate lungo una curva di Hilbert e ogni riga porta un riquadro di delimitazione, quindi un filtro spaziale o su un comune legge solo i gruppi di righe che servono.

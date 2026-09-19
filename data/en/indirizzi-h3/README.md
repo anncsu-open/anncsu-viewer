@@ -5,6 +5,13 @@ The same addresses as the indirizzi collection, split into 1,348 files by the re
 Updated to the 15 September 2026 release, with 20,731,065 addresses.
 See the data on a map in the [web viewer](https://anncsu-open.github.io/anncsu-viewer/).
 
+> **Display note.** In the Portolan Browser, as in the STAC Browser it derives
+> from, the temporal extent of this collection is rendered as "until present"
+> without its start date in every interface language other than English. It is
+> a defect of the browser, not of the catalog: the interval declared in
+> `extent.temporal` starts on 15 September 2026 and is open-ended, and reads
+> in full with the English interface or in the JSON through Source.
+
 ## How to read it
 
 The data is split by resolution 5 H3 cell, in Hive layout. The bulk-access glob is `https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/tiles/h3_cell=*/*.parquet`, but HTTPS offers no directory listing, so a reader cannot expand it on its own. To know which cells you need, read the `comuni-h3.json` index, which maps every comune to its cells.

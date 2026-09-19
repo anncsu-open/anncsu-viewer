@@ -5,6 +5,13 @@ Every external access recorded in ANNCSU in one GeoParquet file, spatially sorte
 Updated to the 15 September 2026 release, with 20,731,065 addresses.
 See the data on a map in the [web viewer](https://anncsu-open.github.io/anncsu-viewer/).
 
+> **Display note.** In the Portolan Browser, as in the STAC Browser it derives
+> from, the temporal extent of this collection is rendered as "until present"
+> without its start date in every interface language other than English. It is
+> a defect of the browser, not of the catalog: the interval declared in
+> `extent.temporal` starts on 15 September 2026 and is open-ended, and reads
+> in full with the English interface or in the JSON through Source.
+
 ## How to read it
 
 The file is a GeoParquet readable over HTTP with DuckDB, GDAL, GeoPandas or any Parquet reader. Rows are sorted along a Hilbert curve and every row carries a bounding box, so a spatial filter or a filter on one comune reads only the row groups it needs.
