@@ -5,6 +5,11 @@ on:
     workflows: ["Update ANNCSU Data"]
     types: [completed]
   workflow_dispatch:
+    inputs:
+      force_upload:
+        description: "Upload the catalog to R2 even when nothing changed"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -58,12 +63,15 @@ jobs:
           git commit -m "Update Portolan catalog"
           git push
 
+      # The upload normally follows a change. `force_upload` lets a manual run
+      # publish anyway, for example after a failed upload whose commit already
+      # landed, when a re-run would otherwise see no change and skip it.
       - name: Install rclone
-        if: steps.changes.outputs.changed == 'true'
+        if: steps.changes.outputs.changed == 'true' || inputs.force_upload == true
         run: curl -fsSL https://rclone.org/install.sh | sudo bash
 
       - name: Upload the catalog to Cloudflare R2
-        if: steps.changes.outputs.changed == 'true'
+        if: steps.changes.outputs.changed == 'true' || inputs.force_upload == true
         env:
           RCLONE_CONFIG_R2_TYPE: s3
           RCLONE_CONFIG_R2_PROVIDER: Cloudflare
@@ -71,6 +79,11 @@ jobs:
           RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           RCLONE_CONFIG_R2_ENDPOINT: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
           RCLONE_CONFIG_R2_ACL: private
+          # The token can write objects but not create buckets. Without this,
+          # rclone answers a 404 on a new object by trying CreateBucket, which
+          # fails with 403. Existing objects and directory syncs never hit it,
+          # which is why the data workflow's overwrites always worked.
+          RCLONE_CONFIG_R2_NO_CHECK_BUCKET: "true"
         run: |
           # Only the catalog. The data files are synced by the update workflow,
           # and a narrow scope keeps anything else out of a public bucket.
@@ -81,7 +94,7 @@ jobs:
           rclone sync data/indirizzi-h3/ r2:anncsu-data/indirizzi-h3/ -P
 
       - name: Check the published catalog
-        if: steps.changes.outputs.changed == 'true'
+        if: steps.changes.outputs.changed == 'true' || inputs.force_upload == true
         continue-on-error: true
         run: |
           # Reports on range requests and CORS at the host. A problem here is
