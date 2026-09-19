@@ -1175,5 +1175,73 @@ class TestEnglishBuild:
             )
 
 
+class TestDataUpdatedInGit:
+    """`updated` must come from the commit that brought the parquet in.
+
+    actions/checkout clones at depth 1 by default. In such a clone every file
+    looks as if HEAD introduced it, so `git log -1 -- parquet` returns HEAD and
+    `updated` would move with every unrelated commit, producing a spurious
+    "Update Portolan catalog" commit on every run. That is what happened on
+    2026-09-19. A shallow repository must therefore not be trusted.
+    """
+
+    def _git(self, *args, cwd, date=None):
+        import os
+        import subprocess
+
+        env = dict(os.environ)
+        if date:
+            env["GIT_AUTHOR_DATE"] = date
+            env["GIT_COMMITTER_DATE"] = date
+        subprocess.run(
+            ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", *args],
+            cwd=cwd,
+            check=True,
+            capture_output=True,
+            env=env,
+        )
+
+    def _make_origin(self, root):
+        """Two commits: the parquet lands first, an unrelated file later."""
+        origin = root / "origin"
+        (origin / "data").mkdir(parents=True)
+        self._git("init", "-q", "-b", "main", cwd=origin)
+        (origin / "data" / "in.parquet").write_bytes(b"parquet")
+        (origin / "data" / ".last_remote_date").write_text("20260915")
+        self._git("add", ".", cwd=origin)
+        self._git("commit", "-q", "-m", "data", cwd=origin, date="2026-09-01T10:00:00Z")
+        (origin / "other.txt").write_text("later")
+        self._git("add", ".", cwd=origin)
+        self._git(
+            "commit", "-q", "-m", "unrelated", cwd=origin, date="2026-09-02T10:00:00Z"
+        )
+        return origin
+
+    def test_full_history_gives_the_parquet_commit_date(self, tmp_path):
+        origin = self._make_origin(tmp_path)
+
+        result = data_updated(
+            origin / "data" / "in.parquet", origin / "data" / ".last_remote_date"
+        )
+
+        assert result == "2026-09-01T10:00:00Z"
+
+    def test_shallow_clone_falls_back_to_the_dataset_date(self, tmp_path):
+        origin = self._make_origin(tmp_path)
+        clone = tmp_path / "shallow"
+        self._git(
+            "clone", "-q", "--depth", "1", f"file://{origin}", str(clone), cwd=tmp_path
+        )
+
+        result = data_updated(
+            clone / "data" / "in.parquet", clone / "data" / ".last_remote_date"
+        )
+
+        assert result != "2026-09-02T10:00:00Z", (
+            "HEAD's date is not when the parquet changed"
+        )
+        assert result == "2026-09-15T00:00:00Z"
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))

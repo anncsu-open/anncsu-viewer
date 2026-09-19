@@ -288,21 +288,41 @@ def data_updated(parquet_path: Path, marker_path: Path) -> str:
 
     Outside a git checkout, or before the parquet is committed, the dataset
     release date stands in. It is equally deterministic.
-    """
-    try:
-        result = subprocess.run(
-            ["git", "log", "-1", "--format=%cI", "--", str(parquet_path)],
-            cwd=parquet_path.parent,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    except OSError:
-        result = None
 
-    if result is not None and result.returncode == 0 and result.stdout.strip():
-        committed = datetime.fromisoformat(result.stdout.strip())
-        return committed.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    A shallow clone is not trusted either: with no history, ``git log`` for
+    any path returns HEAD, so ``updated`` would follow every unrelated commit
+    and the workflow would commit a changed catalog on every run. This is
+    what actions/checkout produces at its default depth of 1; the workflow
+    fetches the full history precisely to avoid this fallback.
+    """
+
+    def git(*args: str) -> str | None:
+        try:
+            result = subprocess.run(
+                ["git", *args],
+                cwd=parquet_path.parent,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except OSError:
+            return None
+        if result.returncode != 0:
+            return None
+        return result.stdout.strip()
+
+    if git("rev-parse", "--is-shallow-repository") == "true":
+        print(
+            "Warning: shallow git clone, git log cannot date the parquet; "
+            "using the dataset release date as `updated`.",
+            flush=True,
+        )
+        return dataset_date(marker_path)
+
+    committed = git("log", "-1", "--format=%cI", "--", str(parquet_path))
+    if committed:
+        parsed = datetime.fromisoformat(committed)
+        return parsed.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     return dataset_date(marker_path)
 
