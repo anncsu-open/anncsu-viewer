@@ -52,6 +52,12 @@ PUBLIC_BASE = "https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev"
 REPO_URL = "https://github.com/anncsu-open/anncsu-viewer"
 SOURCE_PORTAL = "https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/"
 LICENSE_ID = "CC-BY-4.0"
+VIEWER_URL = "https://anncsu-open.github.io/anncsu-viewer/"
+BROWSER_URL = (
+    "https://browser.portolan-sdi.org/#/external/"
+    + PUBLIC_BASE.removeprefix("https://")
+    + "/catalog.json"
+)
 
 PORTOLAN_SCHEMA = "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json"
 PARTITION_SCHEMA = (
@@ -82,15 +88,31 @@ def stac_type(duckdb_type: str) -> str:
 
 
 def load_columns(path: Path) -> dict[str, dict]:
-    """Load the hand-written column documentation."""
+    """Load the hand-written column documentation in both languages.
+
+    A column without an English description would silently publish Italian
+    text in the English tree, so its absence stops the build.
+    """
     with open(path, encoding="utf-8") as handle:
         raw = yaml.safe_load(handle)
+
+    untranslated = [
+        name
+        for name, spec in raw.items()
+        if not str(spec.get("description_en", "")).strip()
+    ]
+    if untranslated:
+        raise SystemExit(
+            f"Columns without description_en in {path.name}: "
+            f"{', '.join(untranslated)}. The English tree needs every column."
+        )
 
     columns = {}
     for name, spec in raw.items():
         columns[name] = {
             "type": str(spec["type"]),
             "description": " ".join(str(spec["description"]).split()),
+            "description_en": " ".join(str(spec["description_en"]).split()),
             "derived": bool(spec.get("derived", False)),
             "tiles_only": bool(spec.get("tiles_only", False)),
         }
@@ -110,14 +132,17 @@ def read_parquet_columns(parquet_path: Path) -> list[tuple[str, str]]:
     return [(row[0], row[1]) for row in rows]
 
 
-def table_columns(parquet_path: Path, columns_path: Path) -> list[dict]:
+def table_columns(
+    parquet_path: Path, columns_path: Path, lang: str = "it"
+) -> list[dict]:
     """Build the STAC table:columns array, failing on any schema drift.
 
     An upstream schema change must stop the build rather than produce a
     catalog that describes columns the data no longer has, or omits columns it
     gained. Columns flagged tiles_only are expected to be absent from a file
-    that is not a partition.
+    that is not a partition. ``lang`` selects the description language.
     """
+    description_key = "description" if lang == "it" else f"description_{lang}"
     documented = load_columns(columns_path)
     actual = read_parquet_columns(parquet_path)
     actual_names = {name for name, _ in actual}
@@ -157,7 +182,7 @@ def table_columns(parquet_path: Path, columns_path: Path) -> list[dict]:
         {
             "name": name,
             "type": stac_type(found),
-            "description": documented[name]["description"],
+            "description": documented[name][description_key],
         }
         for name, found in actual
     ]
@@ -342,8 +367,56 @@ def render_thumbnail(
     image.save(output_path, format="PNG", optimize=True)
 
 
-LANGUAGE = {"code": "it", "name": "Italiano", "alternate": "Italian"}
+def dataset_statistics(parquet_path: Path) -> dict:
+    """Global figures the catalog states about the addresses.
+
+    Recomputed from the parquet rather than carried over from the data
+    workflow, so the catalog never depends on another run's log. The spec has
+    no machine field for attribute statistics beyond table:row_count, so these
+    feed the descriptions and the README tables.
+    """
+    import duckdb
+
+    con = duckdb.connect()
+    out_of_bounds, no_boundary, comuni = con.execute(f"""
+        SELECT
+            count(*) FILTER (WHERE out_of_bounds),
+            count(*) FILTER (WHERE out_of_bounds IS NULL),
+            count(DISTINCT CODICE_ISTAT)
+        FROM read_parquet('{parquet_path}')
+    """).fetchone()
+    methods = con.execute(f"""
+        SELECT METODO, count(*)
+        FROM read_parquet('{parquet_path}')
+        WHERE METODO IS NOT NULL
+        GROUP BY METODO
+        ORDER BY METODO
+    """).fetchall()
+    con.close()
+
+    return {
+        "out_of_bounds": out_of_bounds,
+        "no_boundary": no_boundary,
+        "comuni": comuni,
+        "metodo": {str(code): count for code, count in methods},
+    }
+
+
+# ---------------------------------------------------------------------------
+# Languages. Italian is the source tree at the root of data/; every other
+# language is a translated tree in data/<lang>/ that references the data,
+# styles and thumbnails of the source tree (Portolan multilingual practice).
+# ---------------------------------------------------------------------------
+
 LANGUAGE_SCHEMA = "https://stac-extensions.github.io/language/v1.0.0/schema.json"
+SOURCE_LANG = "it"
+TRANSLATIONS = ["en"]
+ALL_LANGS = [SOURCE_LANG, *TRANSLATIONS]
+
+LANGUAGES = {
+    "it": {"code": "it", "name": "Italiano", "alternate": "Italian"},
+    "en": {"code": "en", "name": "English", "alternate": "Inglese"},
+}
 
 COLLECTION_EXTENSIONS = [
     PORTOLAN_SCHEMA,
@@ -353,6 +426,425 @@ COLLECTION_EXTENSIONS = [
     WEB_MAP_LINKS_SCHEMA,
     LANGUAGE_SCHEMA,
 ]
+
+MONTHS = {
+    "it": [
+        "gennaio",
+        "febbraio",
+        "marzo",
+        "aprile",
+        "maggio",
+        "giugno",
+        "luglio",
+        "agosto",
+        "settembre",
+        "ottobre",
+        "novembre",
+        "dicembre",
+    ],
+    "en": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+    ],
+}
+
+METHOD_LABELS = {
+    "it": {
+        "1": "rilevazione strumentale sul campo, accuratezza inferiore a 5 m",
+        "2": "rilevazione strumentale sul campo, accuratezza pari o superiore a 5 m",
+        "3": "derivazione indiretta da base dati territoriale, accuratezza stimata inferiore a 5 m",
+        "4": "derivazione indiretta da base dati territoriale, accuratezza stimata pari o superiore a 5 m",
+        "5": "derivazione indiretta tramite le funzioni del Portale per i Comuni",
+    },
+    "en": {
+        "1": "field survey with instruments, accuracy below 5 m",
+        "2": "field survey with instruments, accuracy of 5 m or more",
+        "3": "indirect derivation from a spatial database, estimated accuracy below 5 m",
+        "4": "indirect derivation from a spatial database, estimated accuracy of 5 m or more",
+        "5": "indirect derivation through the functions of the Portale per i Comuni",
+    },
+}
+
+TEXTS = {
+    "it": {
+        "root_title": "Indirizzi ANNCSU",
+        "root_description": (
+            "Gli indirizzi certificati dei comuni italiani, dall'Archivio "
+            "Nazionale dei Numeri Civici e delle Strade Urbane, convertiti in "
+            "formati cloud-native. Il catalogo pubblica lo stesso insieme di "
+            "dati in due forme: un unico file GeoParquet per l'analisi "
+            "complessiva, e una partizione in celle H3 per leggere un comune "
+            "alla volta senza scaricare tutto."
+        ),
+        "indirizzi_title": "Indirizzi ANNCSU, file unico",
+        "indirizzi_description": (
+            "Tutti gli accessi esterni censiti in ANNCSU in un unico file "
+            "GeoParquet, ordinato spazialmente secondo una curva di Hilbert e "
+            "corredato di colonna bbox, così che un lettore possa scartare "
+            "interi gruppi di righe senza decodificare le geometrie. Adatto "
+            "all'analisi sull'intero territorio nazionale. Per leggere un "
+            "singolo comune conviene la collection partizionata. $statistics"
+        ),
+        "h3_title": "Indirizzi ANNCSU, partizionati per cella H3",
+        "h3_description": (
+            "Gli stessi indirizzi della collection indirizzi, ripartiti in "
+            "$tile_count file secondo la cella H3 di risoluzione $resolution "
+            "che li contiene, con struttura Hive "
+            "tiles/h3_cell=<cella>/<cella>.parquet. Ogni file pesa meno di un "
+            "megabyte, quindi un client può leggere un comune senza scaricare "
+            "il file nazionale. Il glob di accesso massivo è $glob, ma su "
+            "HTTPS non esiste il listing: per sapere quali celle servono si "
+            "usa l'indice comuni-h3.json, registrato come asset di metadati. "
+            "$statistics"
+        ),
+        "statistics_sentence": (
+            "Su $total accessi, $oob ($pct) cadono oltre 110 metri fuori dal "
+            "confine del comune a cui sono attribuiti secondo i confini Istat, "
+            "e $nob non hanno un confine di riferimento."
+        ),
+        "vcs": "Repository del catalogo e della pipeline",
+        "issues": "Segnalazioni",
+        "via": "Portale open data ANNCSU",
+        "license": "Creative Commons Attribuzione 4.0 Internazionale",
+        "agents": "Istruzioni per agenti automatici",
+        "describedby": "Documentazione leggibile",
+        "viewer": "Visualizzatore web",
+        "other_tree": {"en": "Inglese"},
+        "data_title": "Indirizzi ANNCSU (GeoParquet)",
+        "visual_title": "Indirizzi ANNCSU (PMTiles)",
+        "pmtiles_link": "Tile vettoriali per la mappa",
+        "style_indirizzi_title": "Punti indirizzo",
+        "style_indirizzi_description": "Tutti gli accessi come punti uniformi.",
+        "style_h3_title": "Indirizzi fuori confine",
+        "style_h3_description": (
+            "Gli accessi colorati per posizione rispetto al confine comunale."
+        ),
+        "thumbnail": "Densità degli indirizzi sul territorio nazionale",
+        "cell_index_title": "Indice delle celle H3 per comune",
+        "cell_index_description": (
+            "Per ogni comune, l'elenco delle celle H3 che ne contengono gli "
+            "indirizzi. Sostituisce il listing che HTTPS non offre."
+        ),
+        "partition_key": "Cella H3 di risoluzione $resolution che contiene l'indirizzo.",
+        "keywords": ["indirizzi", "numeri civici", "toponomastica", "italia", "anncsu"],
+        "keywords_h3": ["h3", "partizionato"],
+        "stats_header": ("Statistica", "Valore"),
+        "stats_total": "Accessi totali",
+        "stats_oob": "Fuori dal confine comunale, oltre 110 m",
+        "stats_nob": "Senza confine comunale di riferimento",
+        "stats_comuni": "Comuni con almeno un accesso",
+        "stats_method": "Metodo $code, $label",
+    },
+    "en": {
+        "root_title": "ANNCSU addresses",
+        "root_description": (
+            "The certified addresses of Italian comuni, from the National "
+            "Archive of House Numbers and Urban Streets (ANNCSU), converted to "
+            "cloud-native formats. The catalog publishes the same data in two "
+            "shapes: one GeoParquet file for country-wide analysis, and a "
+            "partition into H3 cells for reading one comune at a time without "
+            "downloading everything."
+        ),
+        "indirizzi_title": "ANNCSU addresses, single file",
+        "indirizzi_description": (
+            "Every external access recorded in ANNCSU in one GeoParquet file, "
+            "spatially sorted along a Hilbert curve and carrying a bbox column, "
+            "so a reader can skip whole row groups without decoding geometries. "
+            "Suited to analysis over the whole country. To read a single comune "
+            "the partitioned collection is the better choice. $statistics"
+        ),
+        "h3_title": "ANNCSU addresses, partitioned by H3 cell",
+        "h3_description": (
+            "The same addresses as the indirizzi collection, split into "
+            "$tile_count files by the resolution $resolution H3 cell that "
+            "contains them, in Hive layout tiles/h3_cell=<cell>/<cell>.parquet. "
+            "Every file is under a megabyte, so a client can read one comune "
+            "without downloading the national file. The bulk-access glob is "
+            "$glob, but HTTPS offers no listing: to know which cells you need, "
+            "use the comuni-h3.json index, registered as a metadata asset. "
+            "$statistics"
+        ),
+        "statistics_sentence": (
+            "Of $total addresses, $oob ($pct) fall more than 110 metres outside "
+            "the boundary of the comune they are assigned to, according to "
+            "Istat boundaries, and $nob have no boundary to compare against."
+        ),
+        "vcs": "Catalog and pipeline repository",
+        "issues": "Issue tracker",
+        "via": "ANNCSU open data portal",
+        "license": "Creative Commons Attribution 4.0 International",
+        "agents": "Instructions for automated agents",
+        "describedby": "Human-readable documentation",
+        "viewer": "Web viewer",
+        "other_tree": {"it": "Italian"},
+        "data_title": "ANNCSU addresses (GeoParquet)",
+        "visual_title": "ANNCSU addresses (PMTiles)",
+        "pmtiles_link": "Vector tiles for the map",
+        "style_indirizzi_title": "Address points",
+        "style_indirizzi_description": "Every access as a uniform point.",
+        "style_h3_title": "Out-of-bounds addresses",
+        "style_h3_description": (
+            "Accesses coloured by their position against the comune boundary."
+        ),
+        "thumbnail": "Address density over the country",
+        "cell_index_title": "Index of H3 cells per comune",
+        "cell_index_description": (
+            "For every comune, the list of H3 cells containing its addresses. "
+            "It stands in for the listing HTTPS does not offer."
+        ),
+        "partition_key": "H3 cell at resolution $resolution containing the address.",
+        "keywords": ["addresses", "house numbers", "street names", "italy", "anncsu"],
+        "keywords_h3": ["h3", "partitioned"],
+        "stats_header": ("Statistic", "Value"),
+        "stats_total": "Total addresses",
+        "stats_oob": "Outside the comune boundary, beyond 110 m",
+        "stats_nob": "Without a comune boundary to compare against",
+        "stats_comuni": "Comuni with at least one address",
+        "stats_method": "Method $code, $label",
+    },
+}
+
+LICENSE_PARAGRAPHS = {
+    "it": (
+        "I dati sono pubblicati con licenza "
+        "[Creative Commons Attribuzione 4.0 Internazionale]"
+        "(https://creativecommons.org/licenses/by/4.0/deed.it), identificativo "
+        "SPDX `CC-BY-4.0`. Le pagine ufficiali ANNCSU richiamano il Regolamento "
+        "di esecuzione (UE) 2023/138 sui dati di elevato valore, che per la serie "
+        "degli indirizzi impone questa licenza, ma non la riportano per esteso. "
+        "Chi ha bisogno di certezza per un riutilizzo commerciale conviene che si "
+        "rivolga all'Agenzia delle Entrate."
+    ),
+    "en": (
+        "The data is published under the "
+        "[Creative Commons Attribution 4.0 International]"
+        "(https://creativecommons.org/licenses/by/4.0/) licence, SPDX "
+        "identifier `CC-BY-4.0`. The official ANNCSU pages cite EU implementing "
+        "regulation 2023/138 on high-value datasets, which mandates this licence "
+        "for the address series, but do not state it in full. Anyone who needs "
+        "certainty for a commercial reuse should ask the Agenzia delle Entrate."
+    ),
+}
+
+USAGE = {
+    "it": {
+        "indirizzi": (
+            "Il file è un GeoParquet leggibile via HTTP con DuckDB, GDAL, "
+            "GeoPandas o qualunque lettore Parquet. Le righe sono ordinate lungo "
+            "una curva di Hilbert e ogni riga porta un riquadro di delimitazione, "
+            "quindi un filtro spaziale o su un comune legge solo i gruppi di righe "
+            "che servono.\n\n"
+            "```sql\n"
+            "INSTALL httpfs; LOAD httpfs;\n"
+            "SELECT ODONIMO, CIVICO, ESPONENTE\n"
+            "FROM read_parquet('$public_base/anncsu-indirizzi.parquet')\n"
+            "WHERE CODICE_ISTAT = '058091'\n"
+            "LIMIT 10;\n"
+            "```"
+        ),
+        "indirizzi-h3": (
+            "I dati sono divisi per cella H3 di risoluzione 5, con struttura "
+            "Hive. Il glob di accesso massivo è "
+            "`$public_base/tiles/h3_cell=*/*.parquet`, ma su HTTPS non esiste il "
+            "listing delle directory, quindi un lettore non può espanderlo da "
+            "solo. Per sapere quali celle servono si legge l'indice "
+            "`comuni-h3.json`, che mappa ogni comune sulle sue celle.\n\n"
+            "```shell\n"
+            "curl -s $public_base/comuni-h3.json \\\n"
+            "  | jq -r '.[] | select(.nome_comune == \"Roma\") | .h3_cells[]'\n"
+            "```\n\n"
+            "```sql\n"
+            "SELECT count(*)\n"
+            "FROM read_parquet('$public_base/tiles/h3_cell=851fb467fffffff/851fb467fffffff.parquet')\n"
+            "WHERE CODICE_ISTAT = '058091';\n"
+            "```"
+        ),
+    },
+    "en": {
+        "indirizzi": (
+            "The file is a GeoParquet readable over HTTP with DuckDB, GDAL, "
+            "GeoPandas or any Parquet reader. Rows are sorted along a Hilbert "
+            "curve and every row carries a bounding box, so a spatial filter or a "
+            "filter on one comune reads only the row groups it needs.\n\n"
+            "```sql\n"
+            "INSTALL httpfs; LOAD httpfs;\n"
+            "SELECT ODONIMO, CIVICO, ESPONENTE\n"
+            "FROM read_parquet('$public_base/anncsu-indirizzi.parquet')\n"
+            "WHERE CODICE_ISTAT = '058091'\n"
+            "LIMIT 10;\n"
+            "```"
+        ),
+        "indirizzi-h3": (
+            "The data is split by resolution 5 H3 cell, in Hive layout. The "
+            "bulk-access glob is `$public_base/tiles/h3_cell=*/*.parquet`, but "
+            "HTTPS offers no directory listing, so a reader cannot expand it on "
+            "its own. To know which cells you need, read the `comuni-h3.json` "
+            "index, which maps every comune to its cells.\n\n"
+            "```shell\n"
+            "curl -s $public_base/comuni-h3.json \\\n"
+            "  | jq -r '.[] | select(.nome_comune == \"Roma\") | .h3_cells[]'\n"
+            "```\n\n"
+            "```sql\n"
+            "SELECT count(*)\n"
+            "FROM read_parquet('$public_base/tiles/h3_cell=851fb467fffffff/851fb467fffffff.parquet')\n"
+            "WHERE CODICE_ISTAT = '058091';\n"
+            "```"
+        ),
+    },
+}
+
+
+def human_date(rfc3339: str, lang: str = SOURCE_LANG) -> str:
+    """Format an RFC 3339 instant as a date spelled in the language."""
+    parsed = datetime.strptime(rfc3339, "%Y-%m-%dT%H:%M:%SZ")
+    return f"{parsed.day} {MONTHS[lang][parsed.month - 1]} {parsed.year}"
+
+
+def human_count(value: int, lang: str = SOURCE_LANG) -> str:
+    """Format an integer with the language's thousands separator."""
+    english = f"{value:,}"
+    return english if lang == "en" else english.replace(",", ".")
+
+
+def human_percent(part: int, total: int, lang: str = SOURCE_LANG) -> str:
+    """Format part/total as a percentage with two decimals, or a dash."""
+    if not total:
+        return "-"
+    english = f"{part / total * 100:.2f}%"
+    return english if lang == "en" else english.replace(".", ",")
+
+
+def statistics_sentence(facts: dict, lang: str) -> str:
+    stats = facts["statistics"]
+    total = facts["row_count"]
+    return Template(TEXTS[lang]["statistics_sentence"]).substitute(
+        total=human_count(total, lang),
+        oob=human_count(stats["out_of_bounds"], lang),
+        pct=human_percent(stats["out_of_bounds"], total, lang),
+        nob=human_count(stats["no_boundary"], lang),
+    )
+
+
+def statistics_table(facts: dict, lang: str = SOURCE_LANG) -> str:
+    """Render the global statistics as a Markdown table."""
+    text = TEXTS[lang]
+    stats = facts["statistics"]
+    total = facts["row_count"]
+    header, value = text["stats_header"]
+    rows = [
+        f"| {header} | {value} |",
+        "|---|---|",
+        f"| {text['stats_total']} | {human_count(total, lang)} |",
+        f"| {text['stats_oob']} | {human_count(stats['out_of_bounds'], lang)} "
+        f"({human_percent(stats['out_of_bounds'], total, lang)}) |",
+        f"| {text['stats_nob']} | {human_count(stats['no_boundary'], lang)} |",
+        f"| {text['stats_comuni']} | {human_count(stats['comuni'], lang)} |",
+    ]
+    for code, count in stats["metodo"].items():
+        label = METHOD_LABELS[lang].get(code, "")
+        name = Template(text["stats_method"]).substitute(code=code, label=label)
+        rows.append(
+            f"| {name} | {human_count(count, lang)} "
+            f"({human_percent(count, total, lang)}) |"
+        )
+    return "\n".join(rows)
+
+
+def schema_table(columns: list[dict], lang: str = SOURCE_LANG) -> str:
+    """Render table:columns as a Markdown table.
+
+    The same descriptions feed the JSON and this table, so they cannot drift.
+    """
+    header = (
+        "| Colonna | Tipo | Descrizione |"
+        if lang == "it"
+        else "| Column | Type | Description |"
+    )
+    lines = [header, "|---|---|---|"]
+    for column in columns:
+        description = column["description"].replace("|", r"\|")
+        lines.append(f"| `{column['name']}` | {column['type']} | {description} |")
+    return "\n".join(lines)
+
+
+def render_template(name: str, values: dict) -> str:
+    """Fill a Markdown template.
+
+    Uses string.Template rather than an engine so the templates stay readable
+    and the only dependency is the standard library. A missing value raises
+    KeyError rather than leaving a placeholder in published output.
+    """
+    text = (TEMPLATE_DIR / name).read_text(encoding="utf-8")
+    return Template(text).substitute(values)
+
+
+def template_name(base: str, lang: str) -> str:
+    """catalog.README.md -> catalog.README.en.md for a translation."""
+    if lang == SOURCE_LANG:
+        return base
+    stem, suffix = base.rsplit(".", 1)
+    return f"{stem}.{lang}.{suffix}"
+
+
+# --- relative paths between trees -------------------------------------------
+
+
+def _tree_root(lang: str) -> str:
+    """Path of a language tree's root, relative to data/."""
+    return "" if lang == SOURCE_LANG else f"{lang}/"
+
+
+def _to_data(lang: str, from_collection: bool) -> str:
+    """Path from an object's directory up to data/."""
+    levels = (0 if lang == SOURCE_LANG else 1) + (1 if from_collection else 0)
+    return "../" * levels
+
+
+def _href_to_tree(lang: str, other: str, from_collection: bool, tail: str) -> str:
+    href = _to_data(lang, from_collection) + _tree_root(other) + tail
+    return href if href.startswith("../") else f"./{href}"
+
+
+def _language_fields(lang: str) -> dict:
+    return {
+        "language": LANGUAGES[lang],
+        "languages": [LANGUAGES[code] for code in ALL_LANGS if code != lang],
+    }
+
+
+def _tree_alternates(lang: str, from_collection: bool, tail: str) -> list[dict]:
+    """alternate links to the same object in every other language tree."""
+    return [
+        {
+            "rel": "alternate",
+            "href": _href_to_tree(lang, other, from_collection, tail),
+            "type": "application/json",
+            "title": TEXTS[lang]["other_tree"][other],
+            "hreflang": other,
+        }
+        for other in ALL_LANGS
+        if other != lang
+    ]
+
+
+def _viewer_link(lang: str) -> dict:
+    """The web viewer, as an HTML alternate representation of the data."""
+    return {
+        "rel": "alternate",
+        "href": VIEWER_URL,
+        "type": "text/html",
+        "title": TEXTS[lang]["viewer"],
+    }
 
 
 def providers() -> list[dict]:
@@ -385,94 +877,95 @@ def providers() -> list[dict]:
     ]
 
 
-def _source_links() -> list[dict]:
+def _source_links(lang: str) -> list[dict]:
     """The provenance and licence links every object in this catalog carries."""
+    deed = "deed.it" if lang == "it" else ""
     return [
         {
             "rel": "via",
             "href": SOURCE_PORTAL,
             "type": "text/html",
-            "title": "Portale open data ANNCSU",
+            "title": TEXTS[lang]["via"],
         },
         {
             "rel": "license",
-            "href": "https://creativecommons.org/licenses/by/4.0/deed.it",
+            "href": f"https://creativecommons.org/licenses/by/4.0/{deed}",
             "type": "text/html",
-            "title": "Creative Commons Attribuzione 4.0 Internazionale",
+            "title": TEXTS[lang]["license"],
         },
     ]
 
 
-def _documentation_links() -> list[dict]:
+def _documentation_links(lang: str) -> list[dict]:
     return [
         {
             "rel": "agents",
             "href": "./AGENTS.md",
             "type": "text/markdown",
-            "title": "Istruzioni per agenti automatici",
-            "hreflang": "it",
+            "title": TEXTS[lang]["agents"],
+            "hreflang": lang,
         },
         {
             "rel": "describedby",
             "href": "./README.md",
             "type": "text/markdown",
-            "title": "Documentazione leggibile",
-            "hreflang": "it",
+            "title": TEXTS[lang]["describedby"],
+            "hreflang": lang,
         },
     ]
 
 
-def build_root(updated: str) -> dict:
-    """Build the root catalog."""
+def build_root(updated: str, lang: str = SOURCE_LANG) -> dict:
+    """Build the root catalog of one language tree.
+
+    The source tree's root sits at data/; a translated root has no parent
+    either, because each language tree stands on its own (PORTO-CORE-080).
+    """
+    text = TEXTS[lang]
     return {
         "type": "Catalog",
         "stac_version": "1.1.0",
         "stac_extensions": [PORTOLAN_SCHEMA, LANGUAGE_SCHEMA],
         "id": "anncsu",
-        "title": "Indirizzi ANNCSU",
-        "description": (
-            "Gli indirizzi certificati dei comuni italiani, dall'Archivio "
-            "Nazionale dei Numeri Civici e delle Strade Urbane, convertiti in "
-            "formati cloud-native. Il catalogo pubblica lo stesso insieme di "
-            "dati in due forme: un unico file GeoParquet per l'analisi "
-            "complessiva, e una partizione in celle H3 per leggere un comune "
-            "alla volta senza scaricare tutto."
-        ),
-        "language": LANGUAGE,
+        "title": text["root_title"],
+        "description": text["root_description"],
+        **_language_fields(lang),
         "updated": updated,
         "links": [
             {"rel": "root", "href": "./catalog.json", "type": "application/json"},
             {
                 "rel": "self",
-                "href": f"{PUBLIC_BASE}/catalog.json",
+                "href": f"{PUBLIC_BASE}/{_tree_root(lang)}catalog.json",
                 "type": "application/json",
             },
             {
                 "rel": "child",
                 "href": "./indirizzi/collection.json",
                 "type": "application/json",
-                "title": "Indirizzi ANNCSU, file unico",
+                "title": text["indirizzi_title"],
             },
             {
                 "rel": "child",
                 "href": "./indirizzi-h3/collection.json",
                 "type": "application/json",
-                "title": "Indirizzi ANNCSU, partizionati per cella H3",
+                "title": text["h3_title"],
             },
+            *_tree_alternates(lang, False, "catalog.json"),
+            _viewer_link(lang),
             {
                 "rel": "vcs",
                 "href": REPO_URL,
                 "type": "text/html",
-                "title": "Repository del catalogo e della pipeline",
+                "title": text["vcs"],
             },
             {
                 "rel": "issues",
                 "href": f"{REPO_URL}/issues",
                 "type": "text/html",
-                "title": "Segnalazioni",
+                "title": text["issues"],
             },
-            *_source_links(),
-            *_documentation_links(),
+            *_source_links(lang),
+            *_documentation_links(lang),
         ],
     }
 
@@ -491,22 +984,29 @@ def _style_asset(
     }
 
 
-def _thumbnail_asset(facts: dict) -> dict:
+def _shared_asset_href(lang: str, collection_id: str, tail: str) -> str:
+    """Path to a style or thumbnail, which live in the source tree only."""
+    if lang == SOURCE_LANG:
+        return f"./{tail}"
+    return f"{_to_data(lang, True)}{collection_id}/{tail}"
+
+
+def _thumbnail_asset(facts: dict, lang: str, collection_id: str) -> dict:
     return {
-        "href": "./thumbnail.png",
+        "href": _shared_asset_href(lang, collection_id, "thumbnail.png"),
         "type": "image/png",
-        "title": "Densità degli indirizzi sul territorio nazionale",
+        "title": TEXTS[lang]["thumbnail"],
         "roles": ["thumbnail"],
         **facts["thumbnail"],
     }
 
 
-def _pmtiles_link(facts: dict) -> dict:
+def _pmtiles_link(facts: dict, lang: str) -> dict:
     return {
         "rel": "pmtiles",
-        "href": "../anncsu-indirizzi.pmtiles",
+        "href": f"{_to_data(lang, True)}anncsu-indirizzi.pmtiles",
         "type": "application/vnd.pmtiles",
-        "title": "Tile vettoriali per la mappa",
+        "title": TEXTS[lang]["pmtiles_link"],
         "pmtiles:layers": facts["pmtiles_layers"],
     }
 
@@ -518,103 +1018,104 @@ def _extent(facts: dict) -> dict:
     }
 
 
-def _keywords() -> list[str]:
-    return ["indirizzi", "numeri civici", "toponomastica", "italia", "anncsu"]
+def _collection_links(facts: dict, lang: str, collection_id: str) -> list[dict]:
+    return [
+        {"rel": "root", "href": "../catalog.json", "type": "application/json"},
+        {"rel": "parent", "href": "../catalog.json", "type": "application/json"},
+        _pmtiles_link(facts, lang),
+        *_tree_alternates(lang, True, f"{collection_id}/collection.json"),
+        _viewer_link(lang),
+        *_source_links(lang),
+        *_documentation_links(lang),
+    ]
 
 
-def build_indirizzi(facts: dict) -> dict:
+def _columns_for(facts: dict, key: str, lang: str) -> list[dict]:
+    return facts[key if lang == SOURCE_LANG else f"{key}_{lang}"]
+
+
+def build_indirizzi(facts: dict, lang: str = SOURCE_LANG) -> dict:
     """Build the single-file collection.
 
     PORTO-CORE-017: one data file means a collection-level asset and no items.
     """
+    text = TEXTS[lang]
+    up = _to_data(lang, True)
     return {
         "type": "Collection",
         "stac_version": "1.1.0",
         "stac_extensions": list(COLLECTION_EXTENSIONS),
         "id": "indirizzi",
-        "title": "Indirizzi ANNCSU, file unico",
-        "description": (
-            "Tutti gli accessi esterni censiti in ANNCSU in un unico file "
-            "GeoParquet, ordinato spazialmente secondo una curva di Hilbert e "
-            "corredato di colonna bbox, così che un lettore possa scartare "
-            "interi gruppi di righe senza decodificare le geometrie. Adatto "
-            "all'analisi sull'intero territorio nazionale. Per leggere un "
-            "singolo comune conviene la collection partizionata."
+        "title": text["indirizzi_title"],
+        "description": Template(text["indirizzi_description"]).substitute(
+            statistics=statistics_sentence(facts, lang)
         ),
         "license": LICENSE_ID,
-        "keywords": _keywords(),
+        "keywords": list(text["keywords"]),
         "providers": providers(),
         "extent": _extent(facts),
-        "language": LANGUAGE,
+        **_language_fields(lang),
         "updated": facts["updated"],
-        "table:columns": facts["table_columns"],
+        "table:columns": _columns_for(facts, "table_columns", lang),
         "table:row_count": facts["row_count"],
         "table:primary_geometry": "geometry",
         "assets": {
             "data": {
-                "href": "../anncsu-indirizzi.parquet",
+                "href": f"{up}anncsu-indirizzi.parquet",
                 "type": "application/vnd.apache.parquet",
-                "title": "Indirizzi ANNCSU (GeoParquet)",
+                "title": text["data_title"],
                 "roles": ["data"],
                 "proj:code": "OGC:CRS84",
                 **facts["parquet"],
             },
             "visual": {
-                "href": "../anncsu-indirizzi.pmtiles",
+                "href": f"{up}anncsu-indirizzi.pmtiles",
                 "type": "application/vnd.pmtiles",
-                "title": "Indirizzi ANNCSU (PMTiles)",
+                "title": text["visual_title"],
                 "roles": ["visual"],
                 **facts["pmtiles"],
             },
             "style-indirizzi": _style_asset(
-                "./styles/indirizzi.json",
-                "Punti indirizzo",
-                "Tutti gli accessi come punti uniformi.",
+                _shared_asset_href(lang, "indirizzi", "styles/indirizzi.json"),
+                text["style_indirizzi_title"],
+                text["style_indirizzi_description"],
                 facts["style_indirizzi"],
                 default=True,
             ),
-            "thumbnail": _thumbnail_asset(facts),
+            "thumbnail": _thumbnail_asset(facts, lang, "indirizzi"),
         },
-        "links": [
-            {"rel": "root", "href": "../catalog.json", "type": "application/json"},
-            {"rel": "parent", "href": "../catalog.json", "type": "application/json"},
-            _pmtiles_link(facts),
-            *_source_links(),
-            *_documentation_links(),
-        ],
+        "links": _collection_links(facts, lang, "indirizzi"),
     }
 
 
-def build_indirizzi_h3(facts: dict) -> dict:
+def build_indirizzi_h3(facts: dict, lang: str = SOURCE_LANG) -> dict:
     """Build the partitioned collection.
 
     PORTO-FMT-022 advises against items for an opaque scheme with hundreds of
     partitions, so the glob is the access path and there are no items.
     """
+    text = TEXTS[lang]
+    up = _to_data(lang, True)
+    glob = f"{PUBLIC_BASE}/tiles/{facts['tile_key']}=*/*.parquet"
     return {
         "type": "Collection",
         "stac_version": "1.1.0",
         "stac_extensions": [*COLLECTION_EXTENSIONS, PARTITION_SCHEMA],
         "id": "indirizzi-h3",
-        "title": "Indirizzi ANNCSU, partizionati per cella H3",
-        "description": (
-            "Gli stessi indirizzi della collection indirizzi, ripartiti in "
-            f"{facts['tile_count']} file secondo la cella H3 di risoluzione "
-            f"{H3_RESOLUTION} che li contiene, con struttura Hive "
-            "tiles/h3_cell=<cella>/<cella>.parquet. Ogni file pesa meno di un "
-            "megabyte, quindi un client può leggere un comune senza scaricare "
-            "il file nazionale. Il glob di accesso massivo è "
-            f"{PUBLIC_BASE}/tiles/h3_cell=*/*.parquet, ma su HTTPS non esiste "
-            "il listing: per sapere quali celle servono si usa l'indice "
-            "comuni-h3.json, registrato come asset di metadati."
+        "title": text["h3_title"],
+        "description": Template(text["h3_description"]).substitute(
+            tile_count=human_count(facts["tile_count"], lang),
+            resolution=H3_RESOLUTION,
+            glob=glob,
+            statistics=statistics_sentence(facts, lang),
         ),
         "license": LICENSE_ID,
-        "keywords": [*_keywords(), "h3", "partizionato"],
+        "keywords": [*text["keywords"], *text["keywords_h3"]],
         "providers": providers(),
         "extent": _extent(facts),
-        "language": LANGUAGE,
+        **_language_fields(lang),
         "updated": facts["updated"],
-        "table:columns": facts["tile_table_columns"],
+        "table:columns": _columns_for(facts, "tile_table_columns", lang),
         "table:row_count": facts["row_count"],
         "table:primary_geometry": "geometry",
         "partition:scheme": "hive",
@@ -623,135 +1124,36 @@ def build_indirizzi_h3(facts: dict) -> dict:
             {
                 "name": facts["tile_key"],
                 "type": "string",
-                "description": (
-                    f"Cella H3 di risoluzione {H3_RESOLUTION} che contiene l'indirizzo."
+                "description": Template(text["partition_key"]).substitute(
+                    resolution=H3_RESOLUTION
                 ),
             }
         ],
         "partition:file_count": facts["tile_count"],
-        "partition:glob": f"{PUBLIC_BASE}/tiles/{facts['tile_key']}=*/*.parquet",
+        "partition:glob": glob,
         "assets": {
             "cell-index": {
-                "href": "../comuni-h3.json",
+                "href": f"{up}comuni-h3.json",
                 "type": "application/json",
-                "title": "Indice delle celle H3 per comune",
-                "description": (
-                    "Per ogni comune, l'elenco delle celle H3 che ne "
-                    "contengono gli indirizzi. Sostituisce il listing che "
-                    "HTTPS non offre."
-                ),
+                "title": text["cell_index_title"],
+                "description": text["cell_index_description"],
                 "roles": ["metadata"],
                 **facts["comuni_h3"],
             },
             "style-indirizzi-h3": _style_asset(
-                "./styles/indirizzi-h3.json",
-                "Indirizzi fuori confine",
-                "Gli accessi colorati per posizione rispetto al confine comunale.",
+                _shared_asset_href(lang, "indirizzi-h3", "styles/indirizzi-h3.json"),
+                text["style_h3_title"],
+                text["style_h3_description"],
                 facts["style_indirizzi_h3"],
                 default=True,
             ),
-            "thumbnail": _thumbnail_asset(facts),
+            "thumbnail": _thumbnail_asset(facts, lang, "indirizzi-h3"),
         },
-        "links": [
-            {"rel": "root", "href": "../catalog.json", "type": "application/json"},
-            {"rel": "parent", "href": "../catalog.json", "type": "application/json"},
-            _pmtiles_link(facts),
-            *_source_links(),
-            *_documentation_links(),
-        ],
+        "links": _collection_links(facts, lang, "indirizzi-h3"),
     }
 
 
-MONTHS_IT = [
-    "gennaio",
-    "febbraio",
-    "marzo",
-    "aprile",
-    "maggio",
-    "giugno",
-    "luglio",
-    "agosto",
-    "settembre",
-    "ottobre",
-    "novembre",
-    "dicembre",
-]
-
-LICENSE_PARAGRAPH = (
-    "I dati sono pubblicati con licenza "
-    "[Creative Commons Attribuzione 4.0 Internazionale]"
-    "(https://creativecommons.org/licenses/by/4.0/deed.it), identificativo "
-    "SPDX `CC-BY-4.0`. Le pagine ufficiali ANNCSU richiamano il Regolamento di "
-    "esecuzione (UE) 2023/138 sui dati di elevato valore, che per la serie "
-    "degli indirizzi impone questa licenza, ma non la riportano per esteso. "
-    "Chi ha bisogno di certezza per un riutilizzo commerciale conviene che si "
-    "rivolga all'Agenzia delle Entrate."
-)
-
-USAGE_INDIRIZZI = (
-    "Il file è un GeoParquet leggibile via HTTP con DuckDB, GDAL, GeoPandas o "
-    "qualunque lettore Parquet. Le righe sono ordinate lungo una curva di "
-    "Hilbert e ogni riga porta un riquadro di delimitazione, quindi un filtro "
-    "spaziale o su un comune legge solo i gruppi di righe che servono.\n\n"
-    "```sql\n"
-    "INSTALL httpfs; LOAD httpfs;\n"
-    "SELECT ODONIMO, CIVICO, ESPONENTE\n"
-    "FROM read_parquet('$public_base/anncsu-indirizzi.parquet')\n"
-    "WHERE CODICE_ISTAT = '058091'\n"
-    "LIMIT 10;\n"
-    "```"
-)
-
-USAGE_INDIRIZZI_H3 = (
-    "I dati sono divisi per cella H3 di risoluzione 5, con struttura Hive. Il "
-    "glob di accesso massivo è `$public_base/tiles/h3_cell=*/*.parquet`, ma su "
-    "HTTPS non esiste il listing delle directory, quindi un lettore non può "
-    "espanderlo da solo. Per sapere quali celle servono si legge l'indice "
-    "`comuni-h3.json`, che mappa ogni comune sulle sue celle.\n\n"
-    "```shell\n"
-    "curl -s $public_base/comuni-h3.json \\\n"
-    "  | jq -r '.[] | select(.nome_comune == \"Roma\") | .h3_cells[]'\n"
-    "```\n\n"
-    "```sql\n"
-    "SELECT count(*)\n"
-    "FROM read_parquet('$public_base/tiles/h3_cell=851fb467fffffff/851fb467fffffff.parquet')\n"
-    "WHERE CODICE_ISTAT = '058091';\n"
-    "```"
-)
-
-
-def human_date(rfc3339: str) -> str:
-    """Format an RFC 3339 instant as an Italian date."""
-    parsed = datetime.strptime(rfc3339, "%Y-%m-%dT%H:%M:%SZ")
-    return f"{parsed.day} {MONTHS_IT[parsed.month - 1]} {parsed.year}"
-
-
-def human_count(value: int) -> str:
-    """Format an integer with the Italian thousands separator."""
-    return f"{value:,}".replace(",", ".")
-
-
-def schema_table(columns: list[dict]) -> str:
-    """Render table:columns as a Markdown table.
-
-    The same descriptions feed the JSON and this table, so they cannot drift.
-    """
-    lines = ["| Colonna | Tipo | Descrizione |", "|---|---|---|"]
-    for column in columns:
-        description = column["description"].replace("|", r"\|")
-        lines.append(f"| `{column['name']}` | {column['type']} | {description} |")
-    return "\n".join(lines)
-
-
-def render_template(name: str, values: dict) -> str:
-    """Fill a Markdown template.
-
-    Uses string.Template rather than an engine so the templates stay readable
-    and the only dependency is the standard library. A missing value raises
-    KeyError rather than leaving a placeholder in published output.
-    """
-    text = (TEMPLATE_DIR / name).read_text(encoding="utf-8")
-    return Template(text).substitute(values)
+# --- writing -----------------------------------------------------------------
 
 
 def write_json(path: Path, document: dict) -> None:
@@ -792,16 +1194,15 @@ def collect_facts(data_dir: Path) -> dict:
 
     print("Reading the parquet ...", flush=True)
     stats = dataset_stats(parquet)
-    columns = table_columns(parquet, COLUMNS_FILE)
+    statistics = dataset_statistics(parquet)
 
     inventory = tile_inventory(tiles)
     sample_tile = sorted(tiles.glob("*=*/*.parquet"))[0]
-    tile_columns = table_columns(sample_tile, COLUMNS_FILE)
 
     print("Reading the PMTiles header ...", flush=True)
     pmtiles_info = pmtiles_facts(pmtiles)
 
-    return {
+    facts = {
         "row_count": stats["row_count"],
         "bbox": stats["bbox"],
         "updated": data_updated(parquet, marker),
@@ -812,9 +1213,15 @@ def collect_facts(data_dir: Path) -> dict:
         "pmtiles_layers": pmtiles_info["layers"],
         "tile_count": inventory["file_count"],
         "tile_key": inventory["key"],
-        "table_columns": columns,
-        "tile_table_columns": tile_columns,
+        "statistics": statistics,
     }
+    for lang in ALL_LANGS:
+        suffix = "" if lang == SOURCE_LANG else f"_{lang}"
+        facts[f"table_columns{suffix}"] = table_columns(parquet, COLUMNS_FILE, lang)
+        facts[f"tile_table_columns{suffix}"] = table_columns(
+            sample_tile, COLUMNS_FILE, lang
+        )
+    return facts
 
 
 def _install_collection_assets(
@@ -823,7 +1230,8 @@ def _install_collection_assets(
     """Copy the style and render the thumbnail, returning their file facts.
 
     The assets must exist before the collection JSON can state their size and
-    checksum, so this runs first and feeds the builders.
+    checksum, so this runs first and feeds the builders. Assets live in the
+    source tree only; translated trees reference them.
     """
     target = data_dir / collection_id
     (target / "styles").mkdir(parents=True, exist_ok=True)
@@ -842,8 +1250,64 @@ def _install_collection_assets(
     return {"style": file_facts(style_target), "thumbnail": file_facts(thumbnail)}
 
 
+def _write_tree(data_dir: Path, facts: dict, lang: str) -> None:
+    """Write one language tree: root catalog, READMEs, both collections."""
+    tree = data_dir / _tree_root(lang)
+    shared = {
+        "dataset_date_human": human_date(facts["dataset_date"], lang),
+        "row_count_human": human_count(facts["row_count"], lang),
+        "license_paragraph": LICENSE_PARAGRAPHS[lang],
+        "source_portal": SOURCE_PORTAL,
+        "repo_url": REPO_URL,
+        "viewer_url": VIEWER_URL,
+        "browser_url": BROWSER_URL,
+        "statistics_table": statistics_table(facts, lang),
+    }
+
+    write_json(tree / "catalog.json", build_root(facts["updated"], lang))
+    write_text(
+        tree / "README.md",
+        render_template(template_name("catalog.README.md", lang), shared),
+    )
+    write_text(
+        tree / "AGENTS.md",
+        render_template(template_name("catalog.AGENTS.md", lang), {}),
+    )
+
+    collections = [
+        ("indirizzi", build_indirizzi(facts, lang), "table_columns"),
+        ("indirizzi-h3", build_indirizzi_h3(facts, lang), "tile_table_columns"),
+    ]
+    for collection_id, document, columns_key in collections:
+        usage = Template(USAGE[lang][collection_id]).substitute(public_base=PUBLIC_BASE)
+        target = tree / collection_id
+        write_json(target / "collection.json", document)
+        write_text(
+            target / "README.md",
+            render_template(
+                template_name("collection.README.md", lang),
+                {
+                    **shared,
+                    "title": document["title"],
+                    "description": document["description"],
+                    "usage": usage,
+                    "schema_table": schema_table(
+                        _columns_for(facts, columns_key, lang), lang
+                    ),
+                },
+            ),
+        )
+        write_text(
+            target / "AGENTS.md",
+            render_template(
+                template_name("collection.AGENTS.md", lang),
+                {"id": collection_id, "usage": usage},
+            ),
+        )
+
+
 def build(data_dir: Path) -> None:
-    """Generate the whole catalog into data_dir."""
+    """Generate the whole catalog, in every language, into data_dir."""
     facts = collect_facts(data_dir)
 
     print("Rendering styles and thumbnails ...", flush=True)
@@ -857,60 +1321,14 @@ def build(data_dir: Path) -> None:
     facts["style_indirizzi_h3"] = h3_assets["style"]
     facts["thumbnail"] = indirizzi_assets["thumbnail"]
 
-    shared = {
-        "dataset_date_human": human_date(facts["dataset_date"]),
-        "row_count_human": human_count(facts["row_count"]),
-        "license_paragraph": LICENSE_PARAGRAPH,
-        "source_portal": SOURCE_PORTAL,
-        "repo_url": REPO_URL,
-    }
-
-    print("Writing the catalog ...", flush=True)
-    write_json(data_dir / "catalog.json", build_root(facts["updated"]))
-    write_text(data_dir / "README.md", render_template("catalog.README.md", shared))
-    write_text(data_dir / "AGENTS.md", render_template("catalog.AGENTS.md", {}))
-
-    collections = [
-        (
-            "indirizzi",
-            build_indirizzi(facts),
-            facts["table_columns"],
-            Template(USAGE_INDIRIZZI).substitute(public_base=PUBLIC_BASE),
-        ),
-        (
-            "indirizzi-h3",
-            build_indirizzi_h3(facts),
-            facts["tile_table_columns"],
-            Template(USAGE_INDIRIZZI_H3).substitute(public_base=PUBLIC_BASE),
-        ),
-    ]
-
-    for collection_id, document, columns, usage in collections:
-        target = data_dir / collection_id
-        write_json(target / "collection.json", document)
-        write_text(
-            target / "README.md",
-            render_template(
-                "collection.README.md",
-                {
-                    **shared,
-                    "title": document["title"],
-                    "description": document["description"],
-                    "usage": usage,
-                    "schema_table": schema_table(columns),
-                },
-            ),
-        )
-        write_text(
-            target / "AGENTS.md",
-            render_template(
-                "collection.AGENTS.md", {"id": collection_id, "usage": usage}
-            ),
-        )
+    for lang in ALL_LANGS:
+        print(f"Writing the {lang} tree ...", flush=True)
+        _write_tree(data_dir, facts, lang)
 
     print(
         f"Catalog written: {facts['row_count']:,} rows, "
-        f"{facts['tile_count']} tiles, updated {facts['updated']}",
+        f"{facts['tile_count']} tiles, updated {facts['updated']}, "
+        f"languages {', '.join(ALL_LANGS)}",
         flush=True,
     )
 

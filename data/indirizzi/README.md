@@ -1,8 +1,9 @@
 # Indirizzi ANNCSU, file unico
 
-Tutti gli accessi esterni censiti in ANNCSU in un unico file GeoParquet, ordinato spazialmente secondo una curva di Hilbert e corredato di colonna bbox, così che un lettore possa scartare interi gruppi di righe senza decodificare le geometrie. Adatto all'analisi sull'intero territorio nazionale. Per leggere un singolo comune conviene la collection partizionata.
+Tutti gli accessi esterni censiti in ANNCSU in un unico file GeoParquet, ordinato spazialmente secondo una curva di Hilbert e corredato di colonna bbox, così che un lettore possa scartare interi gruppi di righe senza decodificare le geometrie. Adatto all'analisi sull'intero territorio nazionale. Per leggere un singolo comune conviene la collection partizionata. Su 20.731.065 accessi, 51.423 (0,25%) cadono oltre 110 metri fuori dal confine del comune a cui sono attribuiti secondo i confini Istat, e 0 non hanno un confine di riferimento.
 
-Aggiornato al 15 settembre 2026, con 20.731.065 indirizzi.
+Aggiornato al 15 settembre 2026, con 20.731.065 indirizzi. I dati si
+vedono sulla mappa nel [visualizzatore web](https://anncsu-open.github.io/anncsu-viewer/).
 
 ## Come si legge
 
@@ -15,6 +16,20 @@ FROM read_parquet('https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/anncsu-in
 WHERE CODICE_ISTAT = '058091'
 LIMIT 10;
 ```
+
+## Statistiche
+
+| Statistica | Valore |
+|---|---|
+| Accessi totali | 20.731.065 |
+| Fuori dal confine comunale, oltre 110 m | 51.423 (0,25%) |
+| Senza confine comunale di riferimento | 0 |
+| Comuni con almeno un accesso | 5.493 |
+| Metodo 1, rilevazione strumentale sul campo, accuratezza inferiore a 5 m | 1.714.163 (8,27%) |
+| Metodo 2, rilevazione strumentale sul campo, accuratezza pari o superiore a 5 m | 290.652 (1,40%) |
+| Metodo 3, derivazione indiretta da base dati territoriale, accuratezza stimata inferiore a 5 m | 7.125.819 (34,37%) |
+| Metodo 4, derivazione indiretta da base dati territoriale, accuratezza stimata pari o superiore a 5 m | 10.894.269 (52,55%) |
+| Metodo 5, derivazione indiretta tramite le funzioni del Portale per i Comuni | 706.162 (3,41%) |
 
 ## Schema
 

@@ -28,13 +28,18 @@ from build_catalog import (
     PARTITION_SCHEMA,
     PORTOLAN_SCHEMA,
     PUBLIC_BASE,
+    VIEWER_URL,
     build,
     build_indirizzi,
     build_indirizzi_h3,
     build_root,
     data_updated,
+    dataset_statistics,
     dataset_stats,
     file_facts,
+    human_count,
+    human_date,
+    human_percent,
     load_columns,
     multihash_sha256,
     providers,
@@ -43,6 +48,7 @@ from build_catalog import (
     render_thumbnail,
     schema_table,
     stac_type,
+    statistics_table,
     table_columns,
     tile_inventory,
 )
@@ -111,9 +117,11 @@ class TestTableColumns:
             "CODICE_ISTAT:\n"
             "  type: VARCHAR\n"
             "  description: codice Istat\n"
+            "  description_en: Istat code\n"
             "CIVICO:\n"
             "  type: BIGINT\n"
-            "  description: numero civico\n",
+            "  description: numero civico\n"
+            "  description_en: house number\n",
             encoding="utf-8",
         )
 
@@ -131,7 +139,8 @@ class TestTableColumns:
         write_parquet(parquet, "'x' AS CODICE_ISTAT, 'y' AS SORPRESA")
         yaml_path = tmp_path / "columns.yaml"
         yaml_path.write_text(
-            "CODICE_ISTAT:\n  type: VARCHAR\n  description: codice Istat\n",
+            "CODICE_ISTAT:\n  type: VARCHAR\n"
+            "  description: codice Istat\n  description_en: Istat code\n",
             encoding="utf-8",
         )
 
@@ -143,8 +152,10 @@ class TestTableColumns:
         write_parquet(parquet, "'x' AS CODICE_ISTAT")
         yaml_path = tmp_path / "columns.yaml"
         yaml_path.write_text(
-            "CODICE_ISTAT:\n  type: VARCHAR\n  description: codice Istat\n"
-            "SPARITA:\n  type: VARCHAR\n  description: non esiste piu\n",
+            "CODICE_ISTAT:\n  type: VARCHAR\n"
+            "  description: codice Istat\n  description_en: Istat code\n"
+            "SPARITA:\n  type: VARCHAR\n"
+            "  description: non esiste piu\n  description_en: gone\n",
             encoding="utf-8",
         )
 
@@ -156,7 +167,8 @@ class TestTableColumns:
         write_parquet(parquet, "1::BIGINT AS CIVICO")
         yaml_path = tmp_path / "columns.yaml"
         yaml_path.write_text(
-            "CIVICO:\n  type: VARCHAR\n  description: numero civico\n",
+            "CIVICO:\n  type: VARCHAR\n"
+            "  description: numero civico\n  description_en: house number\n",
             encoding="utf-8",
         )
 
@@ -168,11 +180,13 @@ class TestTableColumns:
         write_parquet(parquet, "'x' AS CODICE_ISTAT")
         yaml_path = tmp_path / "columns.yaml"
         yaml_path.write_text(
-            "CODICE_ISTAT:\n  type: VARCHAR\n  description: codice Istat\n"
+            "CODICE_ISTAT:\n  type: VARCHAR\n"
+            "  description: codice Istat\n  description_en: Istat code\n"
             "h3_cell:\n"
             "  type: VARCHAR\n"
             "  tiles_only: true\n"
-            "  description: cella H3\n",
+            "  description: cella H3\n"
+            "  description_en: H3 cell\n",
             encoding="utf-8",
         )
 
@@ -367,12 +381,25 @@ def fake_facts():
         "pmtiles_layers": ["addresses"],
         "tile_count": 1348,
         "tile_key": "h3_cell",
+        "statistics": {
+            "out_of_bounds": 51_423,
+            "no_boundary": 1_200,
+            "comuni": 7_896,
+            "metodo": {"1": 100, "2": 200, "3": 300, "4": 400, "5": 500},
+        },
         "table_columns": [
             {"name": "CODICE_ISTAT", "type": "varchar", "description": "x"}
         ],
         "tile_table_columns": [
             {"name": "CODICE_ISTAT", "type": "varchar", "description": "x"},
             {"name": "h3_cell", "type": "varchar", "description": "y"},
+        ],
+        "table_columns_en": [
+            {"name": "CODICE_ISTAT", "type": "varchar", "description": "x en"}
+        ],
+        "tile_table_columns_en": [
+            {"name": "CODICE_ISTAT", "type": "varchar", "description": "x en"},
+            {"name": "h3_cell", "type": "varchar", "description": "y en"},
         ],
     }
 
@@ -600,9 +627,11 @@ class TestRenderTemplate:
                 "row_count_human": "20.731.065",
                 "usage": "Uso",
                 "schema_table": "| Colonna |\n|---|\n",
+                "statistics_table": "| Statistica |\n|---|\n",
                 "license_paragraph": "Licenza",
                 "source_portal": "https://example.invalid/",
                 "repo_url": "https://github.com/example/repo",
+                "viewer_url": "https://example.invalid/viewer/",
             },
         )
 
@@ -627,10 +656,18 @@ def fixture_data_dir(tmp_path):
     data = tmp_path / "data"
     (data / "tiles" / "h3_cell=851fb467fffffff").mkdir(parents=True)
 
+    def oob(i):
+        # 4 rows out of bounds, 1 with no boundary to compare against.
+        if i % 50 == 0:
+            return "true"
+        if i == 199:
+            return "NULL::BOOLEAN"
+        return "false"
+
     rows = ", ".join(
         f"('058091', 'Roma', 'VIA ROMA {i}', {i}::BIGINT, "
         f"{12.49 + i * 0.0001}::DOUBLE, {41.90 + i * 0.0001}::DOUBLE, "
-        f"NULL::DOUBLE, false)"
+        f"NULL::DOUBLE, {oob(i)}, {1 + i % 5}::BIGINT)"
         for i in range(200)
     )
     # Shaped like csv_to_parquet output: no bbox yet, DuckDB's own geo block.
@@ -642,7 +679,7 @@ def fixture_data_dir(tmp_path):
             ST_Point(longitude, latitude) AS geometry
         FROM (VALUES {rows}) AS t(
             CODICE_ISTAT, NOME_COMUNE, ODONIMO, CIVICO,
-            longitude, latitude, oob_distance_m, out_of_bounds
+            longitude, latitude, oob_distance_m, out_of_bounds, METODO
         )
     """
     parquet = data / "anncsu-indirizzi.parquet"
@@ -679,22 +716,62 @@ def fixture_data_dir(tmp_path):
 def fixture_columns(tmp_path, monkeypatch):
     """columns.yaml trimmed to the fixture's schema."""
     path = tmp_path / "columns.yaml"
+
+    def column(name, ctype, it, en, extra=""):
+        return (
+            f"{name}:\n  type: {ctype}\n{extra}"
+            f"  description: {it}\n  description_en: {en}\n"
+        )
+
     path.write_text(
-        "CODICE_ISTAT:\n  type: VARCHAR\n  description: codice Istat del comune\n"
-        "NOME_COMUNE:\n  type: VARCHAR\n  derived: true\n  description: nome del comune\n"
-        "ODONIMO:\n  type: VARCHAR\n  description: denominazione della strada\n"
-        "CIVICO:\n  type: BIGINT\n  description: numero civico\n"
-        "longitude:\n  type: DOUBLE\n  description: longitudine\n"
-        "latitude:\n  type: DOUBLE\n  description: latitudine\n"
-        "oob_distance_m:\n  type: DOUBLE\n  derived: true\n  description: distanza dal confine\n"
-        "out_of_bounds:\n  type: BOOLEAN\n  derived: true\n  description: fuori confine\n"
-        "bbox:\n"
-        "  type: STRUCT(xmin DOUBLE, ymin DOUBLE, xmax DOUBLE, ymax DOUBLE)\n"
-        "  derived: true\n  description: riquadro del punto\n"
-        "geometry:\n"
-        "  type: GEOMETRY('OGC:CRS84')\n  derived: true\n  description: punto WGS84\n"
-        "h3_cell:\n"
-        "  type: VARCHAR\n  derived: true\n  tiles_only: true\n  description: cella H3\n",
+        column("CODICE_ISTAT", "VARCHAR", "codice Istat del comune", "Istat code")
+        + column(
+            "NOME_COMUNE",
+            "VARCHAR",
+            "nome del comune",
+            "comune name",
+            "  derived: true\n",
+        )
+        + column("ODONIMO", "VARCHAR", "denominazione della strada", "street name")
+        + column("CIVICO", "BIGINT", "numero civico", "house number")
+        + column("longitude", "DOUBLE", "longitudine", "longitude")
+        + column("latitude", "DOUBLE", "latitudine", "latitude")
+        + column(
+            "oob_distance_m",
+            "DOUBLE",
+            "distanza dal confine",
+            "distance",
+            "  derived: true\n",
+        )
+        + column(
+            "out_of_bounds",
+            "BOOLEAN",
+            "fuori confine",
+            "out of bounds",
+            "  derived: true\n",
+        )
+        + column("METODO", "BIGINT", "metodo", "method")
+        + column(
+            "bbox",
+            "STRUCT(xmin DOUBLE, ymin DOUBLE, xmax DOUBLE, ymax DOUBLE)",
+            "riquadro del punto",
+            "point bbox",
+            "  derived: true\n",
+        )
+        + column(
+            "geometry",
+            "GEOMETRY('OGC:CRS84')",
+            "punto WGS84",
+            "WGS84 point",
+            "  derived: true\n",
+        )
+        + column(
+            "h3_cell",
+            "VARCHAR",
+            "cella H3",
+            "H3 cell",
+            "  derived: true\n  tiles_only: true\n",
+        ),
         encoding="utf-8",
     )
     monkeypatch.setattr(build_catalog, "COLUMNS_FILE", path)
@@ -827,6 +904,275 @@ class TestConformance:
         assert report["passed"] and not blocking, json.dumps(
             blocking, indent=2, ensure_ascii=False
         )
+
+
+class TestEnglishColumns:
+    def test_every_real_column_has_an_english_description(self):
+        columns = load_columns(COLUMNS_YAML)
+        for name, spec in columns.items():
+            assert spec["description_en"].strip(), f"{name} has no description_en"
+
+    def test_table_columns_picks_the_requested_language(self, tmp_path):
+        parquet = tmp_path / "in.parquet"
+        write_parquet(parquet, "'x' AS CODICE_ISTAT")
+        yaml_path = tmp_path / "columns.yaml"
+        yaml_path.write_text(
+            "CODICE_ISTAT:\n  type: VARCHAR\n"
+            "  description: codice Istat\n  description_en: Istat code\n",
+            encoding="utf-8",
+        )
+
+        assert table_columns(parquet, yaml_path)[0]["description"] == "codice Istat"
+        assert (
+            table_columns(parquet, yaml_path, lang="en")[0]["description"]
+            == "Istat code"
+        )
+
+    def test_fails_when_the_english_description_is_missing(self, tmp_path):
+        yaml_path = tmp_path / "columns.yaml"
+        yaml_path.write_text(
+            "CODICE_ISTAT:\n  type: VARCHAR\n  description: codice Istat\n",
+            encoding="utf-8",
+        )
+
+        with pytest.raises(SystemExit, match="description_en"):
+            load_columns(yaml_path)
+
+
+class TestDatasetStatistics:
+    def _parquet(self, path):
+        import duckdb
+
+        con = duckdb.connect()
+        con.execute(f"""
+            COPY (SELECT * FROM (VALUES
+                ('058091', true,  1::BIGINT),
+                ('058091', false, 1::BIGINT),
+                ('058091', false, 3::BIGINT),
+                ('001001', NULL::BOOLEAN, 5::BIGINT),
+                ('001001', false, NULL::BIGINT)
+            ) AS t(CODICE_ISTAT, out_of_bounds, METODO)) TO '{path}' (FORMAT PARQUET)
+        """)
+        con.close()
+
+    def test_counts_out_of_bounds_no_boundary_comuni_and_methods(self, tmp_path):
+        parquet = tmp_path / "in.parquet"
+        self._parquet(parquet)
+
+        stats = dataset_statistics(parquet)
+
+        assert stats["out_of_bounds"] == 1
+        assert stats["no_boundary"] == 1
+        assert stats["comuni"] == 2
+        assert stats["metodo"] == {"1": 2, "3": 1, "5": 1}
+
+
+class TestHumanFormats:
+    def test_count_uses_the_language_thousands_separator(self):
+        assert human_count(20_731_065) == "20.731.065"
+        assert human_count(20_731_065, lang="en") == "20,731,065"
+
+    def test_date_is_spelled_in_the_language(self):
+        assert human_date("2026-09-15T00:00:00Z") == "15 settembre 2026"
+        assert human_date("2026-09-15T00:00:00Z", lang="en") == "15 September 2026"
+
+    def test_percent_uses_two_decimals_and_the_language_decimal_mark(self):
+        assert human_percent(51_423, 20_731_065) == "0,25%"
+        assert human_percent(51_423, 20_731_065, lang="en") == "0.25%"
+
+    def test_percent_of_zero_total_is_a_dash(self):
+        assert human_percent(0, 0) == "-"
+
+
+class TestStatisticsTable:
+    def test_lists_totals_and_every_method_in_italian(self):
+        table = statistics_table(fake_facts())
+        assert "| 20.731.065 |" in table
+        assert "51.423" in table and "0,25%" in table
+        assert "7.896" in table
+        for code in "12345":
+            assert f"| {code} " in table or f"metodo {code}" in table.lower()
+
+    def test_lists_totals_in_english(self):
+        table = statistics_table(fake_facts(), lang="en")
+        assert "| 20,731,065 |" in table
+        assert "51,423" in table and "0.25%" in table
+
+
+class TestLanguageTrees:
+    def test_italian_root_announces_and_links_the_english_tree(self):
+        root = build_root("2026-09-15T00:00:00Z")
+        assert root["language"]["code"] == "it"
+        assert [lang["code"] for lang in root["languages"]] == ["en"]
+        alternate = [
+            l
+            for l in links_by_rel(root, "alternate")
+            if l["type"] == "application/json"
+        ]
+        assert len(alternate) == 1
+        assert alternate[0]["href"] == "./en/catalog.json"
+        assert alternate[0]["hreflang"] == "en"
+
+    def test_english_root_is_its_own_tree(self):
+        root = build_root("2026-09-15T00:00:00Z", lang="en")
+        assert root["language"]["code"] == "en"
+        assert [lang["code"] for lang in root["languages"]] == ["it"]
+        assert links_by_rel(root, "parent") == []
+        assert links_by_rel(root, "self")[0]["href"] == f"{PUBLIC_BASE}/en/catalog.json"
+        alternate = [
+            l
+            for l in links_by_rel(root, "alternate")
+            if l["type"] == "application/json"
+        ]
+        assert alternate[0]["href"] == "../catalog.json"
+        assert alternate[0]["hreflang"] == "it"
+        assert {c["href"] for c in links_by_rel(root, "child")} == {
+            "./indirizzi/collection.json",
+            "./indirizzi-h3/collection.json",
+        }
+        assert root["title"] == "ANNCSU addresses"
+
+    @pytest.mark.parametrize("builder", [build_indirizzi, build_indirizzi_h3])
+    def test_italian_collection_links_its_translation(self, builder):
+        collection = builder(fake_facts())
+        alternate = [
+            l
+            for l in links_by_rel(collection, "alternate")
+            if l["type"] == "application/json"
+        ]
+        assert alternate[0]["href"] == f"../en/{collection['id']}/collection.json"
+        assert alternate[0]["hreflang"] == "en"
+
+    @pytest.mark.parametrize("builder", [build_indirizzi, build_indirizzi_h3])
+    def test_english_collection_reaches_data_two_levels_up(self, builder):
+        collection = builder(fake_facts(), lang="en")
+        assert collection["language"]["code"] == "en"
+        assert links_by_rel(collection, "root")[0]["href"] == "../catalog.json"
+        assert links_by_rel(collection, "parent")[0]["href"] == "../catalog.json"
+        assert links_by_rel(collection, "pmtiles")[0]["href"] == (
+            "../../anncsu-indirizzi.pmtiles"
+        )
+        alternate = [
+            l
+            for l in links_by_rel(collection, "alternate")
+            if l["type"] == "application/json"
+        ]
+        assert alternate[0]["href"] == f"../../{collection['id']}/collection.json"
+        assert alternate[0]["hreflang"] == "it"
+        for key, asset in collection["assets"].items():
+            assert asset["href"].startswith("../../"), f"{key}: {asset['href']}"
+        assert collection["assets"]["thumbnail"]["href"] == (
+            f"../../{collection['id']}/thumbnail.png"
+        )
+        assert collection["table:columns"][0]["description"] == "x en"
+
+    def test_english_single_file_collection_points_at_the_shared_style(self):
+        collection = build_indirizzi(fake_facts(), lang="en")
+        assert collection["assets"]["style-indirizzi"]["href"] == (
+            "../../indirizzi/styles/indirizzi.json"
+        )
+        assert collection["assets"]["data"]["href"] == "../../anncsu-indirizzi.parquet"
+
+    def test_english_partitioned_collection_keeps_the_index_and_glob(self):
+        collection = build_indirizzi_h3(fake_facts(), lang="en")
+        assert collection["assets"]["cell-index"]["href"] == "../../comuni-h3.json"
+        assert (
+            collection["partition:glob"] == f"{PUBLIC_BASE}/tiles/h3_cell=*/*.parquet"
+        )
+        assert collection["partition:keys"][0]["description"].startswith("H3 cell")
+
+
+class TestViewerLink:
+    @pytest.mark.parametrize("lang", ["it", "en"])
+    def test_root_links_the_web_viewer_as_html_alternate(self, lang):
+        root = build_root("2026-09-15T00:00:00Z", lang=lang)
+        viewer = [
+            l for l in links_by_rel(root, "alternate") if l["type"] == "text/html"
+        ]
+        assert len(viewer) == 1
+        assert viewer[0]["href"] == VIEWER_URL
+        assert viewer[0]["title"].strip()
+        assert "hreflang" not in viewer[0], "an html alternate is not a language tree"
+
+    @pytest.mark.parametrize("builder", [build_indirizzi, build_indirizzi_h3])
+    @pytest.mark.parametrize("lang", ["it", "en"])
+    def test_collections_link_the_web_viewer(self, builder, lang):
+        collection = builder(fake_facts(), lang=lang)
+        viewer = [
+            l for l in links_by_rel(collection, "alternate") if l["type"] == "text/html"
+        ]
+        assert [v["href"] for v in viewer] == [VIEWER_URL]
+
+
+class TestStatisticsInDescriptions:
+    @pytest.mark.parametrize("builder", [build_indirizzi, build_indirizzi_h3])
+    def test_italian_description_states_the_out_of_bounds_share(self, builder):
+        description = builder(fake_facts())["description"]
+        assert "20.731.065" in description
+        assert "51.423" in description
+        assert "0,25%" in description
+
+    @pytest.mark.parametrize("builder", [build_indirizzi, build_indirizzi_h3])
+    def test_english_description_states_the_out_of_bounds_share(self, builder):
+        description = builder(fake_facts(), lang="en")["description"]
+        assert "20,731,065" in description
+        assert "51,423" in description
+        assert "0.25%" in description
+
+
+@pytest.mark.skipif(
+    shutil.which("tippecanoe") is None, reason="tippecanoe not installed"
+)
+class TestEnglishBuild:
+    def test_writes_the_english_tree(self, fixture_data_dir, fixture_columns):
+        build(fixture_data_dir)
+
+        for relative in [
+            "en/catalog.json",
+            "en/README.md",
+            "en/AGENTS.md",
+            "en/indirizzi/collection.json",
+            "en/indirizzi/README.md",
+            "en/indirizzi/AGENTS.md",
+            "en/indirizzi-h3/collection.json",
+            "en/indirizzi-h3/README.md",
+            "en/indirizzi-h3/AGENTS.md",
+        ]:
+            assert (fixture_data_dir / relative).exists(), relative
+        assert not (fixture_data_dir / "en" / "indirizzi" / "thumbnail.png").exists(), (
+            "assets stay in the source tree; the translation only references them"
+        )
+
+    def test_english_assets_resolve_with_matching_checksums(
+        self, fixture_data_dir, fixture_columns
+    ):
+        import json
+
+        build(fixture_data_dir)
+        for collection_id in ("indirizzi", "indirizzi-h3"):
+            base = fixture_data_dir / "en" / collection_id
+            collection = json.loads((base / "collection.json").read_text())
+            for key, asset in collection["assets"].items():
+                target = (base / asset["href"]).resolve()
+                assert target.exists(), f"{collection_id}/{key} -> {asset['href']}"
+                assert asset["file:checksum"] == multihash_sha256(target), key
+
+    def test_readmes_carry_statistics_and_the_browser_link(
+        self, fixture_data_dir, fixture_columns
+    ):
+        build(fixture_data_dir)
+        root_readme = (fixture_data_dir / "README.md").read_text()
+        assert "browser.portolan-sdi.org" in root_readme
+        for readme in (
+            fixture_data_dir / "indirizzi" / "README.md",
+            fixture_data_dir / "en" / "indirizzi" / "README.md",
+        ):
+            text = readme.read_text()
+            assert "$" not in text, f"placeholder left in {readme}"
+            assert "METODO" in text or "metodo" in text.lower()
+            assert "200" in text, (
+                "the fixture's 200 rows should appear in the statistics"
+            )
 
 
 if __name__ == "__main__":

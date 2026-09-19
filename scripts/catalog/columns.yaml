@@ -1,4 +1,4 @@
-# Single source of truth for column documentation.
+# Single source of truth for column documentation, in Italian and English.
 #
 # Descriptions of upstream columns are taken from the publisher's own field
 # documentation:
@@ -7,19 +7,26 @@
 # not part of the upstream CSV.
 #
 # `type` is the DuckDB type the column is expected to have. build_catalog.py
-# fails when it disagrees with the real parquet schema.
+# fails when it disagrees with the real parquet schema, and when a column lacks
+# either `description` (Italian, the source language) or `description_en`.
 
 CODICE_COMUNE:
   type: VARCHAR
   description: >-
     Codice amministrativo assegnato ai Comuni italiani dall'Agenzia delle
     Entrate e utilizzato nella composizione dei codici fiscali.
+  description_en: >-
+    Administrative code assigned to Italian comuni by the Agenzia delle
+    Entrate and used in composing tax codes.
 
 CODICE_ISTAT:
   type: VARCHAR
   description: >-
     Codice amministrativo assegnato ai Comuni italiani dall'Istat. Sei cifre.
     È la chiave di join con l'elenco dei comuni e con i confini ISTAT.
+  description_en: >-
+    Administrative code assigned to Italian comuni by Istat. Six digits. It
+    is the join key with the comuni list and with the Istat boundaries.
 
 NOME_COMUNE:
   type: VARCHAR
@@ -28,18 +35,28 @@ NOME_COMUNE:
     Denominazione del comune, aggiunta dalla pipeline tramite join su
     CODICE_ISTAT con l'elenco ufficiale dei comuni italiani pubblicato
     dall'Istat. Nulla quando il codice non trova corrispondenza.
+  description_en: >-
+    Name of the comune, added by the pipeline by joining CODICE_ISTAT with
+    the official list of Italian comuni published by Istat. Null when the
+    code has no match.
 
 PROGRESSIVO_NAZIONALE:
   type: BIGINT
   description: >-
     Codice progressivo univoco nazionale, identificativo dell'area di
     circolazione.
+  description_en: >-
+    National unique sequential code identifying the circulation area, that
+    is the street.
 
 CODICE_COMUNALE:
   type: VARCHAR
   description: >-
     Codice dell'odonimo fornito dal Comune. Identificativo utilizzato dal
     Comune ove presente.
+  description_en: >-
+    Street code supplied by the comune. Identifier used by the comune, where
+    present.
 
 ODONIMO:
   type: VARCHAR
@@ -48,6 +65,10 @@ ODONIMO:
     La DUG è la Denominazione Urbanistica Generica, cioè la tipologia come via
     o piazza; la DUF è la Denominazione Ufficiale attribuita dal Comune ai
     sensi delle norme vigenti.
+  description_en: >-
+    Full name of the circulation area, made of DUG and DUF. The DUG is the
+    generic urban denomination, the type such as via or piazza; the DUF is
+    the official denomination assigned by the comune under current rules.
 
 DIZIONE_LINGUA1:
   type: VARCHAR
@@ -55,6 +76,9 @@ DIZIONE_LINGUA1:
     Odonimo registrato in una prima lingua diversa dall'italiano, secondo le
     norme in materia di bilinguismo e sull'uso delle lingue delle minoranze
     linguistiche riconosciute.
+  description_en: >-
+    Street name recorded in a first language other than Italian, under the
+    rules on bilingualism and on the use of recognised minority languages.
 
 DIZIONE_LINGUA2:
   type: VARCHAR
@@ -62,11 +86,17 @@ DIZIONE_LINGUA2:
     Odonimo registrato in una seconda lingua diversa dall'italiano, secondo le
     norme in materia di bilinguismo e sull'uso delle lingue delle minoranze
     linguistiche riconosciute.
+  description_en: >-
+    Street name recorded in a second language other than Italian, under the
+    same rules on bilingualism and recognised minority languages.
 
 PROGRESSIVO_ACCESSO:
   type: BIGINT
   description: >-
     Codice progressivo univoco nazionale, identificativo dell'accesso esterno.
+  description_en: >-
+    National unique sequential code identifying the external access, that is
+    the entrance.
 
 CODICE_COMUNALE_ACCESSO:
   type: VARCHAR
@@ -75,6 +105,11 @@ CODICE_COMUNALE_ACCESSO:
     Comune ove presente. La pipeline lo forza a VARCHAR perché contiene codici
     alfanumerici che un'inferenza automatica leggerebbe come interi, scartando
     le righe non conformi.
+  description_en: >-
+    House number code supplied by the comune. Identifier used by the comune,
+    where present. The pipeline forces it to VARCHAR because it contains
+    alphanumeric codes that automatic inference would read as integers,
+    dropping the non-conforming rows.
 
 CIVICO:
   type: BIGINT
@@ -83,23 +118,36 @@ CIVICO:
     successione naturale dei numeri. La documentazione della fonte lo descrive
     come testo di al massimo 5 caratteri, ma nei dati pubblicati è sempre
     numerico e la pipeline lo conserva come intero.
+  description_en: >-
+    House number assigned to the external access following the natural
+    sequence of numbers. The source documents it as text of at most 5
+    characters, but in the published data it is always numeric and the
+    pipeline keeps it as an integer.
 
 ESPONENTE:
   type: VARCHAR
   description: >-
     Parte letterale del numero civico, ove presente. Per esempio A, B, bis.
+  description_en: >-
+    Letter part of the house number, where present. For example A, B, bis.
 
 SPECIFICITA:
   type: VARCHAR
   description: >-
     Valore utilizzato in presenza di uno specifico metodo di classificazione
     della numerazione civica validato dall'Istat, per esempio ROSSO e NERO.
+  description_en: >-
+    Value used where a specific house-numbering classification validated by
+    Istat applies, for example ROSSO and NERO.
 
 METRICO:
   type: VARCHAR
   description: >-
     Valore del numero civico espresso in metri, usato dai comuni che adottano
     il sistema metrico anziché la successione naturale dei numeri.
+  description_en: >-
+    House number expressed in metres, used by comuni that adopt metric
+    numbering instead of the natural sequence of numbers.
 
 PROGRESSIVO_SNC:
   type: BIGINT
@@ -107,6 +155,10 @@ PROGRESSIVO_SNC:
     Se valorizzato indica che l'accesso, posizionato dopo il civico o il
     metrico indicato, è privo di numero civico standard. Se i riferimenti
     all'accesso precedente sono assenti, l'accesso SNC è a inizio strada.
+  description_en: >-
+    When set, the access placed after the given house or metric number has
+    no standard house number. When the references to the previous access are
+    absent, the SNC access is at the start of the street.
 
 longitude:
   type: DOUBLE
@@ -115,6 +167,11 @@ longitude:
     della fonte. Il sistema di riferimento dichiarato dalla fonte è ETRF2000
     alla epoca 2008.0, realizzazione italiana di ETRS89. La pipeline converte
     la virgola decimale in punto.
+  description_en: >-
+    Longitude of the access in decimal degrees, from the source column
+    COORD_X_COMUNE. The reference system declared by the source is ETRF2000
+    at epoch 2008.0, the Italian realisation of ETRS89. The pipeline converts
+    the decimal comma to a point.
 
 latitude:
   type: DOUBLE
@@ -122,6 +179,10 @@ latitude:
     Latitudine dell'accesso in gradi decimali, dalla colonna COORD_Y_COMUNE
     della fonte. Stesso sistema di riferimento e stessa conversione decimale
     della longitudine.
+  description_en: >-
+    Latitude of the access in decimal degrees, from the source column
+    COORD_Y_COMUNE. Same reference system and same decimal conversion as the
+    longitude.
 
 QUOTA:
   type: VARCHAR
@@ -129,6 +190,10 @@ QUOTA:
     Altezza ortometrica dell'accesso nei sistemi di riferimento altimetrici
     nazionali ufficiali. La pipeline la conserva come testo perché i valori
     usano la virgola come separatore decimale.
+  description_en: >-
+    Orthometric height of the access in the official national height
+    reference systems. The pipeline keeps it as text because the values use
+    a comma as decimal separator.
 
 METODO:
   type: BIGINT
@@ -140,6 +205,13 @@ METODO:
     inferiore a 5 m; 4 derivazione indiretta da base dati territoriale con
     accuratezza stimata pari o superiore a 5 m; 5 derivazione indiretta
     tramite le funzioni del Portale per i Comuni.
+  description_en: >-
+    How the comune assigned the coordinates. 1 field survey with instruments,
+    accuracy below 5 m; 2 field survey with instruments, accuracy of 5 m or
+    more; 3 indirect derivation from a spatial database, estimated accuracy
+    below 5 m; 4 indirect derivation from a spatial database, estimated
+    accuracy of 5 m or more; 5 indirect derivation through the functions of
+    the Portale per i Comuni.
 
 oob_distance_m:
   type: DOUBLE
@@ -149,6 +221,11 @@ oob_distance_m:
     confini amministrativi Istat, calcolata dalla pipeline. Nulla quando il
     comune non ha un confine corrispondente, zero quando il punto cade dentro
     il confine.
+  description_en: >-
+    Distance in metres between the address and the boundary of its comune
+    according to Istat administrative boundaries, computed by the pipeline.
+    Null when the comune has no matching boundary, zero when the point falls
+    inside it.
 
 out_of_bounds:
   type: BOOLEAN
@@ -157,6 +234,10 @@ out_of_bounds:
     Vero quando l'indirizzo cade oltre 110 metri fuori dal confine del comune
     a cui è attribuito. La soglia assorbe la tolleranza di geocodifica. Nullo
     quando il comune non ha un confine corrispondente.
+  description_en: >-
+    True when the address falls more than 110 metres outside the boundary of
+    the comune it is assigned to. The threshold absorbs geocoding tolerance.
+    Null when the comune has no matching boundary.
 
 bbox:
   type: STRUCT(xmin DOUBLE, ymin DOUBLE, xmax DOUBLE, ymax DOUBLE)
@@ -166,6 +247,10 @@ bbox:
     coordinate. È la colonna di covering prevista da GeoParquet, che consente
     a un lettore di scartare interi gruppi di righe senza decodificare le
     geometrie.
+  description_en: >-
+    Bounding box of the point, with all four values equal to its
+    coordinates. It is the covering column defined by GeoParquet, which lets
+    a reader skip whole row groups without decoding geometries.
 
 geometry:
   type: GEOMETRY('OGC:CRS84')
@@ -175,6 +260,11 @@ geometry:
     Dichiarato in OGC:CRS84. La fonte esprime le coordinate in ETRF2000, che
     differisce da WGS84 per meno di un metro in Italia, quindi lo scarto è
     trascurabile rispetto alla precisione degli indirizzi.
+  description_en: >-
+    Point built by the pipeline from longitude and latitude. Declared in
+    OGC:CRS84. The source expresses coordinates in ETRF2000, which differs
+    from WGS84 by less than a metre in Italy, so the offset is negligible
+    against address precision.
 
 h3_cell:
   type: VARCHAR
@@ -184,3 +274,7 @@ h3_cell:
     Identificativo esadecimale della cella H3 di risoluzione 5 che contiene
     l'indirizzo. Presente solo nei file partizionati, dove coincide con il
     nome della directory e del file.
+  description_en: >-
+    Hexadecimal identifier of the resolution 5 H3 cell containing the
+    address. Present only in the partitioned files, where it matches the
+    directory and file name.

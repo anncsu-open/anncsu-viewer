@@ -1,0 +1,311 @@
+{
+  "type": "Collection",
+  "stac_version": "1.1.0",
+  "stac_extensions": [
+    "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json",
+    "https://stac-extensions.github.io/file/v2.1.0/schema.json",
+    "https://stac-extensions.github.io/table/v1.2.0/schema.json",
+    "https://stac-extensions.github.io/projection/v2.0.0/schema.json",
+    "https://stac-extensions.github.io/web-map-links/v1.3.0/schema.json",
+    "https://stac-extensions.github.io/language/v1.0.0/schema.json"
+  ],
+  "id": "indirizzi",
+  "title": "ANNCSU addresses, single file",
+  "description": "Every external access recorded in ANNCSU in one GeoParquet file, spatially sorted along a Hilbert curve and carrying a bbox column, so a reader can skip whole row groups without decoding geometries. Suited to analysis over the whole country. To read a single comune the partitioned collection is the better choice. Of 20,731,065 addresses, 51,423 (0.25%) fall more than 110 metres outside the boundary of the comune they are assigned to, according to Istat boundaries, and 0 have no boundary to compare against.",
+  "license": "CC-BY-4.0",
+  "keywords": [
+    "addresses",
+    "house numbers",
+    "street names",
+    "italy",
+    "anncsu"
+  ],
+  "providers": [
+    {
+      "name": "Agenzia delle Entrate",
+      "url": "https://www.agenziaentrate.gov.it/",
+      "roles": [
+        "producer",
+        "licensor"
+      ]
+    },
+    {
+      "name": "Istat",
+      "url": "https://www.istat.it/",
+      "roles": [
+        "producer"
+      ]
+    },
+    {
+      "name": "anncsu-open",
+      "url": "https://github.com/anncsu-open/anncsu-viewer",
+      "roles": [
+        "processor"
+      ]
+    },
+    {
+      "name": "Geobeyond",
+      "url": "https://geobeyond.it/",
+      "roles": [
+        "host"
+      ]
+    }
+  ],
+  "extent": {
+    "spatial": {
+      "bbox": [
+        [
+          6.7003259,
+          35.5017421,
+          18.660009,
+          47.0805336
+        ]
+      ]
+    },
+    "temporal": {
+      "interval": [
+        [
+          "2026-09-15T00:00:00Z",
+          null
+        ]
+      ]
+    }
+  },
+  "language": {
+    "code": "en",
+    "name": "English",
+    "alternate": "Inglese"
+  },
+  "languages": [
+    {
+      "code": "it",
+      "name": "Italiano",
+      "alternate": "Italian"
+    }
+  ],
+  "updated": "2026-09-19T15:07:48Z",
+  "table:columns": [
+    {
+      "name": "CODICE_COMUNE",
+      "type": "varchar",
+      "description": "Administrative code assigned to Italian comuni by the Agenzia delle Entrate and used in composing tax codes."
+    },
+    {
+      "name": "CODICE_ISTAT",
+      "type": "varchar",
+      "description": "Administrative code assigned to Italian comuni by Istat. Six digits. It is the join key with the comuni list and with the Istat boundaries."
+    },
+    {
+      "name": "NOME_COMUNE",
+      "type": "varchar",
+      "description": "Name of the comune, added by the pipeline by joining CODICE_ISTAT with the official list of Italian comuni published by Istat. Null when the code has no match."
+    },
+    {
+      "name": "PROGRESSIVO_NAZIONALE",
+      "type": "bigint",
+      "description": "National unique sequential code identifying the circulation area, that is the street."
+    },
+    {
+      "name": "CODICE_COMUNALE",
+      "type": "varchar",
+      "description": "Street code supplied by the comune. Identifier used by the comune, where present."
+    },
+    {
+      "name": "ODONIMO",
+      "type": "varchar",
+      "description": "Full name of the circulation area, made of DUG and DUF. The DUG is the generic urban denomination, the type such as via or piazza; the DUF is the official denomination assigned by the comune under current rules."
+    },
+    {
+      "name": "DIZIONE_LINGUA1",
+      "type": "varchar",
+      "description": "Street name recorded in a first language other than Italian, under the rules on bilingualism and on the use of recognised minority languages."
+    },
+    {
+      "name": "DIZIONE_LINGUA2",
+      "type": "varchar",
+      "description": "Street name recorded in a second language other than Italian, under the same rules on bilingualism and recognised minority languages."
+    },
+    {
+      "name": "PROGRESSIVO_ACCESSO",
+      "type": "bigint",
+      "description": "National unique sequential code identifying the external access, that is the entrance."
+    },
+    {
+      "name": "CODICE_COMUNALE_ACCESSO",
+      "type": "varchar",
+      "description": "House number code supplied by the comune. Identifier used by the comune, where present. The pipeline forces it to VARCHAR because it contains alphanumeric codes that automatic inference would read as integers, dropping the non-conforming rows."
+    },
+    {
+      "name": "CIVICO",
+      "type": "bigint",
+      "description": "House number assigned to the external access following the natural sequence of numbers. The source documents it as text of at most 5 characters, but in the published data it is always numeric and the pipeline keeps it as an integer."
+    },
+    {
+      "name": "ESPONENTE",
+      "type": "varchar",
+      "description": "Letter part of the house number, where present. For example A, B, bis."
+    },
+    {
+      "name": "SPECIFICITA",
+      "type": "varchar",
+      "description": "Value used where a specific house-numbering classification validated by Istat applies, for example ROSSO and NERO."
+    },
+    {
+      "name": "METRICO",
+      "type": "varchar",
+      "description": "House number expressed in metres, used by comuni that adopt metric numbering instead of the natural sequence of numbers."
+    },
+    {
+      "name": "PROGRESSIVO_SNC",
+      "type": "bigint",
+      "description": "When set, the access placed after the given house or metric number has no standard house number. When the references to the previous access are absent, the SNC access is at the start of the street."
+    },
+    {
+      "name": "longitude",
+      "type": "double",
+      "description": "Longitude of the access in decimal degrees, from the source column COORD_X_COMUNE. The reference system declared by the source is ETRF2000 at epoch 2008.0, the Italian realisation of ETRS89. The pipeline converts the decimal comma to a point."
+    },
+    {
+      "name": "latitude",
+      "type": "double",
+      "description": "Latitude of the access in decimal degrees, from the source column COORD_Y_COMUNE. Same reference system and same decimal conversion as the longitude."
+    },
+    {
+      "name": "QUOTA",
+      "type": "varchar",
+      "description": "Orthometric height of the access in the official national height reference systems. The pipeline keeps it as text because the values use a comma as decimal separator."
+    },
+    {
+      "name": "METODO",
+      "type": "bigint",
+      "description": "How the comune assigned the coordinates. 1 field survey with instruments, accuracy below 5 m; 2 field survey with instruments, accuracy of 5 m or more; 3 indirect derivation from a spatial database, estimated accuracy below 5 m; 4 indirect derivation from a spatial database, estimated accuracy of 5 m or more; 5 indirect derivation through the functions of the Portale per i Comuni."
+    },
+    {
+      "name": "oob_distance_m",
+      "type": "double",
+      "description": "Distance in metres between the address and the boundary of its comune according to Istat administrative boundaries, computed by the pipeline. Null when the comune has no matching boundary, zero when the point falls inside it."
+    },
+    {
+      "name": "out_of_bounds",
+      "type": "boolean",
+      "description": "True when the address falls more than 110 metres outside the boundary of the comune it is assigned to. The threshold absorbs geocoding tolerance. Null when the comune has no matching boundary."
+    },
+    {
+      "name": "bbox",
+      "type": "struct(xmin double, ymin double, xmax double, ymax double)",
+      "description": "Bounding box of the point, with all four values equal to its coordinates. It is the covering column defined by GeoParquet, which lets a reader skip whole row groups without decoding geometries."
+    },
+    {
+      "name": "geometry",
+      "type": "geometry",
+      "description": "Point built by the pipeline from longitude and latitude. Declared in OGC:CRS84. The source expresses coordinates in ETRF2000, which differs from WGS84 by less than a metre in Italy, so the offset is negligible against address precision."
+    }
+  ],
+  "table:row_count": 20731065,
+  "table:primary_geometry": "geometry",
+  "assets": {
+    "data": {
+      "href": "../../anncsu-indirizzi.parquet",
+      "type": "application/vnd.apache.parquet",
+      "title": "ANNCSU addresses (GeoParquet)",
+      "roles": [
+        "data"
+      ],
+      "proj:code": "OGC:CRS84",
+      "file:size": 1059267903,
+      "file:checksum": "122075f778b597b110cd7e63e4c3a3353a22983e73e8a938f10f84a58472fb7dde6f"
+    },
+    "visual": {
+      "href": "../../anncsu-indirizzi.pmtiles",
+      "type": "application/vnd.pmtiles",
+      "title": "ANNCSU addresses (PMTiles)",
+      "roles": [
+        "visual"
+      ],
+      "file:size": 333155352,
+      "file:checksum": "1220fc4d822927fd668df682b3f3c6f14493081c294d48c996d0d4bc1039814d1802"
+    },
+    "style-indirizzi": {
+      "href": "../../indirizzi/styles/indirizzi.json",
+      "type": "application/vnd.mapbox.style+json",
+      "title": "Address points",
+      "description": "Every access as a uniform point.",
+      "roles": [
+        "style",
+        "default"
+      ],
+      "file:size": 592,
+      "file:checksum": "12204da33adfa626c2f0e1b43ab40620c5bac5c5a438c0f60b2fde69d0727844b045"
+    },
+    "thumbnail": {
+      "href": "../../indirizzi/thumbnail.png",
+      "type": "image/png",
+      "title": "Address density over the country",
+      "roles": [
+        "thumbnail"
+      ],
+      "file:size": 329347,
+      "file:checksum": "122091b04bcaa894fd50801c6f5f769cb6ae32c213a6e3403517e7f6e10f2007c5c8"
+    }
+  },
+  "links": [
+    {
+      "rel": "root",
+      "href": "../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "parent",
+      "href": "../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "pmtiles",
+      "href": "../../anncsu-indirizzi.pmtiles",
+      "type": "application/vnd.pmtiles",
+      "title": "Vector tiles for the map",
+      "pmtiles:layers": [
+        "addresses"
+      ]
+    },
+    {
+      "rel": "alternate",
+      "href": "../../indirizzi/collection.json",
+      "type": "application/json",
+      "title": "Italian",
+      "hreflang": "it"
+    },
+    {
+      "rel": "alternate",
+      "href": "https://anncsu-open.github.io/anncsu-viewer/",
+      "type": "text/html",
+      "title": "Web viewer"
+    },
+    {
+      "rel": "via",
+      "href": "https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/",
+      "type": "text/html",
+      "title": "ANNCSU open data portal"
+    },
+    {
+      "rel": "license",
+      "href": "https://creativecommons.org/licenses/by/4.0/",
+      "type": "text/html",
+      "title": "Creative Commons Attribution 4.0 International"
+    },
+    {
+      "rel": "agents",
+      "href": "./AGENTS.md",
+      "type": "text/markdown",
+      "title": "Instructions for automated agents",
+      "hreflang": "en"
+    },
+    {
+      "rel": "describedby",
+      "href": "./README.md",
+      "type": "text/markdown",
+      "title": "Human-readable documentation",
+      "hreflang": "en"
+    }
+  ]
+}

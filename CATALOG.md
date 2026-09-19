@@ -15,6 +15,11 @@ design decisions behind it, and the Portolan requirements they satisfy, are in
 
 ## Using the data
 
+The quickest look is the live catalog in the
+[Portolan Browser](https://browser.portolan-sdi.org/#/external/pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/catalog.json).
+The catalog is written in Italian, with an English tree under `en/` that
+describes the same data and points at the same files.
+
 Everything is served from `https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev`.
 Start at `catalog.json` and follow the links, or go straight to a file if you
 already know what you want.

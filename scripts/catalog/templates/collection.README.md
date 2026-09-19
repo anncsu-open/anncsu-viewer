@@ -2,11 +2,16 @@
 
 $description
 
-Aggiornato al $dataset_date_human, con $row_count_human indirizzi.
+Aggiornato al $dataset_date_human, con $row_count_human indirizzi. I dati si
+vedono sulla mappa nel [visualizzatore web]($viewer_url).
 
 ## Come si legge
 
 $usage
+
+## Statistiche
+
+$statistics_table
 
 ## Schema
 
