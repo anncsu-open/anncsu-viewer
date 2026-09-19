@@ -88,7 +88,7 @@ ZIP (remote)
   → CSV (extracted)
     → DuckDB (in-memory, JOIN with comuni.json)
       → GeoParquet (bbox + Hilbert sorting)
-        → PMTiles (via gpio-pmtiles)
+        → PMTiles (via geoparquet-io + tippecanoe)
         → H3 tiles (via geoparquet-io partition_by_h3)
           → Cloudflare R2 (via rclone)
 ```
@@ -101,9 +101,9 @@ ZIP (remote)
 4. **JOIN with `comuni.json`** to add `NOME_COMUNE` column
 5. **Create point geometries** using `ST_Point(longitude, latitude)` via DuckDB spatial extension
 6. **Export as Parquet** with ZSTD compression
-7. **Enhance with geoparquet-io**: add bbox metadata and Hilbert spatial sorting
-8. **Convert to PMTiles** via `gpio-pmtiles` for map visualization
-9. **Partition into H3 tiles** via `geoparquet-io` `partition_by_h3()` at resolution 5
+7. **Enhance with DuckDB**: add bbox column and Hilbert spatial sorting (streamed to disk)
+8. **Convert to PMTiles** via `geoparquet-io` `ops.create_pmtiles()` (tippecanoe) for map visualization
+9. **Partition into H3 tiles** via `geoparquet-io` `partition_by_h3(hive=True)` at resolution 5
 10. **Clean up** temporary CSV
 
 ### DuckDB schema
@@ -234,9 +234,8 @@ uv run scripts/generate_comuni_h3.py # Map municipalities to H3 cells
 ```
 
 Dependencies resolved automatically by `uv`:
-- `duckdb` — CSV loading, spatial extension, parquet export
-- `geoparquet-io` — bbox metadata, spatial sorting, H3 partitioning
-- `gpio-pmtiles` — GeoParquet to PMTiles conversion
+- `duckdb` (>=1.5.5) — CSV loading, spatial extension, parquet export, bbox + Hilbert sort
+- `geoparquet-io` (>=1.5.0) — H3 partitioning, GeoParquet to PMTiles conversion (PMTiles is in core since 1.1.0; the separate `gpio-pmtiles` plugin is deprecated)
 - `httpx` — HTTP client with range request support
 
 ## GitHub Action Schedule

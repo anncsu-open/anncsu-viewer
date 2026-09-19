@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#     "duckdb>=1.5.2",
+#     "duckdb>=1.5.5",
 # ]
 # ///
 """Generate comuni-h3.json mapping each comune to its H3 tile cells.

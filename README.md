@@ -74,7 +74,7 @@ VITE_APP_MODE=comunale
 - **Frontend** — [Vue 3](https://vuejs.org/) + [Pinia](https://pinia.vuejs.org/) + [Tailwind CSS](https://tailwindcss.com/)
 - **Map** — [MapLibre GL JS](https://maplibre.org/) + [PMTiles](https://protomaps.com/docs/pmtiles)
 - **Data** — [DuckDB WASM](https://duckdb.org/) + [GeoParquet](https://geoparquet.org/) + [H3](https://h3geo.org/)
-- **Data pipeline** — Python + [geoparquet-io](https://github.com/geoparquet/geoparquet-io) + [gpio-pmtiles](https://github.com/geoparquet/gpio-pmtiles)
+- **Data pipeline** — Python + [DuckDB](https://duckdb.org/) + [geoparquet-io](https://github.com/geoparquet/geoparquet-io) (H3 partitioning, PMTiles via [tippecanoe](https://github.com/felt/tippecanoe))
 - **Hosting** — GitHub Pages (app) + Cloudflare R2 (data)
 - **Design** — [Design System Italia](https://designers.italia.it/) (colors, Titillium Web font)
 

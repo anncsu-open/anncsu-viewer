@@ -1,8 +1,8 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#     "duckdb>=1.5.2",
-#     "geoparquet-io>=1.1.1",
+#     "duckdb>=1.5.5",
+#     "geoparquet-io>=1.5.0",
 #     "httpx",
 #     "shapely>=2.0",
 # ]

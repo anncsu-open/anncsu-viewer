@@ -1,9 +1,8 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#     "geoparquet-io>=1.1.1",
-#     "gpio-pmtiles",
-#     "duckdb>=1.5.2",
+#     "geoparquet-io>=1.5.0",
+#     "duckdb>=1.5.5",
 #     "httpx",
 #     "typer",
 # ]
@@ -185,14 +184,20 @@ def download_and_extract() -> Path:
                     mb = downloaded / (1024 * 1024)
                     if total:
                         pct = downloaded * 100 / total
-                        print(f"  {mb:.0f} MB / {total / (1024 * 1024):.0f} MB ({pct:.0f}%)")
+                        print(
+                            f"  {mb:.0f} MB / {total / (1024 * 1024):.0f} MB ({pct:.0f}%)"
+                        )
                     else:
                         print(f"  {mb:.0f} MB downloaded ...")
             break
         except (httpx.HTTPStatusError, httpx.TransportError) as exc:
             if attempt == MAX_RETRIES:
-                raise SystemExit(f"Download failed after {MAX_RETRIES} attempts: {exc}") from exc
-            print(f"Attempt {attempt}/{MAX_RETRIES} failed ({exc}), retrying in {RETRY_WAIT}s ...")
+                raise SystemExit(
+                    f"Download failed after {MAX_RETRIES} attempts: {exc}"
+                ) from exc
+            print(
+                f"Attempt {attempt}/{MAX_RETRIES} failed ({exc}), retrying in {RETRY_WAIT}s ..."
+            )
             time.sleep(RETRY_WAIT)
     print(f"Downloaded {downloaded / (1024 * 1024):.1f} MB")
 
@@ -401,11 +406,13 @@ def generate_comuni_h3(parquet_path: Path, output_path: Path | None = None) -> P
     comuni_h3 = []
     for codice_istat, nome_comune, h3_cells in result:
         hex_cells = [hex(c)[2:] for c in h3_cells]
-        comuni_h3.append({
-            "codice_istat": codice_istat,
-            "nome_comune": nome_comune,
-            "h3_cells": hex_cells,
-        })
+        comuni_h3.append(
+            {
+                "codice_istat": codice_istat,
+                "nome_comune": nome_comune,
+                "h3_cells": hex_cells,
+            }
+        )
 
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(comuni_h3, f, ensure_ascii=False)
@@ -442,8 +449,7 @@ def enhance_parquet(parquet_path: Path) -> None:
         return
     xmin, ymin, xmax, ymax = extent
     print(
-        f"  extent: lon [{xmin:.4f}, {xmax:.4f}], "
-        f"lat [{ymin:.4f}, {ymax:.4f}]",
+        f"  extent: lon [{xmin:.4f}, {xmax:.4f}], lat [{ymin:.4f}, {ymax:.4f}]",
         flush=True,
     )
 
@@ -476,8 +482,9 @@ def enhance_parquet(parquet_path: Path) -> None:
 def _clean_tiles_dir(tiles_dir: Path) -> None:
     """Wipe the tiles directory before partitioning.
 
-    geoparquet-io 1.1.1's partition_by_h3 does not overwrite existing files
-    in the destination, so without this step tiles silently retain stale
+    geoparquet-io's partition_by_h3 does not remove pre-existing files in
+    the destination (verified on 1.1.1 and 1.5.0, with and without
+    ``overwrite=True``), so without this step tiles silently retain stale
     data from previous runs (alongside any newly written ones).
     """
     if tiles_dir.exists():
@@ -512,9 +519,14 @@ def partition_h3_tiles(parquet_path: Path) -> Path:
 
     print(f"Partitioning into H3 tiles (resolution {H3_RESOLUTION}) ...")
     _clean_tiles_dir(TILES_DIR)
-    gpio.read(str(parquet_path)) \
-        .add_h3(resolution=H3_RESOLUTION) \
-        .partition_by_h3(str(TILES_DIR), resolution=H3_RESOLUTION)
+    # hive=True is required: the frontend fetches
+    # tiles/h3_cell=<cell>/<cell>.parquet (see SearchBar.vue). geoparquet-io
+    # 1.4.0 changed the Python API default from True to False to match the
+    # CLI, which would silently flatten the layout to tiles/<cell>.parquet.
+    # Hive output also keeps the h3_cell column, matching the existing tiles.
+    gpio.read(str(parquet_path)).add_h3(resolution=H3_RESOLUTION).partition_by_h3(
+        str(TILES_DIR), resolution=H3_RESOLUTION, hive=True
+    )
 
     tile_count = len(list(TILES_DIR.glob("**/*.parquet")))
     print(f"Created {tile_count} H3 tiles in {TILES_DIR}")
@@ -524,18 +536,26 @@ def partition_h3_tiles(parquet_path: Path) -> Path:
 
 
 def convert_to_pmtiles(parquet_path: Path) -> Path:
-    """Convert GeoParquet to PMTiles for map visualization."""
-    from gpio_pmtiles import create_pmtiles_from_geoparquet
+    """Convert GeoParquet to PMTiles for map visualization.
+
+    Uses geoparquet-io's built-in PMTiles support (core since 1.1.0, which
+    absorbed the deprecated ``gpio-pmtiles`` plugin). Still shells out to
+    tippecanoe, so ``_check_tippecanoe`` must have passed.
+    """
+    from geoparquet_io.api import ops
 
     print(f"Converting to PMTiles: {PMTILES_FILE} ...")
     if PMTILES_FILE.exists():
         PMTILES_FILE.unlink()
-    create_pmtiles_from_geoparquet(
+    ops.create_pmtiles(
         str(parquet_path),
         str(PMTILES_FILE),
         layer="addresses",
         include_cols="ODONIMO,CIVICO,ESPONENTE,CODICE_ISTAT,NOME_COMUNE,oob_distance_m,out_of_bounds",
         verbose=True,
+        # Geometries are ST_Point built from coordinates and always valid;
+        # skip the ST_MakeValid pass over ~20M rows (gpio-pmtiles had none).
+        repair_geometry=False,
     )
     size_mb = PMTILES_FILE.stat().st_size / (1024 * 1024)
     print(f"PMTiles conversion complete ({size_mb:.1f} MB)")
@@ -543,7 +563,9 @@ def convert_to_pmtiles(parquet_path: Path) -> Path:
 
 
 def main(
-    force: bool = typer.Option(False, "--force", help="Skip freshness check and force re-download"),
+    force: bool = typer.Option(
+        False, "--force", help="Skip freshness check and force re-download"
+    ),
 ) -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     _check_tippecanoe()

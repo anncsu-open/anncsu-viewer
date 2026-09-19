@@ -1,9 +1,8 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#     "duckdb>=1.5.2",
-#     "geoparquet-io>=1.1.1",
-#     "gpio-pmtiles",
+#     "duckdb>=1.5.5",
+#     "geoparquet-io>=1.5.0",
 #     "httpx",
 #     "pytest",
 #     "respx",
@@ -13,9 +12,13 @@
 """Tests for update_data.py server availability and download resilience.
 
 Usage:
-    uv run --with httpx --with pytest --with respx --with typer -- pytest scripts/test_update_data.py -v
+    uv run scripts/test_update_data.py
+    # or explicitly:
+    uv run --with duckdb --with geoparquet-io --with httpx --with pytest \
+        --with respx --with typer -- pytest scripts/test_update_data.py -v
 """
 
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
@@ -24,6 +27,7 @@ import httpx
 import pytest
 import respx
 
+import update_data
 from update_data import (
     ANNCSU_URL,
     MARKER_FILE,
@@ -32,11 +36,13 @@ from update_data import (
     _clean_tiles_dir,
     _validate_row_count,
     _validate_tile_row_count,
+    convert_to_pmtiles,
     csv_to_parquet,
     enhance_parquet,
     generate_comuni_h3,
     get_remote_date,
     is_update_needed,
+    partition_h3_tiles,
 )
 
 
@@ -227,6 +233,7 @@ class TestGenerateComuniH3:
         generate_comuni_h3(parquet, output)
 
         import json
+
         with open(output) as f:
             data = json.load(f)
 
@@ -262,6 +269,7 @@ class TestGenerateComuniH3:
         generate_comuni_h3(parquet, output)
 
         import json
+
         with open(output) as f:
             data = json.load(f)
 
@@ -306,21 +314,27 @@ class TestValidateRowCount:
 
     def test_passes_when_counts_match(self, tmp_path):
         csv_path = tmp_path / "input.csv"
-        _write_csv(csv_path, [
-            "001001;010001;1;001001;VIA A;;;;1;001001;1;;;;0;7,684;45,066;200;1",
-            "001001;010001;2;001001;VIA B;;;;1;001001;2;;;;0;7,684;45,066;100;1",
-        ])
+        _write_csv(
+            csv_path,
+            [
+                "001001;010001;1;001001;VIA A;;;;1;001001;1;;;;0;7,684;45,066;200;1",
+                "001001;010001;2;001001;VIA B;;;;1;001001;2;;;;0;7,684;45,066;100;1",
+            ],
+        )
         parquet_path = tmp_path / "out.parquet"
         _make_parquet(parquet_path, 2)
         _validate_row_count(csv_path, parquet_path)  # should not raise
 
     def test_raises_on_count_mismatch(self, tmp_path):
         csv_path = tmp_path / "input.csv"
-        _write_csv(csv_path, [
-            "001001;010001;1;001001;VIA A;;;;1;001001;1;;;;0;7,684;45,066;200;1",
-            "001001;010001;2;001001;VIA B;;;;1;001001;2;;;;0;7,684;45,066;100;1",
-            "001001;010001;3;001001;VIA C;;;;1;001001;3;;;;0;7,684;45,066;300;1",
-        ])
+        _write_csv(
+            csv_path,
+            [
+                "001001;010001;1;001001;VIA A;;;;1;001001;1;;;;0;7,684;45,066;200;1",
+                "001001;010001;2;001001;VIA B;;;;1;001001;2;;;;0;7,684;45,066;100;1",
+                "001001;010001;3;001001;VIA C;;;;1;001001;3;;;;0;7,684;45,066;300;1",
+            ],
+        )
         parquet_path = tmp_path / "out.parquet"
         _make_parquet(parquet_path, 2)
         with pytest.raises(RuntimeError, match="Row count mismatch"):
@@ -329,12 +343,15 @@ class TestValidateRowCount:
     def test_excludes_rows_without_coordinates(self, tmp_path):
         """Rows with empty COORD_X/Y are excluded from the CSV count."""
         csv_path = tmp_path / "input.csv"
-        _write_csv(csv_path, [
-            "001001;010001;1;001001;VIA A;;;;1;001001;1;;;;0;7,684;45,066;200;1",
-            # no coordinates → not counted
-            "001001;010001;2;001001;VIA B;;;;1;001001;2;;;;0;;;200;1",
-            "001001;010001;3;001001;VIA C;;;;1;001001;3;;;;0;7,684;45,066;100;1",
-        ])
+        _write_csv(
+            csv_path,
+            [
+                "001001;010001;1;001001;VIA A;;;;1;001001;1;;;;0;7,684;45,066;200;1",
+                # no coordinates → not counted
+                "001001;010001;2;001001;VIA B;;;;1;001001;2;;;;0;;;200;1",
+                "001001;010001;3;001001;VIA C;;;;1;001001;3;;;;0;7,684;45,066;100;1",
+            ],
+        )
         parquet_path = tmp_path / "out.parquet"
         _make_parquet(parquet_path, 2)  # only 2 rows had coords
         _validate_row_count(csv_path, parquet_path)  # should not raise
@@ -347,10 +364,13 @@ class TestValidateRowCount:
         parquet would go unnoticed.
         """
         csv_path = tmp_path / "input.csv"
-        _write_csv(csv_path, [
-            "001001;010001;1;001001;VIA A;;;;1;001001;1;;;;0;7,684;45,066;200;1",
-            "001001;010001;2;001001;VIA B;;;;1;001001;2;;;;0;7,684;45,066;58,77;1",
-        ])
+        _write_csv(
+            csv_path,
+            [
+                "001001;010001;1;001001;VIA A;;;;1;001001;1;;;;0;7,684;45,066;200;1",
+                "001001;010001;2;001001;VIA B;;;;1;001001;2;;;;0;7,684;45,066;58,77;1",
+            ],
+        )
         parquet_path = tmp_path / "out.parquet"
         _make_parquet(parquet_path, 2)
         _validate_row_count(csv_path, parquet_path)  # should not raise
@@ -358,10 +378,13 @@ class TestValidateRowCount:
     def test_passes_when_alphanumeric_codice_accesso_is_present(self, tmp_path):
         """The validator must count rows with alphanumeric CODICE_COMUNALE_ACCESSO."""
         csv_path = tmp_path / "input.csv"
-        _write_csv(csv_path, [
-            "001001;010001;1;001001;VIA A;;;;1;001001;1;;;;0;7,684;45,066;200;1",
-            "001001;010001;2;001001;VIA B;;;;2;G282;2;;;;0;7,684;45,066;100;1",
-        ])
+        _write_csv(
+            csv_path,
+            [
+                "001001;010001;1;001001;VIA A;;;;1;001001;1;;;;0;7,684;45,066;200;1",
+                "001001;010001;2;001001;VIA B;;;;2;G282;2;;;;0;7,684;45,066;100;1",
+            ],
+        )
         parquet_path = tmp_path / "out.parquet"
         _make_parquet(parquet_path, 2)
         _validate_row_count(csv_path, parquet_path)  # should not raise
@@ -394,13 +417,16 @@ class TestCsvToParquet:
         import duckdb
 
         csv_path = tmp_path / "input.csv"
-        _write_csv(csv_path, [
-            # First two rows have integer QUOTA — would let auto_detect infer BIGINT
-            "001001;010001;1;001001;VIA A;;;;1;001001;1;;;;0;7,684;45,066;200;1",
-            "001001;010001;2;001001;VIA B;;;;1;001001;2;;;;0;7,684;45,066;100;1",
-            # Decimal QUOTA — historic regression: this row was silently dropped
-            "001001;010001;3;001001;VIA C;;;;1;001001;3;;;;0;7,684;45,066;58,77;1",
-        ])
+        _write_csv(
+            csv_path,
+            [
+                # First two rows have integer QUOTA — would let auto_detect infer BIGINT
+                "001001;010001;1;001001;VIA A;;;;1;001001;1;;;;0;7,684;45,066;200;1",
+                "001001;010001;2;001001;VIA B;;;;1;001001;2;;;;0;7,684;45,066;100;1",
+                # Decimal QUOTA — historic regression: this row was silently dropped
+                "001001;010001;3;001001;VIA C;;;;1;001001;3;;;;0;7,684;45,066;58,77;1",
+            ],
+        )
         output_path = self._setup_paths(tmp_path, monkeypatch)
 
         csv_to_parquet(csv_path)
@@ -419,12 +445,15 @@ class TestCsvToParquet:
         import duckdb
 
         csv_path = tmp_path / "input.csv"
-        _write_csv(csv_path, [
-            "001001;010001;1;001001;VIA A;;;;1;001001;1;;;;0;7,684;45,066;200;1",
-            "001001;010001;2;001001;VIA B;;;;2;001002;2;;;;0;7,684;45,066;100;1",
-            # Belfiore-style code — historic regression: silently dropped
-            "001001;010001;3;001001;VIA C;;;;3;G282;3;;;;0;7,684;45,066;300;1",
-        ])
+        _write_csv(
+            csv_path,
+            [
+                "001001;010001;1;001001;VIA A;;;;1;001001;1;;;;0;7,684;45,066;200;1",
+                "001001;010001;2;001001;VIA B;;;;2;001002;2;;;;0;7,684;45,066;100;1",
+                # Belfiore-style code — historic regression: silently dropped
+                "001001;010001;3;001001;VIA C;;;;3;G282;3;;;;0;7,684;45,066;300;1",
+            ],
+        )
         output_path = self._setup_paths(tmp_path, monkeypatch)
 
         csv_to_parquet(csv_path)
@@ -443,12 +472,15 @@ class TestCsvToParquet:
         import duckdb
 
         csv_path = tmp_path / "input.csv"
-        _write_csv(csv_path, [
-            "001001;010001;1;001001;VIA A;;;;1;001001;1;;;;0;7,684;45,066;200;1",
-            # Empty coordinates → must be filtered
-            "001001;010001;2;001001;VIA B;;;;1;001001;2;;;;0;;;100;1",
-            "001001;010001;3;001001;VIA C;;;;1;001001;3;;;;0;7,684;45,066;100;1",
-        ])
+        _write_csv(
+            csv_path,
+            [
+                "001001;010001;1;001001;VIA A;;;;1;001001;1;;;;0;7,684;45,066;200;1",
+                # Empty coordinates → must be filtered
+                "001001;010001;2;001001;VIA B;;;;1;001001;2;;;;0;;;100;1",
+                "001001;010001;3;001001;VIA C;;;;1;001001;3;;;;0;7,684;45,066;100;1",
+            ],
+        )
         output_path = self._setup_paths(tmp_path, monkeypatch)
 
         csv_to_parquet(csv_path)
@@ -494,6 +526,7 @@ class TestValidateTileRowCount:
 
     def _make_parquet(self, path: Path, n_rows: int) -> None:
         import duckdb
+
         con = duckdb.connect()
         con.execute(
             f"COPY (SELECT range AS x FROM range({n_rows})) "
@@ -565,11 +598,10 @@ class TestEnhanceParquet:
 
     def _read_rows(self, path: Path, columns: str = "*") -> list[tuple]:
         import duckdb
+
         con = duckdb.connect()
         con.execute("INSTALL spatial; LOAD spatial;")
-        rows = con.execute(
-            f"SELECT {columns} FROM read_parquet('{path}')"
-        ).fetchall()
+        rows = con.execute(f"SELECT {columns} FROM read_parquet('{path}')").fetchall()
         con.close()
         return rows
 
@@ -584,10 +616,9 @@ class TestEnhanceParquet:
         self._write_input(p, [(12.0, 42.0)])
         enhance_parquet(p)
         import duckdb
+
         con = duckdb.connect()
-        cols = con.execute(
-            f"DESCRIBE SELECT * FROM read_parquet('{p}')"
-        ).fetchall()
+        cols = con.execute(f"DESCRIBE SELECT * FROM read_parquet('{p}')").fetchall()
         con.close()
         bbox_rows = [c for c in cols if c[0] == "bbox"]
         assert len(bbox_rows) == 1, f"Expected exactly one bbox column, got cols={cols}"
@@ -600,27 +631,42 @@ class TestEnhanceParquet:
         self._write_input(p, [(12.5, 41.9)])
         enhance_parquet(p)
         import duckdb
-        row = duckdb.connect().execute(f"""
+
+        row = (
+            duckdb.connect()
+            .execute(f"""
             SELECT longitude, latitude,
                    bbox.xmin, bbox.ymin, bbox.xmax, bbox.ymax
             FROM read_parquet('{p}')
-        """).fetchone()
+        """)
+            .fetchone()
+        )
         lon, lat, xmin, ymin, xmax, ymax = row
-        assert xmin == lon and xmax == lon, f"bbox xmin/xmax should equal longitude={lon}"
-        assert ymin == lat and ymax == lat, f"bbox ymin/ymax should equal latitude={lat}"
+        assert xmin == lon and xmax == lon, (
+            f"bbox xmin/xmax should equal longitude={lon}"
+        )
+        assert ymin == lat and ymax == lat, (
+            f"bbox ymin/ymax should equal latitude={lat}"
+        )
 
     def test_preserves_original_columns(self, tmp_path):
         p = tmp_path / "in.parquet"
         self._write_input(p, [(12.0, 42.0), (9.0, 45.0)])
         enhance_parquet(p)
         import duckdb
+
         col_names = {
-            row[0] for row in duckdb.connect().execute(
-                f"DESCRIBE SELECT * FROM read_parquet('{p}')"
-            ).fetchall()
+            row[0]
+            for row in duckdb.connect()
+            .execute(f"DESCRIBE SELECT * FROM read_parquet('{p}')")
+            .fetchall()
         }
         for required in (
-            "CODICE_ISTAT", "NOME_COMUNE", "longitude", "latitude", "geometry"
+            "CODICE_ISTAT",
+            "NOME_COMUNE",
+            "longitude",
+            "latitude",
+            "geometry",
         ):
             assert required in col_names, (
                 f"Original column {required!r} dropped by enhance_parquet "
@@ -681,9 +727,9 @@ class TestEnhanceParquet:
 
         out_dir = tmp_path / "tiles"
         out_dir.mkdir()
-        gpio.read(str(p)) \
-            .add_h3(resolution=5) \
-            .partition_by_h3(str(out_dir), resolution=5)
+        gpio.read(str(p)).add_h3(resolution=5).partition_by_h3(
+            str(out_dir), resolution=5
+        )
 
         files = list(out_dir.glob("**/*.parquet"))
         assert len(files) >= 1, "partition_by_h3 should produce at least one tile"
@@ -698,3 +744,196 @@ class TestEnhanceParquet:
 
         rows = self._read_rows(p, "longitude, latitude")
         assert sorted(rows) == sorted(points)
+
+
+def _write_enhanced_parquet(path: Path, n_points: int = 300) -> None:
+    """Write a small parquet with the full post-enhance_parquet schema.
+
+    Points are clustered around Roma so they collapse into a single H3
+    res-5 cell, clearing geoparquet-io's minimum rows-per-partition floor.
+    Includes every column convert_to_pmtiles passes via ``include_cols`` so
+    the real tippecanoe run has something to select.
+    """
+    import random
+
+    import duckdb
+
+    rng = random.Random(0)
+    rows = ",".join(
+        f"('058091', 'Roma', 'VIA ROMA {i}', {i}, NULL, "
+        f"CAST({12.49 + rng.uniform(-0.001, 0.001)} AS DOUBLE), "
+        f"CAST({41.90 + rng.uniform(-0.001, 0.001)} AS DOUBLE), "
+        f"CAST(NULL AS DOUBLE), false)"
+        for i in range(n_points)
+    )
+    con = duckdb.connect()
+    con.execute("INSTALL spatial; LOAD spatial;")
+    con.execute(f"""
+        COPY (
+            SELECT
+                *,
+                {{'xmin': longitude, 'ymin': latitude,
+                  'xmax': longitude, 'ymax': latitude}} AS bbox,
+                ST_Point(longitude, latitude) AS geometry
+            FROM (VALUES {rows}) AS t(
+                CODICE_ISTAT, NOME_COMUNE, ODONIMO, CIVICO, ESPONENTE,
+                longitude, latitude, oob_distance_m, out_of_bounds
+            )
+        ) TO '{path}' (FORMAT PARQUET)
+    """)
+    con.close()
+
+
+class TestPartitionH3Tiles:
+    """Tests for partition_h3_tiles() output layout.
+
+    The frontend (SearchBar.vue) fetches tiles at
+    ``tiles/h3_cell=<cell>/<cell>.parquet``, i.e. Hive-style partitioning.
+    geoparquet-io 1.4.0 flipped the Python API default of ``hive`` from True
+    to False to match the CLI, so the layout must be requested explicitly or
+    every tile silently moves to ``tiles/<cell>.parquet`` and the nazionale
+    search breaks with 404s.
+    """
+
+    def test_writes_hive_layout_expected_by_frontend(self, tmp_path, monkeypatch):
+        parquet_path = tmp_path / "in.parquet"
+        _write_enhanced_parquet(parquet_path)
+        tiles_dir = tmp_path / "tiles"
+        monkeypatch.setattr(update_data, "TILES_DIR", tiles_dir)
+
+        result = partition_h3_tiles(parquet_path)
+
+        assert result == tiles_dir
+        files = sorted(tiles_dir.glob("**/*.parquet"))
+        assert len(files) >= 1, "partition_by_h3 should produce at least one tile"
+        for f in files:
+            cell = f.stem
+            rel = f.relative_to(tiles_dir)
+            assert rel == Path(f"h3_cell={cell}") / f"{cell}.parquet", (
+                f"Tile {rel} is not in the Hive layout tiles/h3_cell=<cell>/<cell>.parquet "
+                f"that SearchBar.vue requests"
+            )
+
+    def test_tiles_keep_h3_cell_column(self, tmp_path, monkeypatch):
+        """Existing tiles on R2 carry an ``h3_cell`` VARCHAR column; keep the schema stable."""
+        import duckdb
+
+        parquet_path = tmp_path / "in.parquet"
+        _write_enhanced_parquet(parquet_path)
+        tiles_dir = tmp_path / "tiles"
+        monkeypatch.setattr(update_data, "TILES_DIR", tiles_dir)
+
+        partition_h3_tiles(parquet_path)
+
+        tile = next(tiles_dir.glob("**/*.parquet"))
+        con = duckdb.connect()
+        cols = {
+            row[0]: row[1]
+            for row in con.execute(
+                f"DESCRIBE SELECT * FROM read_parquet('{tile}')"
+            ).fetchall()
+        }
+        con.close()
+        assert cols.get("h3_cell") == "VARCHAR"
+        for expected in (
+            "CODICE_ISTAT",
+            "NOME_COMUNE",
+            "longitude",
+            "latitude",
+            "bbox",
+            "geometry",
+        ):
+            assert expected in cols
+
+
+class TestConvertToPmtiles:
+    """Tests for convert_to_pmtiles() using geoparquet-io's built-in PMTiles.
+
+    PMTiles generation moved into geoparquet-io core in 1.1.0 and the
+    separate ``gpio-pmtiles`` plugin is deprecated (its GitHub repo is gone,
+    the PyPI package emits a DeprecationWarning and pins pyarrow<25).
+    """
+
+    def test_calls_geoparquet_io_ops_create_pmtiles(self, tmp_path, monkeypatch):
+        from geoparquet_io.api import ops
+
+        parquet_path = tmp_path / "in.parquet"
+        parquet_path.write_bytes(b"not read by the fake")
+        pmtiles_path = tmp_path / "out.pmtiles"
+        monkeypatch.setattr(update_data, "PMTILES_FILE", pmtiles_path)
+
+        calls: list[tuple[tuple, dict]] = []
+
+        def fake_create_pmtiles(input_path, output_path, **kwargs):
+            calls.append(((input_path, output_path), kwargs))
+            Path(output_path).write_bytes(b"PMTiles\x03" + b"\x00" * 120)
+
+        monkeypatch.setattr(ops, "create_pmtiles", fake_create_pmtiles)
+
+        result = convert_to_pmtiles(parquet_path)
+
+        assert result == pmtiles_path
+        assert len(calls) == 1
+        (input_path, output_path), kwargs = calls[0]
+        assert input_path == str(parquet_path)
+        assert output_path == str(pmtiles_path)
+        assert kwargs["layer"] == "addresses"
+        assert kwargs["include_cols"].split(",") == [
+            "ODONIMO",
+            "CIVICO",
+            "ESPONENTE",
+            "CODICE_ISTAT",
+            "NOME_COMUNE",
+            "oob_distance_m",
+            "out_of_bounds",
+        ]
+
+    def test_removes_stale_output_before_conversion(self, tmp_path, monkeypatch):
+        from geoparquet_io.api import ops
+
+        parquet_path = tmp_path / "in.parquet"
+        parquet_path.write_bytes(b"")
+        pmtiles_path = tmp_path / "out.pmtiles"
+        pmtiles_path.write_bytes(b"stale")
+        monkeypatch.setattr(update_data, "PMTILES_FILE", pmtiles_path)
+
+        seen_existing: list[bool] = []
+
+        def fake_create_pmtiles(input_path, output_path, **kwargs):
+            seen_existing.append(Path(output_path).exists())
+            Path(output_path).write_bytes(b"fresh")
+
+        monkeypatch.setattr(ops, "create_pmtiles", fake_create_pmtiles)
+
+        convert_to_pmtiles(parquet_path)
+
+        assert seen_existing == [False], (
+            "stale PMTiles must be unlinked before create_pmtiles runs"
+        )
+        assert pmtiles_path.read_bytes() == b"fresh"
+
+    @pytest.mark.skipif(
+        shutil.which("tippecanoe") is None, reason="tippecanoe not installed"
+    )
+    def test_end_to_end_produces_valid_pmtiles_with_addresses_layer(
+        self, tmp_path, monkeypatch
+    ):
+        """Real run through geoparquet-io + tippecanoe on a tiny dataset."""
+        from pmtiles.reader import MmapSource, Reader
+
+        parquet_path = tmp_path / "in.parquet"
+        _write_enhanced_parquet(parquet_path, n_points=50)
+        pmtiles_path = tmp_path / "out.pmtiles"
+        monkeypatch.setattr(update_data, "PMTILES_FILE", pmtiles_path)
+
+        convert_to_pmtiles(parquet_path)
+
+        assert pmtiles_path.exists() and pmtiles_path.stat().st_size > 0
+        with open(pmtiles_path, "rb") as f:
+            assert f.read(7) == b"PMTiles"
+            f.seek(0)
+            metadata = Reader(MmapSource(f)).metadata()
+        layer_ids = [layer["id"] for layer in metadata["vector_layers"]]
+        assert layer_ids == ["addresses"]
+        fields = set(metadata["vector_layers"][0]["fields"])
+        assert {"ODONIMO", "CIVICO", "CODICE_ISTAT", "NOME_COMUNE"} <= fields
