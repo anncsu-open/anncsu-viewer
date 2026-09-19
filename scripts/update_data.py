@@ -23,6 +23,7 @@ with the last commit date of the existing GeoParquet file.
 """
 
 import io
+import json
 import re
 import shutil
 import time
@@ -421,6 +422,40 @@ def generate_comuni_h3(parquet_path: Path, output_path: Path | None = None) -> P
     return output_path
 
 
+def _geoparquet_metadata(extent: tuple[float, float, float, float]) -> str:
+    """Build the GeoParquet 1.1 ``geo`` block for the enhanced parquet.
+
+    DuckDB writes a GeoParquet 1.0.0 block on its own, without a ``covering``
+    entry, so readers cannot tell that the ``bbox`` struct carries per-row
+    bounds they may prune on. Portolan requires 1.1 or later with that
+    covering (PTL-DAT-007, PTL-DAT-012). Geometries are points built from the
+    coordinates, and the CRS is left absent, which GeoParquet defines as
+    OGC:CRS84.
+    """
+    xmin, ymin, xmax, ymax = extent
+    return json.dumps(
+        {
+            "version": "1.1.0",
+            "primary_column": "geometry",
+            "columns": {
+                "geometry": {
+                    "encoding": "WKB",
+                    "geometry_types": ["Point"],
+                    "bbox": [xmin, ymin, xmax, ymax],
+                    "covering": {
+                        "bbox": {
+                            "xmin": ["bbox", "xmin"],
+                            "ymin": ["bbox", "ymin"],
+                            "xmax": ["bbox", "xmax"],
+                            "ymax": ["bbox", "ymax"],
+                        }
+                    },
+                }
+            },
+        }
+    )
+
+
 def enhance_parquet(parquet_path: Path) -> None:
     """Add a GeoParquet bbox column and Hilbert-sort the rows in place.
 
@@ -428,6 +463,9 @@ def enhance_parquet(parquet_path: Path) -> None:
     Streams the sort to disk (memory_limit + spill_to_disk) instead of
     materialising the whole table in memory, which reliably OOMed the
     GitHub-hosted runner (16 GB) on 20M rows.
+
+    Writes GeoParquet 1.1 metadata with a bbox covering. Idempotent: running
+    it on its own output replaces the bbox column instead of duplicating it.
     """
     print("Enhancing parquet (bbox + Hilbert sort) ...", flush=True)
     con = duckdb.connect()
@@ -453,15 +491,29 @@ def enhance_parquet(parquet_path: Path) -> None:
         flush=True,
     )
 
+    # A previous run already added bbox: drop it so it is rebuilt, not doubled.
+    columns = {
+        row[0]
+        for row in con.execute(
+            f"DESCRIBE SELECT * FROM read_parquet('{parquet_path}')"
+        ).fetchall()
+    }
+    exclude = "geometry, bbox" if "bbox" in columns else "geometry"
+
     # Second pass: stream into a temp file, atomic-rename on success.
     tmp_path = parquet_path.with_suffix(parquet_path.suffix + ".tmp")
     if tmp_path.exists():
         tmp_path.unlink()
 
+    # With automatic GeoParquet conversion off, DuckDB reads the geometry
+    # column as the WKB blob it already is, passes it through untouched, and
+    # does not append its own 1.0.0 geo block next to the one written here.
+    geo_metadata = _geoparquet_metadata(extent).replace("'", "''")
+    con.execute("SET enable_geoparquet_conversion = false")
     con.execute(f"""
         COPY (
             SELECT
-                * EXCLUDE (geometry),
+                * EXCLUDE ({exclude}),
                 {{'xmin': longitude, 'ymin': latitude,
                   'xmax': longitude, 'ymax': latitude}} AS bbox,
                 geometry
@@ -471,7 +523,11 @@ def enhance_parquet(parquet_path: Path) -> None:
                 {{'min_x': {xmin}, 'min_y': {ymin},
                   'max_x': {xmax}, 'max_y': {ymax}}}::BOX_2D
             )
-        ) TO '{tmp_path}' (FORMAT PARQUET, COMPRESSION ZSTD)
+        ) TO '{tmp_path}' (
+            FORMAT PARQUET,
+            COMPRESSION ZSTD,
+            KV_METADATA {{'geo': '{geo_metadata}'}}
+        )
     """)
     con.close()
 
