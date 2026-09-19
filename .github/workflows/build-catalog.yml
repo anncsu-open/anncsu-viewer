@@ -48,7 +48,7 @@ jobs:
         id: changes
         run: |
           git add data/catalog.json data/README.md data/AGENTS.md \
-            data/indirizzi data/indirizzi-h3
+            data/indirizzi data/indirizzi-h3 data/en
           if git diff --cached --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
@@ -92,6 +92,7 @@ jobs:
           rclone copy data/AGENTS.md r2:anncsu-data/ -P
           rclone sync data/indirizzi/ r2:anncsu-data/indirizzi/ -P
           rclone sync data/indirizzi-h3/ r2:anncsu-data/indirizzi-h3/ -P
+          rclone sync data/en/ r2:anncsu-data/en/ -P
 
       - name: Check the published catalog
         if: steps.changes.outputs.changed == 'true' || inputs.force_upload == true

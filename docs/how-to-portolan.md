@@ -286,7 +286,13 @@ not, so there is nothing to point at.
 ## Out of scope
 
 - A `confini-comuni` collection for `istat-boundaries.parquet`. That file is not uploaded to R2 today, and its ISTAT licence needs separate checking.
-- An English translation tree under `en/`. The language extension supports
-  adding one later without restructuring.
+- (Added on 2026-09-19, after the first release.) An English translation tree
+  under `en/`, following the multilingual best practice: same ids, its own root
+  with no parent, `alternate` links with `hreflang` in both directions, data
+  and visual assets referenced in the Italian tree. Column descriptions carry
+  a `description_en` in `columns.yaml`, and the build fails when one is
+  missing. The same change added global statistics to descriptions and
+  READMEs, recomputed from the parquet, and a `text/html` `alternate` link to
+  the web viewer on the root and both collections.
 - Migrating to `portolan push` or the template's `tools/publish.py`. The
   existing rclone step already does the job.

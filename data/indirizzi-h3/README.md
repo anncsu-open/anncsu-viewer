@@ -1,8 +1,9 @@
 # Indirizzi ANNCSU, partizionati per cella H3
 
-Gli stessi indirizzi della collection indirizzi, ripartiti in 1348 file secondo la cella H3 di risoluzione 5 che li contiene, con struttura Hive tiles/h3_cell=<cella>/<cella>.parquet. Ogni file pesa meno di un megabyte, quindi un client può leggere un comune senza scaricare il file nazionale. Il glob di accesso massivo è https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/tiles/h3_cell=*/*.parquet, ma su HTTPS non esiste il listing: per sapere quali celle servono si usa l'indice comuni-h3.json, registrato come asset di metadati.
+Gli stessi indirizzi della collection indirizzi, ripartiti in 1.348 file secondo la cella H3 di risoluzione 5 che li contiene, con struttura Hive tiles/h3_cell=<cella>/<cella>.parquet. Ogni file pesa meno di un megabyte, quindi un client può leggere un comune senza scaricare il file nazionale. Il glob di accesso massivo è https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/tiles/h3_cell=*/*.parquet, ma su HTTPS non esiste il listing: per sapere quali celle servono si usa l'indice comuni-h3.json, registrato come asset di metadati. Su 20.731.065 accessi, 51.423 (0,25%) cadono oltre 110 metri fuori dal confine del comune a cui sono attribuiti secondo i confini Istat, e 0 non hanno un confine di riferimento.
 
-Aggiornato al 15 settembre 2026, con 20.731.065 indirizzi.
+Aggiornato al 15 settembre 2026, con 20.731.065 indirizzi. I dati si
+vedono sulla mappa nel [visualizzatore web](https://anncsu-open.github.io/anncsu-viewer/).
 
 ## Come si legge
 
@@ -18,6 +19,20 @@ SELECT count(*)
 FROM read_parquet('https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/tiles/h3_cell=851fb467fffffff/851fb467fffffff.parquet')
 WHERE CODICE_ISTAT = '058091';
 ```
+
+## Statistiche
+
+| Statistica | Valore |
+|---|---|
+| Accessi totali | 20.731.065 |
+| Fuori dal confine comunale, oltre 110 m | 51.423 (0,25%) |
+| Senza confine comunale di riferimento | 0 |
+| Comuni con almeno un accesso | 5.493 |
+| Metodo 1, rilevazione strumentale sul campo, accuratezza inferiore a 5 m | 1.714.163 (8,27%) |
+| Metodo 2, rilevazione strumentale sul campo, accuratezza pari o superiore a 5 m | 290.652 (1,40%) |
+| Metodo 3, derivazione indiretta da base dati territoriale, accuratezza stimata inferiore a 5 m | 7.125.819 (34,37%) |
+| Metodo 4, derivazione indiretta da base dati territoriale, accuratezza stimata pari o superiore a 5 m | 10.894.269 (52,55%) |
+| Metodo 5, derivazione indiretta tramite le funzioni del Portale per i Comuni | 706.162 (3,41%) |
 
 ## Schema
 

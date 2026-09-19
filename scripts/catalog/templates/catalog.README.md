@@ -4,7 +4,9 @@ Gli indirizzi certificati dei comuni italiani, dall'Archivio Nazionale dei
 Numeri Civici e delle Strade Urbane, convertiti in formati cloud-native e
 pubblicati come catalogo STAC secondo il profilo Portolan.
 
-Aggiornato al $dataset_date_human, con $row_count_human indirizzi.
+Aggiornato al $dataset_date_human, con $row_count_human indirizzi. Il catalogo
+si può esplorare nel [Portolan Browser]($browser_url) e i dati si vedono sulla
+mappa nel [visualizzatore web]($viewer_url).
 
 ## Cosa contiene
 
@@ -13,7 +15,12 @@ Aggiornato al $dataset_date_human, con $row_count_human indirizzi.
 | [Indirizzi ANNCSU, file unico](./indirizzi/) | Analisi sull'intero territorio nazionale |
 | [Indirizzi ANNCSU, partizionati per cella H3](./indirizzi-h3/) | Leggere un comune senza scaricare tutto |
 
-Le due collection descrivono gli stessi dati in due forme di accesso.
+Le due collection descrivono gli stessi dati in due forme di accesso. Una
+versione in inglese di questo catalogo è in [`en/`](./en/).
+
+## Statistiche
+
+$statistics_table
 
 ## Licenza
 
