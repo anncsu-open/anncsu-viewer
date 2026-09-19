@@ -101,7 +101,7 @@ ZIP (remote)
 4. **JOIN with `comuni.json`** to add `NOME_COMUNE` column
 5. **Create point geometries** using `ST_Point(longitude, latitude)` via DuckDB spatial extension
 6. **Export as Parquet** with ZSTD compression
-7. **Enhance with DuckDB**: add bbox column and Hilbert spatial sorting (streamed to disk)
+7. **Enhance with DuckDB**: add bbox column and Hilbert spatial sorting (streamed to disk), written as GeoParquet 1.1 with a bbox covering
 8. **Convert to PMTiles** via `geoparquet-io` `ops.create_pmtiles()` (tippecanoe) for map visualization
 9. **Partition into H3 tiles** via `geoparquet-io` `partition_by_h3(hive=True)` at resolution 5
 10. **Clean up** temporary CSV

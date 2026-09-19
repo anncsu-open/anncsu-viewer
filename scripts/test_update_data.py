@@ -745,6 +745,114 @@ class TestEnhanceParquet:
         rows = self._read_rows(p, "longitude, latitude")
         assert sorted(rows) == sorted(points)
 
+    def _geo_metadata_entries(self, path: Path) -> list[dict]:
+        import json
+
+        import duckdb
+
+        con = duckdb.connect()
+        rows = con.execute(
+            f"SELECT key, value FROM parquet_kv_metadata('{path}')"
+        ).fetchall()
+        con.close()
+        entries = []
+        for key, value in rows:
+            key = key.decode() if isinstance(key, bytes) else key
+            if key == "geo":
+                value = value.decode() if isinstance(value, bytes) else value
+                entries.append(json.loads(value))
+        return entries
+
+    def test_writes_geoparquet_1_1_metadata_with_bbox_covering(self, tmp_path):
+        """Portolan requires GeoParquet 1.1+ with a bbox covering so readers can
+        prune row groups from statistics alone (PTL-DAT-007, PTL-DAT-012).
+
+        DuckDB writes a 1.0.0 block by itself, so the pipeline has to disable
+        that and write the block it means. Exactly one geo key must result.
+        """
+        p = tmp_path / "in.parquet"
+        points = [(12.0 + i * 0.1, 42.0 + i * 0.1) for i in range(20)]
+        self._write_input(p, points)
+
+        enhance_parquet(p)
+
+        entries = self._geo_metadata_entries(p)
+        assert len(entries) == 1, (
+            "one geo key only; DuckDB's own block must not coexist"
+        )
+        geo = entries[0]
+        assert geo["version"] == "1.1.0"
+        assert geo["primary_column"] == "geometry"
+        column = geo["columns"]["geometry"]
+        assert column["encoding"] == "WKB"
+        assert column["geometry_types"] == ["Point"]
+        assert column["covering"] == {
+            "bbox": {
+                "xmin": ["bbox", "xmin"],
+                "ymin": ["bbox", "ymin"],
+                "xmax": ["bbox", "xmax"],
+                "ymax": ["bbox", "ymax"],
+            }
+        }
+        assert column["bbox"] == pytest.approx([12.0, 42.0, 13.9, 43.9])
+
+    def test_geometry_reads_back_as_geometry_in_a_fresh_connection(self, tmp_path):
+        import duckdb
+
+        p = tmp_path / "in.parquet"
+        self._write_input(p, [(12.0, 42.0), (12.5, 41.9)])
+
+        enhance_parquet(p)
+
+        con = duckdb.connect()
+        con.execute("INSTALL spatial; LOAD spatial;")
+        described = {
+            row[0]: row[1]
+            for row in con.execute(
+                f"DESCRIBE SELECT * FROM read_parquet('{p}')"
+            ).fetchall()
+        }
+        wkt = con.execute(
+            f"SELECT ST_AsText(geometry) FROM read_parquet('{p}') LIMIT 1"
+        ).fetchone()[0]
+        con.close()
+
+        assert described["geometry"].startswith("GEOMETRY")
+        assert wkt.startswith("POINT (")
+
+    def test_is_idempotent_on_already_enhanced_input(self, tmp_path):
+        """Re-running on its own output must not duplicate bbox or drop rows.
+
+        The workflow may need to re-enhance a parquet that was already
+        enhanced, for example after a metadata-only change to this function.
+        """
+        p = tmp_path / "in.parquet"
+        points = [(12.0 + i * 0.1, 42.0 + i * 0.1) for i in range(20)]
+        self._write_input(p, points)
+
+        enhance_parquet(p)
+        first_columns = [row[0] for row in self._describe(p)]
+        first_rows = self._read_rows(p, "longitude, latitude")
+
+        enhance_parquet(p)
+        second_columns = [row[0] for row in self._describe(p)]
+        second_rows = self._read_rows(p, "longitude, latitude")
+
+        assert second_columns == first_columns
+        assert second_columns.count("bbox") == 1
+        assert second_rows == first_rows
+        assert len(self._geo_metadata_entries(p)) == 1
+        assert self._geo_metadata_entries(p)[0]["version"] == "1.1.0"
+
+    def _describe(self, path: Path) -> list[tuple]:
+        import duckdb
+
+        con = duckdb.connect()
+        con.execute("INSTALL spatial; LOAD spatial;")
+        rows = con.execute(f"DESCRIBE SELECT * FROM read_parquet('{path}')").fetchall()
+        con.close()
+        return rows
+
 
 def _write_enhanced_parquet(path: Path, n_points: int = 300) -> None:
     """Write a small parquet with the full post-enhance_parquet schema.

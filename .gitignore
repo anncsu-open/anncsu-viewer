@@ -31,3 +31,6 @@ coverage
 
 # Claude
 .claude
+
+# Superpowers session artifacts
+docs/superpowers/
