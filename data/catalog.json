@@ -1,0 +1,79 @@
+{
+  "type": "Catalog",
+  "stac_version": "1.1.0",
+  "stac_extensions": [
+    "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json",
+    "https://stac-extensions.github.io/language/v1.0.0/schema.json"
+  ],
+  "id": "anncsu",
+  "title": "Indirizzi ANNCSU",
+  "description": "Gli indirizzi certificati dei comuni italiani, dall'Archivio Nazionale dei Numeri Civici e delle Strade Urbane, convertiti in formati cloud-native. Il catalogo pubblica lo stesso insieme di dati in due forme: un unico file GeoParquet per l'analisi complessiva, e una partizione in celle H3 per leggere un comune alla volta senza scaricare tutto.",
+  "language": {
+    "code": "it",
+    "name": "Italiano",
+    "alternate": "Italian"
+  },
+  "updated": "2026-08-10T08:17:03Z",
+  "links": [
+    {
+      "rel": "root",
+      "href": "./catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "self",
+      "href": "https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "child",
+      "href": "./indirizzi/collection.json",
+      "type": "application/json",
+      "title": "Indirizzi ANNCSU, file unico"
+    },
+    {
+      "rel": "child",
+      "href": "./indirizzi-h3/collection.json",
+      "type": "application/json",
+      "title": "Indirizzi ANNCSU, partizionati per cella H3"
+    },
+    {
+      "rel": "vcs",
+      "href": "https://github.com/anncsu-open/anncsu-viewer",
+      "type": "text/html",
+      "title": "Repository del catalogo e della pipeline"
+    },
+    {
+      "rel": "issues",
+      "href": "https://github.com/anncsu-open/anncsu-viewer/issues",
+      "type": "text/html",
+      "title": "Segnalazioni"
+    },
+    {
+      "rel": "via",
+      "href": "https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/",
+      "type": "text/html",
+      "title": "Portale open data ANNCSU"
+    },
+    {
+      "rel": "license",
+      "href": "https://creativecommons.org/licenses/by/4.0/deed.it",
+      "type": "text/html",
+      "title": "Creative Commons Attribuzione 4.0 Internazionale"
+    },
+    {
+      "rel": "agents",
+      "href": "./AGENTS.md",
+      "type": "text/markdown",
+      "title": "Istruzioni per agenti automatici",
+      "hreflang": "it"
+    },
+    {
+      "rel": "describedby",
+      "href": "./README.md",
+      "type": "text/markdown",
+      "title": "Documentazione leggibile",
+      "hreflang": "it"
+    }
+  ]
+}

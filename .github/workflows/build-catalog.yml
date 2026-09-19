@@ -1,0 +1,92 @@
+name: Build Portolan Catalog
+
+on:
+  workflow_run:
+    workflows: ["Update ANNCSU Data"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-catalog
+  cancel-in-progress: false
+
+jobs:
+  build-catalog:
+    # A failed data update must not publish a catalog describing stale data.
+    # workflow_dispatch has no triggering run, so it always proceeds.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Generate the catalog
+        env:
+          PYTHONUNBUFFERED: "1"
+        run: uv run scripts/build_catalog.py
+
+      - name: Validate the catalog
+        run: |
+          uv run --with 'rashid>=0.1.8,<0.2.0' \
+            rashid check data/ --schema --all
+
+      - name: Check for changes
+        id: changes
+        run: |
+          git add data/catalog.json data/README.md data/AGENTS.md \
+            data/indirizzi data/indirizzi-h3
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit the catalog
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update Portolan catalog"
+          git push
+
+      - name: Install rclone
+        if: steps.changes.outputs.changed == 'true'
+        run: curl -fsSL https://rclone.org/install.sh | sudo bash
+
+      - name: Upload the catalog to Cloudflare R2
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          RCLONE_CONFIG_R2_TYPE: s3
+          RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+          RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          RCLONE_CONFIG_R2_ENDPOINT: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          RCLONE_CONFIG_R2_ACL: private
+        run: |
+          # Only the catalog. The data files are synced by the update workflow,
+          # and a narrow scope keeps anything else out of a public bucket.
+          rclone copy data/catalog.json r2:anncsu-data/ -P
+          rclone copy data/README.md r2:anncsu-data/ -P
+          rclone copy data/AGENTS.md r2:anncsu-data/ -P
+          rclone sync data/indirizzi/ r2:anncsu-data/indirizzi/ -P
+          rclone sync data/indirizzi-h3/ r2:anncsu-data/indirizzi-h3/ -P
+
+      - name: Check the published catalog
+        if: steps.changes.outputs.changed == 'true'
+        continue-on-error: true
+        run: |
+          # Reports on range requests and CORS at the host. A problem here is
+          # a bucket configuration issue, not a defect in the metadata just
+          # generated, so it does not fail the run.
+          uv run --with 'rashid>=0.1.8,<0.2.0' \
+            rashid check data/ --live --all \
+            --live-base-url https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev

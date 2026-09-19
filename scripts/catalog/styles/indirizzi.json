@@ -1,0 +1,26 @@
+{
+  "version": 8,
+  "name": "Indirizzi ANNCSU",
+  "sources": {
+    "data": {
+      "type": "vector",
+      "url": "pmtiles://../../anncsu-indirizzi.pmtiles"
+    }
+  },
+  "layers": [
+    {
+      "id": "indirizzi",
+      "type": "circle",
+      "source": "data",
+      "source-layer": "addresses",
+      "paint": {
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 1, 14, 4],
+        "circle-color": "#0066cc",
+        "circle-opacity": 0.8
+      }
+    }
+  ],
+  "metadata": {
+    "description": "Tutti gli accessi come punti uniformi, nel blu della Design System Italia."
+  }
+}

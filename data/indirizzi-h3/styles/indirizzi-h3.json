@@ -1,0 +1,31 @@
+{
+  "version": 8,
+  "name": "Indirizzi fuori confine",
+  "sources": {
+    "data": {
+      "type": "vector",
+      "url": "pmtiles://../../anncsu-indirizzi.pmtiles"
+    }
+  },
+  "layers": [
+    {
+      "id": "indirizzi-h3",
+      "type": "circle",
+      "source": "data",
+      "source-layer": "addresses",
+      "paint": {
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 1, 14, 4],
+        "circle-color": [
+          "case",
+          ["==", ["get", "out_of_bounds"], true],
+          "#d9364f",
+          "#0066cc"
+        ],
+        "circle-opacity": 0.8
+      }
+    }
+  ],
+  "metadata": {
+    "description": "Gli accessi colorati in rosso quando cadono oltre 110 metri fuori dal confine del comune a cui sono attribuiti."
+  }
+}
