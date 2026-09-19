@@ -218,15 +218,19 @@ completion of "Update ANNCSU Data" and by `workflow_dispatch` for manual runs.
 The job runs only when the triggering run concluded successfully, so a failure
 upstream cannot produce a catalog describing stale data.
 
-Checkout is full, with LFS and with the whole commit history (`fetch-depth: 0`
-plus `filter: blob:none`, so commits and trees arrive but only HEAD's files are
-materialised). The history matters because `updated` is read from the commit
-that last touched the parquet: in a depth-1 clone that lookup returns HEAD,
-`updated` moves with every unrelated commit, and the workflow commits a changed
-catalog on every run, which is what happened on the first day. The generator
-also refuses to trust a shallow clone and falls back to the dataset date. The
-real bytes of the parquet and the PMTiles are needed for size and checksum, and
-the tiles are needed for the count. That is
+Checkout is `actions/checkout` at its default depth of 1, with LFS, followed by
+a step that runs `git fetch --unshallow --filter=blob:none`: the whole commit
+history arrives without any blob, in about five seconds, while the files of
+HEAD are already in place. The history matters because `updated` is read from
+the commit that last touched the parquet: in a depth-1 clone that lookup
+returns HEAD, `updated` moves with every unrelated commit, and the workflow
+commits a changed catalog on every run, which is what happened on the first
+day. Fetching the full history with blobs is not an option, the repository
+packs at 6.5 GB, and asking `actions/checkout` for a blobless clone directly
+fails because its LFS step needs the pointer blobs. The generator also refuses
+to trust a shallow clone and falls back to the dataset date. The real bytes of
+the parquet and the PMTiles are needed for size and checksum, and the tiles
+are needed for the count. That is
 about 2.2 GB once a month. If it proves slow, the fallback is to download the
 two large files from R2 and take the tile count from the bucket listing.
 
