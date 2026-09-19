@@ -5,6 +5,13 @@ $description
 Updated to the $dataset_date_human release, with $row_count_human addresses.
 See the data on a map in the [web viewer]($viewer_url).
 
+> **Display note.** In the Portolan Browser, as in the STAC Browser it derives
+> from, the temporal extent of this collection is rendered as "until present"
+> without its start date in every interface language other than English. It is
+> a defect of the browser, not of the catalog: the interval declared in
+> `extent.temporal` starts on $dataset_date_human and is open-ended, and reads
+> in full with the English interface or in the JSON through Source.
+
 ## How to read it
 
 $usage

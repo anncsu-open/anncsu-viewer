@@ -130,7 +130,10 @@ The hand-written sources live outside `data/`, in `scripts/catalog/`:
 ## Making changes
 
 **Edit the source, never the generated output.** Everything the generator writes
-under `data/` is overwritten on the next run.
+under `data/` is overwritten on the next run. Prefer not to commit those
+generated files from a local run either: the workflow regenerates and commits
+them, and a thumbnail rendered on macOS differs in bytes from the runner's,
+which would cost one reconciliation commit.
 
 To change a column description, edit `columns.yaml`. The same text feeds the
 JSON and the README schema table, so it is written once.
@@ -158,7 +161,16 @@ Validation is the gate: on failure nothing is committed and nothing is uploaded.
 The generator is deterministic, so a run over unchanged data produces identical
 files and the workflow commits nothing. Re-running it is always safe.
 
-## Two things to know
+## Things to know
+
+**Non-English interfaces of the Portolan Browser drop the start of the temporal
+extent.** The collections declare an open interval starting at the dataset
+release date. The English interface renders it as "2026-09-15 0:00:00 UTC
+until present"; Italian, German, French and Spanish render only the closing
+words, "fino ad ora" and its equivalents. The JSON is identical, the defect is
+in STAC Browser, which the Portolan Browser derives from: only the English
+locale routes stac-fields strings through the library's own placeholder
+substitution. The date is stated in every README and visible through Source.
 
 **Do not expect the partition glob to expand over HTTPS.** The catalog publishes a glob pattern over the tiles, but plain HTTPS gives no directory listing, so a reader cannot discover the files from the pattern alone. Use `comuni-h3.json` to find the cells you need, or the S3 endpoint if you hold credentials.
 

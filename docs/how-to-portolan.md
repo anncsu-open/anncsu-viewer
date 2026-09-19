@@ -101,6 +101,20 @@ that.
 Output is written atomically, with a temporary file and a rename, and JSON keys
 are emitted in a stable order.
 
+### What is deterministic, and where
+
+Determinism holds within one environment: the runner produces byte-identical
+output on every run over unchanged data, which is what stops spurious
+commits. It does not hold across environments for the thumbnail: the PNG
+encoder in Pillow's Linux wheels compresses differently from the macOS one,
+so a thumbnail rendered locally differs in bytes from the runner's, and with
+it the `file:size` and `file:checksum` of the collections that reference it.
+The runner's output is the canonical catalog. A pull request that commits
+generated files from a local run therefore causes exactly one reconciliation
+commit by the workflow, and nothing after that. To avoid even that, commit
+only the sources under `scripts/catalog/` and let the workflow regenerate
+`data/`.
+
 ### Thumbnail
 
 `PORTO-CORE-067` requires a thumbnail generated from default styling. The

@@ -1174,6 +1174,24 @@ class TestEnglishBuild:
                 "the fixture's 200 rows should appear in the statistics"
             )
 
+    def test_collection_readmes_warn_about_the_browser_temporal_extent_bug(
+        self, fixture_data_dir, fixture_columns
+    ):
+        """STAC Browser drops the start date of an open temporal extent in
+        every non-English interface language, rendering only 'fino ad ora'.
+        The README states the date and says the defect is the browser's."""
+        build(fixture_data_dir)
+
+        italian = (fixture_data_dir / "indirizzi" / "README.md").read_text()
+        assert "fino ad ora" in italian
+        assert "15 settembre 2026" in italian
+        assert "STAC Browser" in italian
+
+        english = (fixture_data_dir / "en" / "indirizzi" / "README.md").read_text()
+        assert "until present" in english
+        assert "15 September 2026" in english
+        assert "STAC Browser" in english
+
 
 class TestDataUpdatedInGit:
     """`updated` must come from the commit that brought the parquet in.
