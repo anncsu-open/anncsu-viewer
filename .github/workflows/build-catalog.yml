@@ -30,6 +30,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           lfs: true
+          # `updated` is read from the last commit that touched the parquet.
+          # A depth-1 clone has no history, so that lookup returns HEAD and
+          # the catalog would change on every unrelated commit. Fetch the
+          # whole history but no blobs: commits and trees are small, and only
+          # the files of HEAD are materialised.
+          fetch-depth: 0
+          filter: blob:none
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
