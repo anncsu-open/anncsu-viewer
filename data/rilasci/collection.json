@@ -5,21 +5,22 @@
     "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json",
     "https://stac-extensions.github.io/file/v2.1.0/schema.json",
     "https://stac-extensions.github.io/table/v1.2.0/schema.json",
-    "https://stac-extensions.github.io/projection/v2.0.0/schema.json",
-    "https://stac-extensions.github.io/web-map-links/v1.3.0/schema.json",
-    "https://stac-extensions.github.io/language/v1.0.0/schema.json",
-    "https://stac-extensions.github.io/version/v1.2.0/schema.json"
+    "https://stac-extensions.github.io/version/v1.2.0/schema.json",
+    "https://stac-extensions.github.io/language/v1.0.0/schema.json"
   ],
-  "id": "indirizzi",
-  "title": "Indirizzi ANNCSU, file unico",
-  "description": "Tutti gli accessi esterni censiti in ANNCSU in un unico file GeoParquet, ordinato spazialmente secondo una curva di Hilbert e corredato di colonna bbox, così che un lettore possa scartare interi gruppi di righe senza decodificare le geometrie. Adatto all'analisi sull'intero territorio nazionale. Per leggere un singolo comune conviene la collection partizionata. Su 20.731.065 accessi, 51.423 (0,25%) cadono oltre 110 metri fuori dal confine del comune a cui sono attribuiti secondo i confini Istat, e 0 non hanno un confine di riferimento. Questa collection contiene i 20.731.065 accessi georeferenziati sui 27.415.954 del rilascio del 15 settembre 2026: gli accessi privi di coordinate sono nell'archivio dei rilasci.",
+  "id": "rilasci",
+  "title": "Rilasci mensili ANNCSU",
+  "description": "Ogni scarico mensile dell'indirizzario nazionale, dal 3 settembre 2025 al 15 settembre 2026, così come pubblicato dal portale ANNCSU: l'archivio ZIP originale e una copia Parquet senza perdita del CSV, con tutte le righe e le 19 colonne originali come testo, coordinate incluse ma senza geometria. È lo storico da cui le collection indirizzi e indirizzi-h3 derivano il rilascio corrente. Il portale conserva solo l'ultimo scarico: i rilasci precedenti al 15 settembre 2026 sono ricostruiti dal parquet consolidato di mfortini/diff_ANNCSU con un metodo verificato byte per byte sul rilascio di settembre.",
   "license": "CC-BY-4.0",
   "keywords": [
     "indirizzi",
     "numeri civici",
     "toponomastica",
     "italia",
-    "anncsu"
+    "anncsu",
+    "rilasci",
+    "storico",
+    "archivio"
   ],
   "providers": [
     {
@@ -66,7 +67,7 @@
     "temporal": {
       "interval": [
         [
-          "2026-09-15T00:00:00Z",
+          "2025-09-03T00:00:00Z",
           null
         ]
       ]
@@ -85,7 +86,6 @@
     }
   ],
   "updated": "2026-09-19T15:07:48Z",
-  "version": "2026-09-15",
   "table:columns": [
     {
       "name": "CODICE_COMUNE",
@@ -98,13 +98,8 @@
       "description": "Codice amministrativo assegnato ai Comuni italiani dall'Istat. Sei cifre. È la chiave di join con l'elenco dei comuni e con i confini ISTAT."
     },
     {
-      "name": "NOME_COMUNE",
-      "type": "varchar",
-      "description": "Denominazione del comune, aggiunta dalla pipeline tramite join su CODICE_ISTAT con l'elenco ufficiale dei comuni italiani pubblicato dall'Istat. Nulla quando il codice non trova corrispondenza."
-    },
-    {
       "name": "PROGRESSIVO_NAZIONALE",
-      "type": "bigint",
+      "type": "varchar",
       "description": "Codice progressivo univoco nazionale, identificativo dell'area di circolazione."
     },
     {
@@ -118,6 +113,11 @@
       "description": "Denominazione completa dell'area di circolazione, composta da DUG e DUF. La DUG è la Denominazione Urbanistica Generica, cioè la tipologia come via o piazza; la DUF è la Denominazione Ufficiale attribuita dal Comune ai sensi delle norme vigenti."
     },
     {
+      "name": "LOCALITA'",
+      "type": "varchar",
+      "description": "Denominazione della località, ove il Comune la registra. Presente solo nel CSV originale e nel parquet grezzo dell'archivio: il GeoParquet arricchito non la riporta."
+    },
+    {
       "name": "DIZIONE_LINGUA1",
       "type": "varchar",
       "description": "Odonimo registrato in una prima lingua diversa dall'italiano, secondo le norme in materia di bilinguismo e sull'uso delle lingue delle minoranze linguistiche riconosciute."
@@ -129,7 +129,7 @@
     },
     {
       "name": "PROGRESSIVO_ACCESSO",
-      "type": "bigint",
+      "type": "varchar",
       "description": "Codice progressivo univoco nazionale, identificativo dell'accesso esterno."
     },
     {
@@ -139,7 +139,7 @@
     },
     {
       "name": "CIVICO",
-      "type": "bigint",
+      "type": "varchar",
       "description": "Valore del numero civico assegnato all'accesso esterno secondo la successione naturale dei numeri. La documentazione della fonte lo descrive come testo di al massimo 5 caratteri, ma nei dati pubblicati è sempre numerico e la pipeline lo conserva come intero."
     },
     {
@@ -159,18 +159,18 @@
     },
     {
       "name": "PROGRESSIVO_SNC",
-      "type": "bigint",
+      "type": "varchar",
       "description": "Se valorizzato indica che l'accesso, posizionato dopo il civico o il metrico indicato, è privo di numero civico standard. Se i riferimenti all'accesso precedente sono assenti, l'accesso SNC è a inizio strada."
     },
     {
-      "name": "longitude",
-      "type": "double",
-      "description": "Longitudine dell'accesso in gradi decimali, dalla colonna COORD_X_COMUNE della fonte. Il sistema di riferimento dichiarato dalla fonte è ETRF2000 alla epoca 2008.0, realizzazione italiana di ETRS89. La pipeline converte la virgola decimale in punto."
+      "name": "COORD_X_COMUNE",
+      "type": "varchar",
+      "description": "Longitudine dell'accesso come la scrive il portale: gradi decimali con la virgola come separatore, in ETRF2000. Nel GeoParquet arricchito diventa la colonna longitude, numerica."
     },
     {
-      "name": "latitude",
-      "type": "double",
-      "description": "Latitudine dell'accesso in gradi decimali, dalla colonna COORD_Y_COMUNE della fonte. Stesso sistema di riferimento e stessa conversione decimale della longitudine."
+      "name": "COORD_Y_COMUNE",
+      "type": "varchar",
+      "description": "Latitudine dell'accesso come la scrive il portale: gradi decimali con la virgola come separatore, in ETRF2000. Nel GeoParquet arricchito diventa la colonna latitude, numerica."
     },
     {
       "name": "QUOTA",
@@ -179,77 +179,11 @@
     },
     {
       "name": "METODO",
-      "type": "bigint",
+      "type": "varchar",
       "description": "Modalità con cui il Comune ha attribuito le coordinate. 1 rilevazione strumentale sul campo con accuratezza inferiore a 5 m; 2 rilevazione strumentale sul campo con accuratezza pari o superiore a 5 m; 3 derivazione indiretta da base dati territoriale con accuratezza stimata inferiore a 5 m; 4 derivazione indiretta da base dati territoriale con accuratezza stimata pari o superiore a 5 m; 5 derivazione indiretta tramite le funzioni del Portale per i Comuni."
-    },
-    {
-      "name": "oob_distance_m",
-      "type": "double",
-      "description": "Distanza in metri fra l'indirizzo e il confine del suo comune secondo i confini amministrativi Istat, calcolata dalla pipeline. Nulla quando il comune non ha un confine corrispondente, zero quando il punto cade dentro il confine."
-    },
-    {
-      "name": "out_of_bounds",
-      "type": "boolean",
-      "description": "Vero quando l'indirizzo cade oltre 110 metri fuori dal confine del comune a cui è attribuito. La soglia assorbe la tolleranza di geocodifica. Nullo quando il comune non ha un confine corrispondente."
-    },
-    {
-      "name": "bbox",
-      "type": "struct(xmin double, ymin double, xmax double, ymax double)",
-      "description": "Riquadro di delimitazione del punto, con i quattro valori uguali alle sue coordinate. È la colonna di covering prevista da GeoParquet, che consente a un lettore di scartare interi gruppi di righe senza decodificare le geometrie."
-    },
-    {
-      "name": "geometry",
-      "type": "geometry",
-      "description": "Punto costruito dalla pipeline a partire da longitudine e latitudine. Dichiarato in OGC:CRS84. La fonte esprime le coordinate in ETRF2000, che differisce da WGS84 per meno di un metro in Italia, quindi lo scarto è trascurabile rispetto alla precisione degli indirizzi."
     }
   ],
-  "table:row_count": 20731065,
-  "table:primary_geometry": "geometry",
-  "assets": {
-    "data": {
-      "href": "../anncsu-indirizzi.parquet",
-      "type": "application/vnd.apache.parquet",
-      "title": "Indirizzi ANNCSU (GeoParquet)",
-      "roles": [
-        "data"
-      ],
-      "proj:code": "OGC:CRS84",
-      "file:size": 1059267903,
-      "file:checksum": "122075f778b597b110cd7e63e4c3a3353a22983e73e8a938f10f84a58472fb7dde6f"
-    },
-    "visual": {
-      "href": "../anncsu-indirizzi.pmtiles",
-      "type": "application/vnd.pmtiles",
-      "title": "Indirizzi ANNCSU (PMTiles)",
-      "roles": [
-        "visual"
-      ],
-      "file:size": 333155352,
-      "file:checksum": "1220fc4d822927fd668df682b3f3c6f14493081c294d48c996d0d4bc1039814d1802"
-    },
-    "style-indirizzi": {
-      "href": "./styles/indirizzi.json",
-      "type": "application/vnd.mapbox.style+json",
-      "title": "Punti indirizzo",
-      "description": "Tutti gli accessi come punti uniformi.",
-      "roles": [
-        "style",
-        "default"
-      ],
-      "file:size": 592,
-      "file:checksum": "12204da33adfa626c2f0e1b43ab40620c5bac5c5a438c0f60b2fde69d0727844b045"
-    },
-    "thumbnail": {
-      "href": "./thumbnail.png",
-      "type": "image/png",
-      "title": "Densità degli indirizzi sul territorio nazionale",
-      "roles": [
-        "thumbnail"
-      ],
-      "file:size": 330866,
-      "file:checksum": "12208b9147b71d795c5a240079c1baba1cd66c4ec7e2273e0201ae81f032dc2262ad"
-    }
-  },
+  "assets": {},
   "links": [
     {
       "rel": "root",
@@ -262,27 +196,91 @@
       "type": "application/json"
     },
     {
-      "rel": "pmtiles",
-      "href": "../anncsu-indirizzi.pmtiles",
-      "type": "application/vnd.pmtiles",
-      "title": "Tile vettoriali per la mappa",
-      "pmtiles:layers": [
-        "addresses"
-      ]
+      "rel": "item",
+      "href": "./2025-09-03/2025-09-03.json",
+      "type": "application/geo+json",
+      "title": "Rilascio del 3 settembre 2025"
     },
     {
-      "rel": "derived_from",
-      "href": "../rilasci/2026-09-15/2026-09-15.json",
+      "rel": "item",
+      "href": "./2025-10-10/2025-10-10.json",
+      "type": "application/geo+json",
+      "title": "Rilascio del 10 ottobre 2025"
+    },
+    {
+      "rel": "item",
+      "href": "./2025-11-04/2025-11-04.json",
+      "type": "application/geo+json",
+      "title": "Rilascio del 4 novembre 2025"
+    },
+    {
+      "rel": "item",
+      "href": "./2025-12-02/2025-12-02.json",
+      "type": "application/geo+json",
+      "title": "Rilascio del 2 dicembre 2025"
+    },
+    {
+      "rel": "item",
+      "href": "./2026-01-14/2026-01-14.json",
+      "type": "application/geo+json",
+      "title": "Rilascio del 14 gennaio 2026"
+    },
+    {
+      "rel": "item",
+      "href": "./2026-02-06/2026-02-06.json",
+      "type": "application/geo+json",
+      "title": "Rilascio del 6 febbraio 2026"
+    },
+    {
+      "rel": "item",
+      "href": "./2026-03-06/2026-03-06.json",
+      "type": "application/geo+json",
+      "title": "Rilascio del 6 marzo 2026"
+    },
+    {
+      "rel": "item",
+      "href": "./2026-04-06/2026-04-06.json",
+      "type": "application/geo+json",
+      "title": "Rilascio del 6 aprile 2026"
+    },
+    {
+      "rel": "item",
+      "href": "./2026-05-04/2026-05-04.json",
+      "type": "application/geo+json",
+      "title": "Rilascio del 4 maggio 2026"
+    },
+    {
+      "rel": "item",
+      "href": "./2026-06-02/2026-06-02.json",
+      "type": "application/geo+json",
+      "title": "Rilascio del 2 giugno 2026"
+    },
+    {
+      "rel": "item",
+      "href": "./2026-07-03/2026-07-03.json",
+      "type": "application/geo+json",
+      "title": "Rilascio del 3 luglio 2026"
+    },
+    {
+      "rel": "item",
+      "href": "./2026-08-03/2026-08-03.json",
+      "type": "application/geo+json",
+      "title": "Rilascio del 3 agosto 2026"
+    },
+    {
+      "rel": "item",
+      "href": "./2026-09-15/2026-09-15.json",
+      "type": "application/geo+json",
+      "title": "Rilascio del 15 settembre 2026"
+    },
+    {
+      "rel": "latest-version",
+      "href": "./2026-09-15/2026-09-15.json",
       "type": "application/geo+json"
     },
     {
-      "rel": "version-history",
-      "href": "../rilasci/collection.json",
-      "type": "application/json"
-    },
-    {
       "rel": "alternate",
-      "href": "../en/indirizzi/collection.json",
+      "href": "../en/rilasci/collection.json",
       "type": "application/json",
       "title": "Inglese",
       "hreflang": "en"

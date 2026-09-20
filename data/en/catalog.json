@@ -45,6 +45,12 @@
       "title": "ANNCSU addresses, partitioned by H3 cell"
     },
     {
+      "rel": "child",
+      "href": "./rilasci/collection.json",
+      "type": "application/json",
+      "title": "ANNCSU monthly releases"
+    },
+    {
       "rel": "alternate",
       "href": "../catalog.json",
       "type": "application/json",

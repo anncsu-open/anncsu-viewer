@@ -1,0 +1,198 @@
+{
+  "type": "Feature",
+  "stac_version": "1.1.0",
+  "stac_extensions": [
+    "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json",
+    "https://stac-extensions.github.io/file/v2.1.0/schema.json",
+    "https://stac-extensions.github.io/table/v1.2.0/schema.json",
+    "https://stac-extensions.github.io/version/v1.2.0/schema.json",
+    "https://stac-extensions.github.io/language/v1.0.0/schema.json"
+  ],
+  "id": "2025-12-02",
+  "collection": "rilasci",
+  "geometry": null,
+  "properties": {
+    "datetime": "2025-12-02T00:00:00Z",
+    "title": "Rilascio del 2 dicembre 2025",
+    "description": "Rilascio del 2 dicembre 2025, 27.964.607 accessi, ricostruito dal parquet consolidato di mfortini/diff_ANNCSU, che conserva ogni scarico mensile con un flag di presenza per rilascio. Il metodo di ricostruzione riproduce il CSV del portale ed è verificato byte per byte, ordine delle righe escluso, sul rilascio del 15 settembre 2026, l'unico di cui esiste l'originale. Ricostruzione dal parquet consolidato di mfortini/diff_ANNCSU; metodo verificato byte per byte sul rilascio 2026-09-15.",
+    "version": "2025-12-02",
+    "table:columns": [
+      {
+        "name": "CODICE_COMUNE",
+        "type": "varchar",
+        "description": "Codice amministrativo assegnato ai Comuni italiani dall'Agenzia delle Entrate e utilizzato nella composizione dei codici fiscali."
+      },
+      {
+        "name": "CODICE_ISTAT",
+        "type": "varchar",
+        "description": "Codice amministrativo assegnato ai Comuni italiani dall'Istat. Sei cifre. È la chiave di join con l'elenco dei comuni e con i confini ISTAT."
+      },
+      {
+        "name": "PROGRESSIVO_NAZIONALE",
+        "type": "varchar",
+        "description": "Codice progressivo univoco nazionale, identificativo dell'area di circolazione."
+      },
+      {
+        "name": "CODICE_COMUNALE",
+        "type": "varchar",
+        "description": "Codice dell'odonimo fornito dal Comune. Identificativo utilizzato dal Comune ove presente."
+      },
+      {
+        "name": "ODONIMO",
+        "type": "varchar",
+        "description": "Denominazione completa dell'area di circolazione, composta da DUG e DUF. La DUG è la Denominazione Urbanistica Generica, cioè la tipologia come via o piazza; la DUF è la Denominazione Ufficiale attribuita dal Comune ai sensi delle norme vigenti."
+      },
+      {
+        "name": "LOCALITA'",
+        "type": "varchar",
+        "description": "Denominazione della località, ove il Comune la registra. Presente solo nel CSV originale e nel parquet grezzo dell'archivio: il GeoParquet arricchito non la riporta."
+      },
+      {
+        "name": "DIZIONE_LINGUA1",
+        "type": "varchar",
+        "description": "Odonimo registrato in una prima lingua diversa dall'italiano, secondo le norme in materia di bilinguismo e sull'uso delle lingue delle minoranze linguistiche riconosciute."
+      },
+      {
+        "name": "DIZIONE_LINGUA2",
+        "type": "varchar",
+        "description": "Odonimo registrato in una seconda lingua diversa dall'italiano, secondo le norme in materia di bilinguismo e sull'uso delle lingue delle minoranze linguistiche riconosciute."
+      },
+      {
+        "name": "PROGRESSIVO_ACCESSO",
+        "type": "varchar",
+        "description": "Codice progressivo univoco nazionale, identificativo dell'accesso esterno."
+      },
+      {
+        "name": "CODICE_COMUNALE_ACCESSO",
+        "type": "varchar",
+        "description": "Codice del numero civico fornito dal Comune. Identificativo utilizzato dal Comune ove presente. La pipeline lo forza a VARCHAR perché contiene codici alfanumerici che un'inferenza automatica leggerebbe come interi, scartando le righe non conformi."
+      },
+      {
+        "name": "CIVICO",
+        "type": "varchar",
+        "description": "Valore del numero civico assegnato all'accesso esterno secondo la successione naturale dei numeri. La documentazione della fonte lo descrive come testo di al massimo 5 caratteri, ma nei dati pubblicati è sempre numerico e la pipeline lo conserva come intero."
+      },
+      {
+        "name": "ESPONENTE",
+        "type": "varchar",
+        "description": "Parte letterale del numero civico, ove presente. Per esempio A, B, bis."
+      },
+      {
+        "name": "SPECIFICITA",
+        "type": "varchar",
+        "description": "Valore utilizzato in presenza di uno specifico metodo di classificazione della numerazione civica validato dall'Istat, per esempio ROSSO e NERO."
+      },
+      {
+        "name": "METRICO",
+        "type": "varchar",
+        "description": "Valore del numero civico espresso in metri, usato dai comuni che adottano il sistema metrico anziché la successione naturale dei numeri."
+      },
+      {
+        "name": "PROGRESSIVO_SNC",
+        "type": "varchar",
+        "description": "Se valorizzato indica che l'accesso, posizionato dopo il civico o il metrico indicato, è privo di numero civico standard. Se i riferimenti all'accesso precedente sono assenti, l'accesso SNC è a inizio strada."
+      },
+      {
+        "name": "COORD_X_COMUNE",
+        "type": "varchar",
+        "description": "Longitudine dell'accesso come la scrive il portale: gradi decimali con la virgola come separatore, in ETRF2000. Nel GeoParquet arricchito diventa la colonna longitude, numerica."
+      },
+      {
+        "name": "COORD_Y_COMUNE",
+        "type": "varchar",
+        "description": "Latitudine dell'accesso come la scrive il portale: gradi decimali con la virgola come separatore, in ETRF2000. Nel GeoParquet arricchito diventa la colonna latitude, numerica."
+      },
+      {
+        "name": "QUOTA",
+        "type": "varchar",
+        "description": "Altezza ortometrica dell'accesso nei sistemi di riferimento altimetrici nazionali ufficiali. La pipeline la conserva come testo perché i valori usano la virgola come separatore decimale."
+      },
+      {
+        "name": "METODO",
+        "type": "varchar",
+        "description": "Modalità con cui il Comune ha attribuito le coordinate. 1 rilevazione strumentale sul campo con accuratezza inferiore a 5 m; 2 rilevazione strumentale sul campo con accuratezza pari o superiore a 5 m; 3 derivazione indiretta da base dati territoriale con accuratezza stimata inferiore a 5 m; 4 derivazione indiretta da base dati territoriale con accuratezza stimata pari o superiore a 5 m; 5 derivazione indiretta tramite le funzioni del Portale per i Comuni."
+      }
+    ],
+    "table:row_count": 27964607,
+    "language": {
+      "code": "it",
+      "name": "Italiano",
+      "alternate": "Italian"
+    },
+    "languages": [
+      {
+        "code": "en",
+        "name": "English",
+        "alternate": "Inglese"
+      }
+    ]
+  },
+  "assets": {
+    "data": {
+      "href": "https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/rilasci/2025-12-02/INDIR_ITA_20251202.parquet",
+      "type": "application/vnd.apache.parquet",
+      "title": "CSV del rilascio in Parquet, senza perdita",
+      "roles": [
+        "data"
+      ],
+      "file:size": 128575762,
+      "file:checksum": "1220bf5d550315b576a7fcb9e0f2b63e1aef619601ce8df73e43ec76987a83682005"
+    },
+    "source": {
+      "href": "https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/rilasci/2025-12-02/indirizzarioItalia_20251202.zip",
+      "type": "application/zip",
+      "title": "Archivio ZIP del rilascio",
+      "roles": [
+        "source"
+      ],
+      "file:size": 185677254,
+      "file:checksum": "122036f4955c8ee9e8503611d4bf94ba19e312484078e96bc76e44d3ae5ff58bac76"
+    }
+  },
+  "links": [
+    {
+      "rel": "root",
+      "href": "../../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "parent",
+      "href": "../collection.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "collection",
+      "href": "../collection.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "predecessor-version",
+      "href": "../2025-11-04/2025-11-04.json",
+      "type": "application/geo+json"
+    },
+    {
+      "rel": "successor-version",
+      "href": "../2026-01-14/2026-01-14.json",
+      "type": "application/geo+json"
+    },
+    {
+      "rel": "alternate",
+      "href": "../../en/rilasci/2025-12-02/2025-12-02.json",
+      "type": "application/geo+json",
+      "title": "Inglese",
+      "hreflang": "en"
+    },
+    {
+      "rel": "via",
+      "href": "https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/",
+      "type": "text/html",
+      "title": "Portale open data ANNCSU"
+    },
+    {
+      "rel": "license",
+      "href": "https://creativecommons.org/licenses/by/4.0/deed.it",
+      "type": "text/html",
+      "title": "Creative Commons Attribuzione 4.0 Internazionale"
+    }
+  ]
+}

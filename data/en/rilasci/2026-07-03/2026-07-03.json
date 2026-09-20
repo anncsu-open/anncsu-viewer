@@ -1,0 +1,198 @@
+{
+  "type": "Feature",
+  "stac_version": "1.1.0",
+  "stac_extensions": [
+    "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json",
+    "https://stac-extensions.github.io/file/v2.1.0/schema.json",
+    "https://stac-extensions.github.io/table/v1.2.0/schema.json",
+    "https://stac-extensions.github.io/version/v1.2.0/schema.json",
+    "https://stac-extensions.github.io/language/v1.0.0/schema.json"
+  ],
+  "id": "2026-07-03",
+  "collection": "rilasci",
+  "geometry": null,
+  "properties": {
+    "datetime": "2026-07-03T00:00:00Z",
+    "title": "Release of 3 July 2026",
+    "description": "Release of 3 July 2026, 27,405,384 addresses, reconstructed from the consolidated parquet of mfortini/diff_ANNCSU, which keeps every monthly download with a presence flag per release. The reconstruction reproduces the portal's CSV and is verified byte for byte, row order aside, on the 15 September 2026 release, the only one whose original exists. Ricostruzione dal parquet consolidato di mfortini/diff_ANNCSU; metodo verificato byte per byte sul rilascio 2026-09-15.",
+    "version": "2026-07-03",
+    "table:columns": [
+      {
+        "name": "CODICE_COMUNE",
+        "type": "varchar",
+        "description": "Administrative code assigned to Italian comuni by the Agenzia delle Entrate and used in composing tax codes."
+      },
+      {
+        "name": "CODICE_ISTAT",
+        "type": "varchar",
+        "description": "Administrative code assigned to Italian comuni by Istat. Six digits. It is the join key with the comuni list and with the Istat boundaries."
+      },
+      {
+        "name": "PROGRESSIVO_NAZIONALE",
+        "type": "varchar",
+        "description": "National unique sequential code identifying the circulation area, that is the street."
+      },
+      {
+        "name": "CODICE_COMUNALE",
+        "type": "varchar",
+        "description": "Street code supplied by the comune. Identifier used by the comune, where present."
+      },
+      {
+        "name": "ODONIMO",
+        "type": "varchar",
+        "description": "Full name of the circulation area, made of DUG and DUF. The DUG is the generic urban denomination, the type such as via or piazza; the DUF is the official denomination assigned by the comune under current rules."
+      },
+      {
+        "name": "LOCALITA'",
+        "type": "varchar",
+        "description": "Locality name, where the comune records one. Present only in the original CSV and in the raw archive Parquet: the enriched GeoParquet does not carry it."
+      },
+      {
+        "name": "DIZIONE_LINGUA1",
+        "type": "varchar",
+        "description": "Street name recorded in a first language other than Italian, under the rules on bilingualism and on the use of recognised minority languages."
+      },
+      {
+        "name": "DIZIONE_LINGUA2",
+        "type": "varchar",
+        "description": "Street name recorded in a second language other than Italian, under the same rules on bilingualism and recognised minority languages."
+      },
+      {
+        "name": "PROGRESSIVO_ACCESSO",
+        "type": "varchar",
+        "description": "National unique sequential code identifying the external access, that is the entrance."
+      },
+      {
+        "name": "CODICE_COMUNALE_ACCESSO",
+        "type": "varchar",
+        "description": "House number code supplied by the comune. Identifier used by the comune, where present. The pipeline forces it to VARCHAR because it contains alphanumeric codes that automatic inference would read as integers, dropping the non-conforming rows."
+      },
+      {
+        "name": "CIVICO",
+        "type": "varchar",
+        "description": "House number assigned to the external access following the natural sequence of numbers. The source documents it as text of at most 5 characters, but in the published data it is always numeric and the pipeline keeps it as an integer."
+      },
+      {
+        "name": "ESPONENTE",
+        "type": "varchar",
+        "description": "Letter part of the house number, where present. For example A, B, bis."
+      },
+      {
+        "name": "SPECIFICITA",
+        "type": "varchar",
+        "description": "Value used where a specific house-numbering classification validated by Istat applies, for example ROSSO and NERO."
+      },
+      {
+        "name": "METRICO",
+        "type": "varchar",
+        "description": "House number expressed in metres, used by comuni that adopt metric numbering instead of the natural sequence of numbers."
+      },
+      {
+        "name": "PROGRESSIVO_SNC",
+        "type": "varchar",
+        "description": "When set, the access placed after the given house or metric number has no standard house number. When the references to the previous access are absent, the SNC access is at the start of the street."
+      },
+      {
+        "name": "COORD_X_COMUNE",
+        "type": "varchar",
+        "description": "Longitude of the access as the portal writes it: decimal degrees with a comma as decimal separator, in ETRF2000. The enriched GeoParquet turns it into the numeric longitude column."
+      },
+      {
+        "name": "COORD_Y_COMUNE",
+        "type": "varchar",
+        "description": "Latitude of the access as the portal writes it: decimal degrees with a comma as decimal separator, in ETRF2000. The enriched GeoParquet turns it into the numeric latitude column."
+      },
+      {
+        "name": "QUOTA",
+        "type": "varchar",
+        "description": "Orthometric height of the access in the official national height reference systems. The pipeline keeps it as text because the values use a comma as decimal separator."
+      },
+      {
+        "name": "METODO",
+        "type": "varchar",
+        "description": "How the comune assigned the coordinates. 1 field survey with instruments, accuracy below 5 m; 2 field survey with instruments, accuracy of 5 m or more; 3 indirect derivation from a spatial database, estimated accuracy below 5 m; 4 indirect derivation from a spatial database, estimated accuracy of 5 m or more; 5 indirect derivation through the functions of the Portale per i Comuni."
+      }
+    ],
+    "table:row_count": 27405384,
+    "language": {
+      "code": "en",
+      "name": "English",
+      "alternate": "Inglese"
+    },
+    "languages": [
+      {
+        "code": "it",
+        "name": "Italiano",
+        "alternate": "Italian"
+      }
+    ]
+  },
+  "assets": {
+    "data": {
+      "href": "https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/rilasci/2026-07-03/INDIR_ITA_20260703.parquet",
+      "type": "application/vnd.apache.parquet",
+      "title": "CSV of the release as Parquet, lossless",
+      "roles": [
+        "data"
+      ],
+      "file:size": 258125201,
+      "file:checksum": "1220d32acfbc364916116d896671097396ba775c807f5930d901cfbf152e2759bb06"
+    },
+    "source": {
+      "href": "https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/rilasci/2026-07-03/indirizzarioItalia_20260703.zip",
+      "type": "application/zip",
+      "title": "ZIP archive of the release",
+      "roles": [
+        "source"
+      ],
+      "file:size": 324395610,
+      "file:checksum": "1220f07d0a0505fc1f0cf683d6e5ec29ba75156167302b3ad81207f23d504ffc7f04"
+    }
+  },
+  "links": [
+    {
+      "rel": "root",
+      "href": "../../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "parent",
+      "href": "../collection.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "collection",
+      "href": "../collection.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "predecessor-version",
+      "href": "../2026-06-02/2026-06-02.json",
+      "type": "application/geo+json"
+    },
+    {
+      "rel": "successor-version",
+      "href": "../2026-08-03/2026-08-03.json",
+      "type": "application/geo+json"
+    },
+    {
+      "rel": "alternate",
+      "href": "../../../rilasci/2026-07-03/2026-07-03.json",
+      "type": "application/geo+json",
+      "title": "Italian",
+      "hreflang": "it"
+    },
+    {
+      "rel": "via",
+      "href": "https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/",
+      "type": "text/html",
+      "title": "ANNCSU open data portal"
+    },
+    {
+      "rel": "license",
+      "href": "https://creativecommons.org/licenses/by/4.0/",
+      "type": "text/html",
+      "title": "Creative Commons Attribution 4.0 International"
+    }
+  ]
+}

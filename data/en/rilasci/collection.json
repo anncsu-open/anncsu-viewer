@@ -5,21 +5,22 @@
     "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json",
     "https://stac-extensions.github.io/file/v2.1.0/schema.json",
     "https://stac-extensions.github.io/table/v1.2.0/schema.json",
-    "https://stac-extensions.github.io/projection/v2.0.0/schema.json",
-    "https://stac-extensions.github.io/web-map-links/v1.3.0/schema.json",
-    "https://stac-extensions.github.io/language/v1.0.0/schema.json",
-    "https://stac-extensions.github.io/version/v1.2.0/schema.json"
+    "https://stac-extensions.github.io/version/v1.2.0/schema.json",
+    "https://stac-extensions.github.io/language/v1.0.0/schema.json"
   ],
-  "id": "indirizzi",
-  "title": "ANNCSU addresses, single file",
-  "description": "Every external access recorded in ANNCSU in one GeoParquet file, spatially sorted along a Hilbert curve and carrying a bbox column, so a reader can skip whole row groups without decoding geometries. Suited to analysis over the whole country. To read a single comune the partitioned collection is the better choice. Of 20,731,065 addresses, 51,423 (0.25%) fall more than 110 metres outside the boundary of the comune they are assigned to, according to Istat boundaries, and 0 have no boundary to compare against. This collection holds the 20,731,065 georeferenced addresses out of the 27,415,954 in the 15 September 2026 release: addresses without coordinates are in the release archive.",
+  "id": "rilasci",
+  "title": "ANNCSU monthly releases",
+  "description": "Every monthly download of the national address register, from 3 September 2025 to 15 September 2026, as published by the ANNCSU portal: the original ZIP archive and a lossless Parquet copy of the CSV, with every row and the 19 original columns as text, coordinates included but no geometry. It is the history the indirizzi and indirizzi-h3 collections derive their current release from. The portal keeps only the latest download: releases before 15 September 2026 are reconstructed from the consolidated parquet of mfortini/diff_ANNCSU with a method verified byte for byte on the September release.",
   "license": "CC-BY-4.0",
   "keywords": [
     "addresses",
     "house numbers",
     "street names",
     "italy",
-    "anncsu"
+    "anncsu",
+    "releases",
+    "history",
+    "archive"
   ],
   "providers": [
     {
@@ -66,7 +67,7 @@
     "temporal": {
       "interval": [
         [
-          "2026-09-15T00:00:00Z",
+          "2025-09-03T00:00:00Z",
           null
         ]
       ]
@@ -85,7 +86,6 @@
     }
   ],
   "updated": "2026-09-19T15:07:48Z",
-  "version": "2026-09-15",
   "table:columns": [
     {
       "name": "CODICE_COMUNE",
@@ -98,13 +98,8 @@
       "description": "Administrative code assigned to Italian comuni by Istat. Six digits. It is the join key with the comuni list and with the Istat boundaries."
     },
     {
-      "name": "NOME_COMUNE",
-      "type": "varchar",
-      "description": "Name of the comune, added by the pipeline by joining CODICE_ISTAT with the official list of Italian comuni published by Istat. Null when the code has no match."
-    },
-    {
       "name": "PROGRESSIVO_NAZIONALE",
-      "type": "bigint",
+      "type": "varchar",
       "description": "National unique sequential code identifying the circulation area, that is the street."
     },
     {
@@ -118,6 +113,11 @@
       "description": "Full name of the circulation area, made of DUG and DUF. The DUG is the generic urban denomination, the type such as via or piazza; the DUF is the official denomination assigned by the comune under current rules."
     },
     {
+      "name": "LOCALITA'",
+      "type": "varchar",
+      "description": "Locality name, where the comune records one. Present only in the original CSV and in the raw archive Parquet: the enriched GeoParquet does not carry it."
+    },
+    {
       "name": "DIZIONE_LINGUA1",
       "type": "varchar",
       "description": "Street name recorded in a first language other than Italian, under the rules on bilingualism and on the use of recognised minority languages."
@@ -129,7 +129,7 @@
     },
     {
       "name": "PROGRESSIVO_ACCESSO",
-      "type": "bigint",
+      "type": "varchar",
       "description": "National unique sequential code identifying the external access, that is the entrance."
     },
     {
@@ -139,7 +139,7 @@
     },
     {
       "name": "CIVICO",
-      "type": "bigint",
+      "type": "varchar",
       "description": "House number assigned to the external access following the natural sequence of numbers. The source documents it as text of at most 5 characters, but in the published data it is always numeric and the pipeline keeps it as an integer."
     },
     {
@@ -159,18 +159,18 @@
     },
     {
       "name": "PROGRESSIVO_SNC",
-      "type": "bigint",
+      "type": "varchar",
       "description": "When set, the access placed after the given house or metric number has no standard house number. When the references to the previous access are absent, the SNC access is at the start of the street."
     },
     {
-      "name": "longitude",
-      "type": "double",
-      "description": "Longitude of the access in decimal degrees, from the source column COORD_X_COMUNE. The reference system declared by the source is ETRF2000 at epoch 2008.0, the Italian realisation of ETRS89. The pipeline converts the decimal comma to a point."
+      "name": "COORD_X_COMUNE",
+      "type": "varchar",
+      "description": "Longitude of the access as the portal writes it: decimal degrees with a comma as decimal separator, in ETRF2000. The enriched GeoParquet turns it into the numeric longitude column."
     },
     {
-      "name": "latitude",
-      "type": "double",
-      "description": "Latitude of the access in decimal degrees, from the source column COORD_Y_COMUNE. Same reference system and same decimal conversion as the longitude."
+      "name": "COORD_Y_COMUNE",
+      "type": "varchar",
+      "description": "Latitude of the access as the portal writes it: decimal degrees with a comma as decimal separator, in ETRF2000. The enriched GeoParquet turns it into the numeric latitude column."
     },
     {
       "name": "QUOTA",
@@ -179,77 +179,11 @@
     },
     {
       "name": "METODO",
-      "type": "bigint",
+      "type": "varchar",
       "description": "How the comune assigned the coordinates. 1 field survey with instruments, accuracy below 5 m; 2 field survey with instruments, accuracy of 5 m or more; 3 indirect derivation from a spatial database, estimated accuracy below 5 m; 4 indirect derivation from a spatial database, estimated accuracy of 5 m or more; 5 indirect derivation through the functions of the Portale per i Comuni."
-    },
-    {
-      "name": "oob_distance_m",
-      "type": "double",
-      "description": "Distance in metres between the address and the boundary of its comune according to Istat administrative boundaries, computed by the pipeline. Null when the comune has no matching boundary, zero when the point falls inside it."
-    },
-    {
-      "name": "out_of_bounds",
-      "type": "boolean",
-      "description": "True when the address falls more than 110 metres outside the boundary of the comune it is assigned to. The threshold absorbs geocoding tolerance. Null when the comune has no matching boundary."
-    },
-    {
-      "name": "bbox",
-      "type": "struct(xmin double, ymin double, xmax double, ymax double)",
-      "description": "Bounding box of the point, with all four values equal to its coordinates. It is the covering column defined by GeoParquet, which lets a reader skip whole row groups without decoding geometries."
-    },
-    {
-      "name": "geometry",
-      "type": "geometry",
-      "description": "Point built by the pipeline from longitude and latitude. Declared in OGC:CRS84. The source expresses coordinates in ETRF2000, which differs from WGS84 by less than a metre in Italy, so the offset is negligible against address precision."
     }
   ],
-  "table:row_count": 20731065,
-  "table:primary_geometry": "geometry",
-  "assets": {
-    "data": {
-      "href": "../../anncsu-indirizzi.parquet",
-      "type": "application/vnd.apache.parquet",
-      "title": "ANNCSU addresses (GeoParquet)",
-      "roles": [
-        "data"
-      ],
-      "proj:code": "OGC:CRS84",
-      "file:size": 1059267903,
-      "file:checksum": "122075f778b597b110cd7e63e4c3a3353a22983e73e8a938f10f84a58472fb7dde6f"
-    },
-    "visual": {
-      "href": "../../anncsu-indirizzi.pmtiles",
-      "type": "application/vnd.pmtiles",
-      "title": "ANNCSU addresses (PMTiles)",
-      "roles": [
-        "visual"
-      ],
-      "file:size": 333155352,
-      "file:checksum": "1220fc4d822927fd668df682b3f3c6f14493081c294d48c996d0d4bc1039814d1802"
-    },
-    "style-indirizzi": {
-      "href": "../../indirizzi/styles/indirizzi.json",
-      "type": "application/vnd.mapbox.style+json",
-      "title": "Address points",
-      "description": "Every access as a uniform point.",
-      "roles": [
-        "style",
-        "default"
-      ],
-      "file:size": 592,
-      "file:checksum": "12204da33adfa626c2f0e1b43ab40620c5bac5c5a438c0f60b2fde69d0727844b045"
-    },
-    "thumbnail": {
-      "href": "../../indirizzi/thumbnail.png",
-      "type": "image/png",
-      "title": "Address density over the country",
-      "roles": [
-        "thumbnail"
-      ],
-      "file:size": 330866,
-      "file:checksum": "12208b9147b71d795c5a240079c1baba1cd66c4ec7e2273e0201ae81f032dc2262ad"
-    }
-  },
+  "assets": {},
   "links": [
     {
       "rel": "root",
@@ -262,27 +196,91 @@
       "type": "application/json"
     },
     {
-      "rel": "pmtiles",
-      "href": "../../anncsu-indirizzi.pmtiles",
-      "type": "application/vnd.pmtiles",
-      "title": "Vector tiles for the map",
-      "pmtiles:layers": [
-        "addresses"
-      ]
+      "rel": "item",
+      "href": "./2025-09-03/2025-09-03.json",
+      "type": "application/geo+json",
+      "title": "Release of 3 September 2025"
     },
     {
-      "rel": "derived_from",
-      "href": "../rilasci/2026-09-15/2026-09-15.json",
+      "rel": "item",
+      "href": "./2025-10-10/2025-10-10.json",
+      "type": "application/geo+json",
+      "title": "Release of 10 October 2025"
+    },
+    {
+      "rel": "item",
+      "href": "./2025-11-04/2025-11-04.json",
+      "type": "application/geo+json",
+      "title": "Release of 4 November 2025"
+    },
+    {
+      "rel": "item",
+      "href": "./2025-12-02/2025-12-02.json",
+      "type": "application/geo+json",
+      "title": "Release of 2 December 2025"
+    },
+    {
+      "rel": "item",
+      "href": "./2026-01-14/2026-01-14.json",
+      "type": "application/geo+json",
+      "title": "Release of 14 January 2026"
+    },
+    {
+      "rel": "item",
+      "href": "./2026-02-06/2026-02-06.json",
+      "type": "application/geo+json",
+      "title": "Release of 6 February 2026"
+    },
+    {
+      "rel": "item",
+      "href": "./2026-03-06/2026-03-06.json",
+      "type": "application/geo+json",
+      "title": "Release of 6 March 2026"
+    },
+    {
+      "rel": "item",
+      "href": "./2026-04-06/2026-04-06.json",
+      "type": "application/geo+json",
+      "title": "Release of 6 April 2026"
+    },
+    {
+      "rel": "item",
+      "href": "./2026-05-04/2026-05-04.json",
+      "type": "application/geo+json",
+      "title": "Release of 4 May 2026"
+    },
+    {
+      "rel": "item",
+      "href": "./2026-06-02/2026-06-02.json",
+      "type": "application/geo+json",
+      "title": "Release of 2 June 2026"
+    },
+    {
+      "rel": "item",
+      "href": "./2026-07-03/2026-07-03.json",
+      "type": "application/geo+json",
+      "title": "Release of 3 July 2026"
+    },
+    {
+      "rel": "item",
+      "href": "./2026-08-03/2026-08-03.json",
+      "type": "application/geo+json",
+      "title": "Release of 3 August 2026"
+    },
+    {
+      "rel": "item",
+      "href": "./2026-09-15/2026-09-15.json",
+      "type": "application/geo+json",
+      "title": "Release of 15 September 2026"
+    },
+    {
+      "rel": "latest-version",
+      "href": "./2026-09-15/2026-09-15.json",
       "type": "application/geo+json"
     },
     {
-      "rel": "version-history",
-      "href": "../rilasci/collection.json",
-      "type": "application/json"
-    },
-    {
       "rel": "alternate",
-      "href": "../../indirizzi/collection.json",
+      "href": "../../rilasci/collection.json",
       "type": "application/json",
       "title": "Italian",
       "hreflang": "it"

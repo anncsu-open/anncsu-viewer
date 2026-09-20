@@ -45,6 +45,12 @@
       "title": "Indirizzi ANNCSU, partizionati per cella H3"
     },
     {
+      "rel": "child",
+      "href": "./rilasci/collection.json",
+      "type": "application/json",
+      "title": "Rilasci mensili ANNCSU"
+    },
+    {
       "rel": "alternate",
       "href": "./en/catalog.json",
       "type": "application/json",
