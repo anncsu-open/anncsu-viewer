@@ -29,10 +29,13 @@ from build_catalog import (
     PORTOLAN_SCHEMA,
     PUBLIC_BASE,
     RAW_COLUMNS,
+    VERSION_SCHEMA,
     VIEWER_URL,
     build,
     build_indirizzi,
     build_indirizzi_h3,
+    build_release_item,
+    build_rilasci,
     build_root,
     data_updated,
     dataset_statistics,
@@ -47,6 +50,7 @@ from build_catalog import (
     providers,
     raw_table_columns,
     read_parquet_columns,
+    release_asset_url,
     render_template,
     render_thumbnail,
     schema_table,
@@ -403,6 +407,13 @@ def fake_facts():
         "tile_table_columns_en": [
             {"name": "CODICE_ISTAT", "type": "varchar", "description": "x en"},
             {"name": "h3_cell", "type": "varchar", "description": "y en"},
+        ],
+        "releases": fake_releases(),
+        "raw_table_columns": [
+            {"name": n, "type": "varchar", "description": "x"} for n in RAW_COLUMNS
+        ],
+        "raw_table_columns_en": [
+            {"name": n, "type": "varchar", "description": "x en"} for n in RAW_COLUMNS
         ],
     }
 
@@ -1379,6 +1390,158 @@ class TestRawTableColumns:
         result = table_columns(parquet, yaml_path)
 
         assert [c["name"] for c in result] == ["CODICE_ISTAT"]
+
+
+class TestReleaseAssetUrl:
+    def test_is_absolute_under_the_public_base(self):
+        release = fake_releases()[1]
+        assert release_asset_url(release, "zip") == (
+            f"{PUBLIC_BASE}/rilasci/2026-09-15/indirizzarioItalia_20260915.zip"
+        )
+        assert release_asset_url(release, "parquet") == (
+            f"{PUBLIC_BASE}/rilasci/2026-09-15/INDIR_ITA_20260915.parquet"
+        )
+
+
+class TestBuildReleaseItem:
+    def _item(self, index=1, lang="it"):
+        releases = fake_releases()
+        return build_release_item(releases[index], releases, fake_facts(), lang=lang)
+
+    def test_is_a_tabular_item_with_null_geometry_and_no_bbox(self):
+        item = self._item()
+        assert item["type"] == "Feature"
+        assert item["geometry"] is None
+        assert "bbox" not in item
+        assert item["collection"] == "rilasci"
+
+    def test_carries_version_and_datetime_of_the_release(self):
+        item = self._item()
+        assert item["id"] == "2026-09-15"
+        assert item["properties"]["version"] == "2026-09-15"
+        assert item["properties"]["datetime"] == "2026-09-15T00:00:00Z"
+        assert VERSION_SCHEMA in item["stac_extensions"]
+
+    def test_assets_point_at_r2_with_facts_from_the_index(self):
+        item = self._item()
+        data = item["assets"]["data"]
+        source = item["assets"]["source"]
+        assert data["href"] == (
+            f"{PUBLIC_BASE}/rilasci/2026-09-15/INDIR_ITA_20260915.parquet"
+        )
+        assert data["type"] == "application/vnd.apache.parquet"
+        assert data["roles"] == ["data"]
+        assert data["file:size"] == 320_000_000
+        assert data["file:checksum"] == "1220" + "d" * 64
+        assert source["href"] == (
+            f"{PUBLIC_BASE}/rilasci/2026-09-15/indirizzarioItalia_20260915.zip"
+        )
+        assert source["type"] == "application/zip"
+        assert source["roles"] == ["source"]
+        assert source["file:checksum"] == "1220" + "c" * 64
+
+    def test_documents_columns_and_row_count(self):
+        item = self._item()
+        names = [c["name"] for c in item["properties"]["table:columns"]]
+        assert names == RAW_COLUMNS
+        assert item["properties"]["table:row_count"] == 27_415_954
+
+    def test_links_the_previous_release_but_not_a_missing_next_one(self):
+        latest = self._item(index=1)
+        first = self._item(index=0)
+        assert links_by_rel(latest, "predecessor-version")[0]["href"] == (
+            "../2026-08-03/2026-08-03.json"
+        )
+        assert links_by_rel(latest, "successor-version") == []
+        assert links_by_rel(first, "successor-version")[0]["href"] == (
+            "../2026-09-15/2026-09-15.json"
+        )
+        assert links_by_rel(first, "predecessor-version") == []
+
+    def test_has_the_structural_links(self):
+        item = self._item()
+        assert links_by_rel(item, "root")[0]["href"] == "../../catalog.json"
+        assert links_by_rel(item, "parent")[0]["href"] == "../collection.json"
+        assert links_by_rel(item, "collection")[0]["href"] == "../collection.json"
+        assert links_by_rel(item, "via")[0]["type"] == "text/html"
+
+    def test_states_the_origin_in_the_description(self):
+        original = self._item(index=1)["properties"]["description"]
+        reconstructed = self._item(index=0)["properties"]["description"]
+        assert "originale" in original.lower()
+        assert "diff_ANNCSU" in reconstructed
+        assert "ricostru" in reconstructed.lower()
+
+    def test_english_item_reaches_the_italian_twin_and_translates(self):
+        item = self._item(lang="en")
+        alternate = [
+            l
+            for l in links_by_rel(item, "alternate")
+            if l["type"] == "application/geo+json"
+        ]
+        assert alternate[0]["href"] == "../../../rilasci/2026-09-15/2026-09-15.json"
+        assert alternate[0]["hreflang"] == "it"
+        assert links_by_rel(item, "root")[0]["href"] == "../../catalog.json"
+        assert item["properties"]["table:columns"][0]["description"] == "x en"
+        assert "original" in item["properties"]["description"].lower()
+
+    def test_italian_item_links_its_english_twin(self):
+        item = self._item()
+        alternate = [
+            l
+            for l in links_by_rel(item, "alternate")
+            if l["type"] == "application/geo+json"
+        ]
+        assert alternate[0]["href"] == "../../en/rilasci/2026-09-15/2026-09-15.json"
+        assert alternate[0]["hreflang"] == "en"
+
+
+class TestBuildRilasci:
+    def test_is_tabular(self):
+        collection = build_rilasci(fake_facts())
+        assert "table:primary_geometry" not in collection
+        names = {c["name"].lower() for c in collection["table:columns"]}
+        assert "geometry" not in names and "geom" not in names
+        assert not any("thumbnail" in a["roles"] for a in collection["assets"].values())
+
+    def test_declares_the_version_extension_and_the_area_of_interest(self):
+        collection = build_rilasci(fake_facts())
+        assert VERSION_SCHEMA in collection["stac_extensions"]
+        assert collection["extent"]["spatial"]["bbox"] == [
+            [6.7003, 35.5017, 18.66, 47.0805]
+        ]
+        assert collection["extent"]["temporal"]["interval"] == [
+            ["2026-08-03T00:00:00Z", None]
+        ]
+
+    def test_links_every_release_and_the_latest_version(self):
+        collection = build_rilasci(fake_facts())
+        items = links_by_rel(collection, "item")
+        assert [l["href"] for l in items] == [
+            "./2026-08-03/2026-08-03.json",
+            "./2026-09-15/2026-09-15.json",
+        ]
+        assert all(
+            l["title"].strip() and l["type"] == "application/geo+json" for l in items
+        )
+        assert links_by_rel(collection, "latest-version")[0]["href"] == (
+            "./2026-09-15/2026-09-15.json"
+        )
+
+    def test_has_the_common_mirror_and_documentation_links(self):
+        collection = build_rilasci(fake_facts())
+        assert collection["license"] == "CC-BY-4.0"
+        assert collection["providers"][-1]["roles"] == ["host"]
+        assert links_by_rel(collection, "via")[0]["type"] == "text/html"
+        assert links_by_rel(collection, "agents")[0]["href"] == "./AGENTS.md"
+        assert links_by_rel(collection, "describedby")[0]["href"] == "./README.md"
+        assert collection["updated"] == "2026-09-15T00:00:00Z"
+
+    def test_english_collection(self):
+        collection = build_rilasci(fake_facts(), lang="en")
+        assert collection["language"]["code"] == "en"
+        assert collection["title"] == "ANNCSU monthly releases"
+        assert collection["table:columns"][0]["description"] == "x en"
 
 
 if __name__ == "__main__":

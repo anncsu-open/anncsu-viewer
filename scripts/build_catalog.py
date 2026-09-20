@@ -92,6 +92,7 @@ PARTITION_SCHEMA = (
 )
 FILE_SCHEMA = "https://stac-extensions.github.io/file/v2.1.0/schema.json"
 TABLE_SCHEMA = "https://stac-extensions.github.io/table/v1.2.0/schema.json"
+VERSION_SCHEMA = "https://stac-extensions.github.io/version/v1.2.0/schema.json"
 PROJECTION_SCHEMA = "https://stac-extensions.github.io/projection/v2.0.0/schema.json"
 WEB_MAP_LINKS_SCHEMA = (
     "https://stac-extensions.github.io/web-map-links/v1.3.0/schema.json"
@@ -654,6 +655,35 @@ TEXTS = {
         "partition_key": "Cella H3 di risoluzione $resolution che contiene l'indirizzo.",
         "keywords": ["indirizzi", "numeri civici", "toponomastica", "italia", "anncsu"],
         "keywords_h3": ["h3", "partizionato"],
+        "rilasci_title": "Rilasci mensili ANNCSU",
+        "rilasci_description": (
+            "Ogni scarico mensile dell'indirizzario nazionale, dal $first al "
+            "$last, così come pubblicato dal portale ANNCSU: l'archivio ZIP "
+            "originale e una copia Parquet senza perdita del CSV, con tutte le "
+            "righe e le 19 colonne originali come testo, coordinate incluse ma "
+            "senza geometria. È lo storico da cui le collection indirizzi e "
+            "indirizzi-h3 derivano il rilascio corrente. Il portale conserva "
+            "solo l'ultimo scarico: i rilasci precedenti al 15 settembre 2026 "
+            "sono ricostruiti dal parquet consolidato di mfortini/diff_ANNCSU "
+            "con un metodo verificato byte per byte sul rilascio di settembre."
+        ),
+        "release_title": "Rilascio del $date_human",
+        "release_original": (
+            "Scarico originale dal portale ANNCSU del rilascio del $date_human: "
+            "$rows accessi. Lo ZIP è il file servito dal portale, il Parquet ne "
+            "è la copia senza perdita. $note"
+        ),
+        "release_reconstructed": (
+            "Rilascio del $date_human, $rows accessi, ricostruito dal parquet "
+            "consolidato di mfortini/diff_ANNCSU, che conserva ogni scarico "
+            "mensile con un flag di presenza per rilascio. Il metodo di "
+            "ricostruzione riproduce il CSV del portale ed è verificato "
+            "byte per byte, ordine delle righe escluso, sul rilascio del 15 "
+            "settembre 2026, l'unico di cui esiste l'originale. $note"
+        ),
+        "release_zip": "Archivio ZIP del rilascio",
+        "release_parquet": "CSV del rilascio in Parquet, senza perdita",
+        "keywords_rilasci": ["rilasci", "storico", "archivio"],
         "stats_header": ("Statistica", "Valore"),
         "stats_total": "Accessi totali",
         "stats_oob": "Fuori dal confine comunale, oltre 110 m",
@@ -721,6 +751,36 @@ TEXTS = {
         "partition_key": "H3 cell at resolution $resolution containing the address.",
         "keywords": ["addresses", "house numbers", "street names", "italy", "anncsu"],
         "keywords_h3": ["h3", "partitioned"],
+        "rilasci_title": "ANNCSU monthly releases",
+        "rilasci_description": (
+            "Every monthly download of the national address register, from "
+            "$first to $last, as published by the ANNCSU portal: the original "
+            "ZIP archive and a lossless Parquet copy of the CSV, with every row "
+            "and the 19 original columns as text, coordinates included but no "
+            "geometry. It is the history the indirizzi and indirizzi-h3 "
+            "collections derive their current release from. The portal keeps "
+            "only the latest download: releases before 15 September 2026 are "
+            "reconstructed from the consolidated parquet of "
+            "mfortini/diff_ANNCSU with a method verified byte for byte on the "
+            "September release."
+        ),
+        "release_title": "Release of $date_human",
+        "release_original": (
+            "Original download from the ANNCSU portal of the $date_human "
+            "release: $rows addresses. The ZIP is the file the portal served, "
+            "the Parquet its lossless copy. $note"
+        ),
+        "release_reconstructed": (
+            "Release of $date_human, $rows addresses, reconstructed from the "
+            "consolidated parquet of mfortini/diff_ANNCSU, which keeps every "
+            "monthly download with a presence flag per release. The "
+            "reconstruction reproduces the portal's CSV and is verified byte "
+            "for byte, row order aside, on the 15 September 2026 release, the "
+            "only one whose original exists. $note"
+        ),
+        "release_zip": "ZIP archive of the release",
+        "release_parquet": "CSV of the release as Parquet, lossless",
+        "keywords_rilasci": ["releases", "history", "archive"],
         "stats_header": ("Statistic", "Value"),
         "stats_total": "Total addresses",
         "stats_oob": "Outside the comune boundary, beyond 110 m",
@@ -920,14 +980,18 @@ def _tree_root(lang: str) -> str:
     return "" if lang == SOURCE_LANG else f"{lang}/"
 
 
-def _to_data(lang: str, from_collection: bool) -> str:
-    """Path from an object's directory up to data/."""
-    levels = (0 if lang == SOURCE_LANG else 1) + (1 if from_collection else 0)
+def _to_data(lang: str, depth: int) -> str:
+    """Path from an object's directory up to data/.
+
+    depth is how many directories the object sits below its tree root: 0 for
+    the root catalog, 1 for a collection, 2 for an item.
+    """
+    levels = (0 if lang == SOURCE_LANG else 1) + depth
     return "../" * levels
 
 
-def _href_to_tree(lang: str, other: str, from_collection: bool, tail: str) -> str:
-    href = _to_data(lang, from_collection) + _tree_root(other) + tail
+def _href_to_tree(lang: str, other: str, depth: int, tail: str) -> str:
+    href = _to_data(lang, depth) + _tree_root(other) + tail
     return href if href.startswith("../") else f"./{href}"
 
 
@@ -938,13 +1002,15 @@ def _language_fields(lang: str) -> dict:
     }
 
 
-def _tree_alternates(lang: str, from_collection: bool, tail: str) -> list[dict]:
+def _tree_alternates(
+    lang: str, depth: int, tail: str, media_type: str = "application/json"
+) -> list[dict]:
     """alternate links to the same object in every other language tree."""
     return [
         {
             "rel": "alternate",
-            "href": _href_to_tree(lang, other, from_collection, tail),
-            "type": "application/json",
+            "href": _href_to_tree(lang, other, depth, tail),
+            "type": media_type,
             "title": TEXTS[lang]["other_tree"][other],
             "hreflang": other,
         }
@@ -1066,7 +1132,7 @@ def build_root(updated: str, lang: str = SOURCE_LANG) -> dict:
                 "type": "application/json",
                 "title": text["h3_title"],
             },
-            *_tree_alternates(lang, False, "catalog.json"),
+            *_tree_alternates(lang, 0, "catalog.json"),
             _viewer_link(lang),
             {
                 "rel": "vcs",
@@ -1104,7 +1170,7 @@ def _shared_asset_href(lang: str, collection_id: str, tail: str) -> str:
     """Path to a style or thumbnail, which live in the source tree only."""
     if lang == SOURCE_LANG:
         return f"./{tail}"
-    return f"{_to_data(lang, True)}{collection_id}/{tail}"
+    return f"{_to_data(lang, 1)}{collection_id}/{tail}"
 
 
 def _thumbnail_asset(facts: dict, lang: str, collection_id: str) -> dict:
@@ -1120,7 +1186,7 @@ def _thumbnail_asset(facts: dict, lang: str, collection_id: str) -> dict:
 def _pmtiles_link(facts: dict, lang: str) -> dict:
     return {
         "rel": "pmtiles",
-        "href": f"{_to_data(lang, True)}anncsu-indirizzi.pmtiles",
+        "href": f"{_to_data(lang, 1)}anncsu-indirizzi.pmtiles",
         "type": "application/vnd.pmtiles",
         "title": TEXTS[lang]["pmtiles_link"],
         "pmtiles:layers": facts["pmtiles_layers"],
@@ -1139,7 +1205,7 @@ def _collection_links(facts: dict, lang: str, collection_id: str) -> list[dict]:
         {"rel": "root", "href": "../catalog.json", "type": "application/json"},
         {"rel": "parent", "href": "../catalog.json", "type": "application/json"},
         _pmtiles_link(facts, lang),
-        *_tree_alternates(lang, True, f"{collection_id}/collection.json"),
+        *_tree_alternates(lang, 1, f"{collection_id}/collection.json"),
         _viewer_link(lang),
         *_source_links(lang),
         *_documentation_links(lang),
@@ -1156,7 +1222,7 @@ def build_indirizzi(facts: dict, lang: str = SOURCE_LANG) -> dict:
     PORTO-CORE-017: one data file means a collection-level asset and no items.
     """
     text = TEXTS[lang]
-    up = _to_data(lang, True)
+    up = _to_data(lang, 1)
     return {
         "type": "Collection",
         "stac_version": "1.1.0",
@@ -1211,7 +1277,7 @@ def build_indirizzi_h3(facts: dict, lang: str = SOURCE_LANG) -> dict:
     partitions, so the glob is the access path and there are no items.
     """
     text = TEXTS[lang]
-    up = _to_data(lang, True)
+    up = _to_data(lang, 1)
     glob = f"{PUBLIC_BASE}/tiles/{facts['tile_key']}=*/*.parquet"
     return {
         "type": "Collection",
@@ -1270,6 +1336,196 @@ def build_indirizzi_h3(facts: dict, lang: str = SOURCE_LANG) -> dict:
 
 
 # --- writing -----------------------------------------------------------------
+
+
+def release_asset_url(release: dict, key: str) -> str:
+    """Absolute URL of a release file on R2.
+
+    Only the archive uses absolute hrefs: its files are never in the checkout,
+    so a relative href could not be verified and would break the tree for
+    local validation.
+    """
+    return f"{PUBLIC_BASE}/rilasci/{release['date']}/{release[key]['name']}"
+
+
+def _release_datetime(release: dict) -> str:
+    return f"{release['date']}T00:00:00Z"
+
+
+def _release_description(release: dict, lang: str) -> str:
+    text = TEXTS[lang]
+    key = (
+        "release_original"
+        if release["origin"] == "original"
+        else "release_reconstructed"
+    )
+    return (
+        Template(text[key])
+        .substitute(
+            date_human=human_date(_release_datetime(release), lang),
+            rows=human_count(release["parquet"]["rows"], lang),
+            note=release.get("note", ""),
+        )
+        .strip()
+    )
+
+
+def build_release_item(
+    release: dict, releases: list[dict], facts: dict, lang: str = SOURCE_LANG
+) -> dict:
+    """One release of the archive as a tabular STAC item.
+
+    geometry is null and there is no bbox key: STAC forbids a bbox without a
+    geometry, and the absence of any spatial signal is what keeps the parent
+    collection tabular for the validator, so no thumbnail or style is owed.
+    """
+    text = TEXTS[lang]
+    date = release["date"]
+    ordered = [r["date"] for r in releases]
+    position = ordered.index(date)
+    # An item sits two directories below its tree's root in both trees, so
+    # root is the same literal everywhere.
+    links = [
+        {"rel": "root", "href": "../../catalog.json", "type": "application/json"},
+        {"rel": "parent", "href": "../collection.json", "type": "application/json"},
+        {
+            "rel": "collection",
+            "href": "../collection.json",
+            "type": "application/json",
+        },
+    ]
+    if position > 0:
+        prev = ordered[position - 1]
+        links.append(
+            {
+                "rel": "predecessor-version",
+                "href": f"../{prev}/{prev}.json",
+                "type": "application/geo+json",
+            }
+        )
+    if position < len(ordered) - 1:
+        nxt = ordered[position + 1]
+        links.append(
+            {
+                "rel": "successor-version",
+                "href": f"../{nxt}/{nxt}.json",
+                "type": "application/geo+json",
+            }
+        )
+    links += _tree_alternates(
+        lang, 2, f"rilasci/{date}/{date}.json", "application/geo+json"
+    )
+    links += _source_links(lang)
+
+    return {
+        "type": "Feature",
+        "stac_version": "1.1.0",
+        "stac_extensions": [
+            PORTOLAN_SCHEMA,
+            FILE_SCHEMA,
+            TABLE_SCHEMA,
+            VERSION_SCHEMA,
+            LANGUAGE_SCHEMA,
+        ],
+        "id": date,
+        "collection": "rilasci",
+        "geometry": None,
+        "properties": {
+            "datetime": _release_datetime(release),
+            "title": Template(text["release_title"]).substitute(
+                date_human=human_date(_release_datetime(release), lang)
+            ),
+            "description": _release_description(release, lang),
+            "version": date,
+            "table:columns": _columns_for(facts, "raw_table_columns", lang),
+            "table:row_count": release["parquet"]["rows"],
+            **_language_fields(lang),
+        },
+        "assets": {
+            "data": {
+                "href": release_asset_url(release, "parquet"),
+                "type": "application/vnd.apache.parquet",
+                "title": text["release_parquet"],
+                "roles": ["data"],
+                "file:size": release["parquet"]["size"],
+                "file:checksum": "1220" + release["parquet"]["sha256"],
+            },
+            "source": {
+                "href": release_asset_url(release, "zip"),
+                "type": "application/zip",
+                "title": text["release_zip"],
+                "roles": ["source"],
+                "file:size": release["zip"]["size"],
+                "file:checksum": "1220" + release["zip"]["sha256"],
+            },
+        },
+        "links": links,
+    }
+
+
+def build_rilasci(facts: dict, lang: str = SOURCE_LANG) -> dict:
+    """The archive of monthly releases, a tabular collection with items.
+
+    No geometry column, no spatial asset, items without geometry: the
+    validator classifies it as tabular, so the bbox is the area of interest
+    (PORTO-FMT-036) and no thumbnail or style is required.
+    """
+    text = TEXTS[lang]
+    releases = facts["releases"]
+    first, last = releases[0], releases[-1]
+    item_links = [
+        {
+            "rel": "item",
+            "href": f"./{r['date']}/{r['date']}.json",
+            "type": "application/geo+json",
+            "title": Template(text["release_title"]).substitute(
+                date_human=human_date(_release_datetime(r), lang)
+            ),
+        }
+        for r in releases
+    ]
+    return {
+        "type": "Collection",
+        "stac_version": "1.1.0",
+        "stac_extensions": [
+            PORTOLAN_SCHEMA,
+            FILE_SCHEMA,
+            TABLE_SCHEMA,
+            VERSION_SCHEMA,
+            LANGUAGE_SCHEMA,
+        ],
+        "id": "rilasci",
+        "title": text["rilasci_title"],
+        "description": Template(text["rilasci_description"]).substitute(
+            first=human_date(_release_datetime(first), lang),
+            last=human_date(_release_datetime(last), lang),
+        ),
+        "license": LICENSE_ID,
+        "keywords": [*text["keywords"], *text["keywords_rilasci"]],
+        "providers": providers(),
+        "extent": {
+            "spatial": {"bbox": [facts["bbox"]]},
+            "temporal": {"interval": [[_release_datetime(first), None]]},
+        },
+        **_language_fields(lang),
+        "updated": facts["updated"],
+        "table:columns": _columns_for(facts, "raw_table_columns", lang),
+        "assets": {},
+        "links": [
+            {"rel": "root", "href": "../catalog.json", "type": "application/json"},
+            {"rel": "parent", "href": "../catalog.json", "type": "application/json"},
+            *item_links,
+            {
+                "rel": "latest-version",
+                "href": f"./{last['date']}/{last['date']}.json",
+                "type": "application/geo+json",
+            },
+            *_tree_alternates(lang, 1, "rilasci/collection.json"),
+            _viewer_link(lang),
+            *_source_links(lang),
+            *_documentation_links(lang),
+        ],
+    }
 
 
 def write_json(path: Path, document: dict) -> None:
