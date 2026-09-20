@@ -15,13 +15,16 @@ Usage:
 
 The script downloads the full Italian address CSV from the ANNCSU open data
 portal, loads it into DuckDB, creates point geometries from coordinates,
-and exports the result as a spatially-sorted GeoParquet file.
+and exports the result as a spatially-sorted GeoParquet file. It also keeps
+the release as received: the ZIP and a lossless raw Parquet of the CSV go to
+data/rilasci/<date>/ and an entry is appended to data/rilasci/releases.json.
 
 It checks whether the remote dataset is newer than the last update by
 comparing the date embedded in the CSV filename inside the zip archive
 with the last commit date of the existing GeoParquet file.
 """
 
+import hashlib
 import io
 import json
 import re
@@ -47,6 +50,9 @@ COMUNI_FILE = OUTPUT_DIR / "comuni.json"
 COMUNI_H3_FILE = OUTPUT_DIR / "comuni-h3.json"
 BOUNDARIES_FILE = OUTPUT_DIR / "istat-boundaries.parquet"
 MARKER_FILE = OUTPUT_DIR / ".last_remote_date"
+RELEASES_DIR = OUTPUT_DIR / "rilasci"
+RELEASES_FILE = RELEASES_DIR / "releases.json"
+RELEASE_ORIGINS = ("original", "reconstructed")
 H3_RESOLUTION = 5
 TAIL_SIZE = 65536
 DOWNLOAD_TIMEOUT = 600
@@ -167,8 +173,13 @@ def is_update_needed(remote_date: datetime | None = None) -> bool:
     return False
 
 
-def download_and_extract() -> Path:
-    """Download the ANNCSU zip and extract the CSV."""
+def download_and_extract() -> tuple[Path, bytes]:
+    """Download the ANNCSU zip and extract the CSV.
+
+    Returns the CSV path and the ZIP bytes: the archive step keeps the ZIP
+    as received, and the portal serves only the latest release, so this is
+    the one chance to save it.
+    """
     print(f"Downloading from {ANNCSU_URL} ...")
     for attempt in range(1, MAX_RETRIES + 1):
         try:
@@ -203,6 +214,7 @@ def download_and_extract() -> Path:
     print(f"Downloaded {downloaded / (1024 * 1024):.1f} MB")
 
     data.seek(0)
+    zip_bytes = data.getvalue()
     with zipfile.ZipFile(data) as zf:
         csv_names = [n for n in zf.namelist() if n.lower().endswith(".csv")]
         if not csv_names:
@@ -210,7 +222,140 @@ def download_and_extract() -> Path:
         csv_name = csv_names[0]
         print(f"Extracting {csv_name} ...")
         zf.extract(csv_name, OUTPUT_DIR)
-        return OUTPUT_DIR / csv_name
+        return OUTPUT_DIR / csv_name, zip_bytes
+
+
+def csv_to_raw_parquet(csv_path: Path, parquet_path: Path) -> int:
+    """Convert the raw ANNCSU CSV to Parquet without losing anything.
+
+    Every column stays text exactly as the portal writes it: Italian decimal
+    commas, leading-zero codes, quotes inside odonyms. Empty fields become
+    NULL, which is what they mean in the CSV. Rows are ordered by the three
+    identifying columns so the output does not depend on the CSV's order,
+    which the portal does not fix and a reconstruction cannot reproduce.
+    Returns the row count.
+    """
+    con = duckdb.connect()
+    # Same bounds as enhance_parquet: the sort spills to disk instead of
+    # OOMing the runner. ORDER BY still fixes the output order.
+    con.execute("SET memory_limit='4GB'")
+    con.execute("SET preserve_insertion_order=false")
+    con.execute(f"""
+        COPY (
+            SELECT *
+            FROM read_csv(
+                '{csv_path}',
+                delim=';', header=true, quote='', escape='', all_varchar=true
+            )
+            ORDER BY
+                CODICE_ISTAT,
+                TRY_CAST(PROGRESSIVO_NAZIONALE AS BIGINT),
+                TRY_CAST(PROGRESSIVO_ACCESSO AS BIGINT)
+        ) TO '{parquet_path}' (FORMAT PARQUET, COMPRESSION ZSTD)
+    """)
+    rows = con.execute(
+        f"SELECT count(*) FROM read_parquet('{parquet_path}')"
+    ).fetchone()[0]
+    con.close()
+    return rows
+
+
+def sha256_of(path: Path) -> str:
+    """Plain hex sha256 of a file. The catalog adds the multihash prefix."""
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def release_entry(
+    date: str,
+    zip_path: Path,
+    parquet_path: Path,
+    rows: int,
+    origin: str,
+    note: str,
+    archived: str,
+) -> dict:
+    """One entry of releases.json."""
+    return {
+        "date": date,
+        "origin": origin,
+        "note": note,
+        "zip": {
+            "name": zip_path.name,
+            "size": zip_path.stat().st_size,
+            "sha256": sha256_of(zip_path),
+        },
+        "parquet": {
+            "name": parquet_path.name,
+            "size": parquet_path.stat().st_size,
+            "sha256": sha256_of(parquet_path),
+            "rows": rows,
+        },
+        "archived": archived,
+    }
+
+
+def append_release(index_path: Path, entry: dict) -> None:
+    """Add or replace the entry for one date, keeping the index sorted."""
+    if entry.get("origin") not in RELEASE_ORIGINS:
+        raise ValueError(
+            f"origin must be one of {RELEASE_ORIGINS}, got {entry.get('origin')!r}"
+        )
+    releases = []
+    if index_path.exists():
+        releases = json.loads(index_path.read_text(encoding="utf-8")).get(
+            "releases", []
+        )
+    releases = [r for r in releases if r["date"] != entry["date"]] + [entry]
+    releases.sort(key=lambda r: r["date"])
+    index_path.parent.mkdir(parents=True, exist_ok=True)
+    index_path.write_text(
+        json.dumps({"releases": releases}, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+
+def archive_release(zip_bytes: bytes, csv_path: Path, release_date: datetime) -> Path:
+    """Keep the download: ZIP as received, raw Parquet, and an index entry.
+
+    The portal serves only the latest release, so this is the only place the
+    history accumulates. The files land in data/rilasci/<date>/, which git
+    ignores; the workflow uploads them and commits the index.
+    """
+    date = release_date.strftime("%Y-%m-%d")
+    ymd = release_date.strftime("%Y%m%d")
+    release_dir = RELEASES_DIR / date
+    release_dir.mkdir(parents=True, exist_ok=True)
+
+    zip_path = release_dir / f"indirizzarioItalia_{ymd}.zip"
+    zip_path.write_bytes(zip_bytes)
+    print(f"Archived ZIP: {zip_path} ({len(zip_bytes) / (1024 * 1024):.1f} MB)")
+
+    parquet_path = release_dir / f"INDIR_ITA_{ymd}.parquet"
+    print("Converting the raw CSV to Parquet ...", flush=True)
+    rows = csv_to_raw_parquet(csv_path, parquet_path)
+    print(f"Raw Parquet: {parquet_path} ({rows:,} rows)")
+
+    # The only wall-clock value in the pipeline. Written once into the index
+    # and never recomputed, so the catalog generator stays deterministic.
+    archived = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    append_release(
+        RELEASES_FILE,
+        release_entry(
+            date,
+            zip_path,
+            parquet_path,
+            rows,
+            "original",
+            "Scarico dal portale ANNCSU.",
+            archived,
+        ),
+    )
+    print(f"Release index updated: {RELEASES_FILE}")
+    return release_dir
 
 
 def _csv_types_clause() -> str:
@@ -632,9 +777,13 @@ def main(
     if not force and not is_update_needed(remote_date):
         return
 
-    csv_path = download_and_extract()
+    csv_path, zip_bytes = download_and_extract()
 
     try:
+        if remote_date is not None:
+            archive_release(zip_bytes, csv_path, remote_date)
+        else:
+            print("Warning: remote date unknown, the release is not archived")
         parquet_path = csv_to_parquet(csv_path)
         enhance_parquet(parquet_path)
         generate_comuni_h3(parquet_path)
