@@ -65,6 +65,32 @@ What the columns mean is in `table:columns` inside each `collection.json`, and
 in the schema table of each collection README. Both come from the same source,
 so they cannot disagree.
 
+## Past releases
+
+Every monthly download since September 2025 is kept under `rilasci/`, one
+directory per release date, holding the original ZIP and a lossless Parquet
+copy of the CSV: all rows and all 19 columns as text, including the addresses
+without coordinates that the enriched GeoParquet drops. The catalog describes
+them in the `rilasci` collection, one item per release, chained with the STAC
+version extension, and the live collections point at the release they derive
+from.
+
+```shell
+curl -s https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/rilasci/collection.json \
+  | jq -r '.links[] | select(.rel == "item") | .title'
+```
+
+```sql
+INSTALL httpfs; LOAD httpfs;
+SELECT count(*) FILTER (WHERE COORD_X_COMUNE IS NULL) AS senza_coordinate
+FROM read_parquet('https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/rilasci/2026-09-15/INDIR_ITA_20260915.parquet');
+```
+
+Releases before 15 September 2026 are reconstructions from
+[mfortini/diff_ANNCSU](https://github.com/mfortini/diff_ANNCSU), which kept
+every monthly download when the portal did not; the method is verified byte
+for byte against the one original we hold. Each item says which it is.
+
 ## Working on the catalog
 
 Regenerate it from whatever is currently in `data/`:
@@ -77,8 +103,12 @@ Validate it with the Portolan validator. This is the same check the workflow
 runs as a gate, so a clean run here means CI will pass:
 
 ```shell
-uv run --with 'rashid>=0.1.8,<0.2.0' rashid check data/ --schema
+uv run --with 'rashid>=0.1.8,<0.2.0' rashid check data/ --schema --data-scope local
 ```
+
+`--data-scope local` verifies the bytes of every asset present in the checkout
+and leaves the release archive unread: its ZIPs and raw Parquet live on R2
+only. Drop the flag to check those too, which downloads several gigabytes.
 
 Run the generator's tests:
 
@@ -111,8 +141,16 @@ data/                                  = the public bucket root
 │   ├── README.md, AGENTS.md
 │   ├── thumbnail.png
 │   └── styles/indirizzi.json
-└── indirizzi-h3/                      collection: the same data, split into tiles
-    └── ...                            same shape
+├── indirizzi-h3/                      collection: the same data, split into tiles
+│   └── ...                            same shape
+└── rilasci/                           collection: the monthly release archive
+    ├── collection.json
+    ├── README.md, AGENTS.md
+    ├── releases.json                  the index the items are built from
+    └── <date>/                        one directory per release
+        ├── <date>.json                item
+        ├── indirizzarioItalia_*.zip   R2 only, not in git
+        └── INDIR_ITA_*.parquet        R2 only, not in git
 ```
 
 Data files stay where they are, so the frontend, the sync, and every published
@@ -137,6 +175,10 @@ which would cost one reconciliation commit.
 
 To change a column description, edit `columns.yaml`. The same text feeds the
 JSON and the README schema table, so it is written once.
+
+The facts about the archive live in `data/rilasci/releases.json`, written by
+the pipeline for each new month. Edit that file, never the generated items:
+sizes and checksums there are what the catalog publishes.
 
 To change how the data looks on a map, edit the MapLibre style in
 `scripts/catalog/styles/`.

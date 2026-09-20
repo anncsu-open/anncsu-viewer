@@ -46,6 +46,8 @@ See [`scripts/DESIGN.md`](scripts/DESIGN.md) for detailed pipeline documentation
 
 The published data is described by a [Portolan](https://github.com/portolan-sdi/portolan-spec) catalog — STAC metadata covering the columns, the file layout, and the map styles. Browse the live catalog in the [Portolan Browser](https://browser.portolan-sdi.org/#/external/pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/catalog.json). See [`CATALOG.md`](CATALOG.md) to use or maintain it, and [`docs/how-to-portolan.md`](docs/how-to-portolan.md) for the design decisions behind it.
 
+Every monthly release is archived too: the portal keeps only the latest download, so each month's ZIP and a lossless Parquet copy of its CSV are published under `rilasci/` and described as a versioned collection. See [`docs/how-releases-are-handled.md`](docs/how-releases-are-handled.md).
+
 ## Quick start
 
 ```shell

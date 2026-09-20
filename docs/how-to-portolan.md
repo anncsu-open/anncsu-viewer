@@ -53,13 +53,23 @@ data/                                  = https://pub-1e760dc850cb4a5aa5f8afb7771
 │   ├── AGENTS.md                      generated
 │   ├── thumbnail.png                  generated
 │   └── styles/indirizzi.json          copied from source
-└── indirizzi-h3/
-    ├── collection.json
-    ├── README.md
-    ├── AGENTS.md
-    ├── thumbnail.png
-    └── styles/indirizzi-h3.json
+├── indirizzi-h3/
+│   ├── collection.json
+│   ├── README.md
+│   ├── AGENTS.md
+│   ├── thumbnail.png
+│   └── styles/indirizzi-h3.json
+└── rilasci/                           the monthly release archive
+    ├── collection.json                generated
+    ├── README.md, AGENTS.md           generated
+    ├── releases.json                  the index, written by the pipeline
+    └── <date>/<date>.json             one item per release, generated
 ```
+
+The release archive is designed in
+[how-releases-are-handled.md](how-releases-are-handled.md): why a lossless raw
+Parquet rather than the enriched GeoParquet, why the release date and not a
+commit SHA, and why its assets carry the only absolute hrefs in the catalog.
 
 Data files stay where they are. Nothing moves, so the frontend, the rclone sync, and every published URL keep working.
 
