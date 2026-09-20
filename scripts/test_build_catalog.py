@@ -504,11 +504,12 @@ class TestBuildRoot:
     def test_has_no_parent_link(self):
         assert links_by_rel(build_root("2026-09-15T00:00:00Z"), "parent") == []
 
-    def test_links_both_collections_with_titles(self):
+    def test_links_every_collection_with_titles(self):
         children = links_by_rel(build_root("2026-09-15T00:00:00Z"), "child")
         assert {c["href"] for c in children} == {
             "./indirizzi/collection.json",
             "./indirizzi-h3/collection.json",
+            "./rilasci/collection.json",
         }
         for child in children:
             assert child["title"].strip()
@@ -767,6 +768,11 @@ def fixture_data_dir(tmp_path):
     )
     (data / ".last_remote_date").write_text("20260915")
 
+    # The release index only: ZIP and raw Parquet live on R2, never in the
+    # checkout, and the generator reads facts from the index alone.
+    (data / "rilasci").mkdir()
+    write_releases(data / "rilasci" / "releases.json", fake_releases())
+
     build_pmtiles_fixture(
         data / "anncsu-indirizzi.parquet", data / "anncsu-indirizzi.pmtiles"
     )
@@ -832,6 +838,36 @@ def fixture_columns(tmp_path, monkeypatch):
             "cella H3",
             "H3 cell",
             "  derived: true\n  tiles_only: true\n",
+        )
+        # The raw archive documents all 19 CSV columns. The fixture parquet
+        # has four of them, so the other fifteen are raw_only here: in
+        # production only three are, but the flag describes this fixture
+        # truthfully. Keys are quoted for the apostrophe in LOCALITA'.
+        + "".join(
+            column(
+                f'"{name}"',
+                "VARCHAR",
+                f"colonna grezza {name}",
+                f"raw column {name}",
+                "  raw_only: true\n",
+            )
+            for name in (
+                "CODICE_COMUNE",
+                "PROGRESSIVO_NAZIONALE",
+                "CODICE_COMUNALE",
+                "LOCALITA'",
+                "DIZIONE_LINGUA1",
+                "DIZIONE_LINGUA2",
+                "PROGRESSIVO_ACCESSO",
+                "CODICE_COMUNALE_ACCESSO",
+                "ESPONENTE",
+                "SPECIFICITA",
+                "METRICO",
+                "PROGRESSIVO_SNC",
+                "COORD_X_COMUNE",
+                "COORD_Y_COMUNE",
+                "QUOTA",
+            )
         ),
         encoding="utf-8",
     )
@@ -946,7 +982,18 @@ class TestConformance:
         )
 
         result = subprocess.run(
-            [rashid, "check", str(fixture_data_dir), "--schema", "--json", "--all"],
+            [
+                rashid,
+                "check",
+                str(fixture_data_dir),
+                "--schema",
+                # The archive's assets are absolute URLs to R2 and are not in
+                # the checkout; local scope verifies every asset that is.
+                "--data-scope",
+                "local",
+                "--json",
+                "--all",
+            ],
             capture_output=True,
             text=True,
             check=False,
@@ -1090,6 +1137,7 @@ class TestLanguageTrees:
         assert {c["href"] for c in links_by_rel(root, "child")} == {
             "./indirizzi/collection.json",
             "./indirizzi-h3/collection.json",
+            "./rilasci/collection.json",
         }
         assert root["title"] == "ANNCSU addresses"
 
@@ -1542,6 +1590,90 @@ class TestBuildRilasci:
         assert collection["language"]["code"] == "en"
         assert collection["title"] == "ANNCSU monthly releases"
         assert collection["table:columns"][0]["description"] == "x en"
+
+
+class TestLiveCollectionsAreVersioned:
+    @pytest.mark.parametrize("builder", [build_indirizzi, build_indirizzi_h3])
+    def test_version_is_the_current_release_date(self, builder):
+        collection = builder(fake_facts())
+        assert collection["version"] == "2026-09-15"
+        assert VERSION_SCHEMA in collection["stac_extensions"]
+
+    @pytest.mark.parametrize("builder", [build_indirizzi, build_indirizzi_h3])
+    def test_links_the_release_it_derives_from_and_the_history(self, builder):
+        collection = builder(fake_facts())
+        derived = links_by_rel(collection, "derived_from")[0]
+        assert derived["href"] == "../rilasci/2026-09-15/2026-09-15.json"
+        assert derived["type"] == "application/geo+json"
+        history = links_by_rel(collection, "version-history")[0]
+        assert history["href"] == "../rilasci/collection.json"
+        assert history["type"] == "application/json"
+
+    @pytest.mark.parametrize("builder", [build_indirizzi, build_indirizzi_h3])
+    def test_english_links_stay_inside_the_english_tree(self, builder):
+        collection = builder(fake_facts(), lang="en")
+        assert links_by_rel(collection, "derived_from")[0]["href"] == (
+            "../rilasci/2026-09-15/2026-09-15.json"
+        )
+
+    @pytest.mark.parametrize("builder", [build_indirizzi, build_indirizzi_h3])
+    def test_description_states_the_georeferenced_share(self, builder):
+        description = builder(fake_facts())["description"]
+        assert "20.731.065" in description
+        assert "27.415.954" in description
+
+
+class TestRootLinksTheArchive:
+    @pytest.mark.parametrize("lang", ["it", "en"])
+    def test_child_link_to_rilasci(self, lang):
+        root = build_root("2026-09-15T00:00:00Z", lang=lang)
+        children = {c["href"]: c for c in links_by_rel(root, "child")}
+        assert "./rilasci/collection.json" in children
+        assert children["./rilasci/collection.json"]["title"].strip()
+
+
+@pytest.mark.skipif(
+    shutil.which("tippecanoe") is None, reason="tippecanoe not installed"
+)
+class TestArchiveBuild:
+    def test_writes_the_archive_in_both_trees(self, fixture_data_dir, fixture_columns):
+        build(fixture_data_dir)
+        for tree in ("", "en/"):
+            for relative in [
+                "rilasci/collection.json",
+                "rilasci/README.md",
+                "rilasci/AGENTS.md",
+                "rilasci/2026-08-03/2026-08-03.json",
+                "rilasci/2026-09-15/2026-09-15.json",
+            ]:
+                assert (fixture_data_dir / tree / relative).exists(), tree + relative
+
+    def test_readme_lists_every_release_with_its_origin(
+        self, fixture_data_dir, fixture_columns
+    ):
+        build(fixture_data_dir)
+        readme = (fixture_data_dir / "rilasci" / "README.md").read_text()
+        assert "2026-08-03" in readme and "2026-09-15" in readme
+        assert "ricostruito" in readme.lower() and "originale" in readme.lower()
+        assert "$" not in readme, "an unsubstituted placeholder reached the output"
+        english = (fixture_data_dir / "en" / "rilasci" / "README.md").read_text()
+        assert "reconstructed" in english and "original" in english
+        assert "$" not in english
+
+    def test_relative_links_of_items_resolve(self, fixture_data_dir, fixture_columns):
+        import json
+
+        build(fixture_data_dir)
+        item_paths = sorted(fixture_data_dir.rglob("rilasci/*/*.json"))
+        assert len(item_paths) == 4, "two releases in two trees"
+        for item_path in item_paths:
+            item = json.loads(item_path.read_text())
+            assert item["geometry"] is None and "bbox" not in item
+            for link in item["links"]:
+                if link["href"].startswith("http"):
+                    continue
+                target = (item_path.parent / link["href"]).resolve()
+                assert target.exists(), f"{item_path} {link['rel']} -> {link['href']}"
 
 
 if __name__ == "__main__":
