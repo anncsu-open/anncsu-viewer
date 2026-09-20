@@ -52,16 +52,20 @@ jobs:
           PYTHONUNBUFFERED: "1"
         run: uv run scripts/build_catalog.py
 
+      # Local data scope: the release archive's assets are absolute URLs to
+      # R2 and are never in the checkout (.gitignore keeps the ZIPs and raw
+      # Parquet out). Every asset that is in the checkout is still verified
+      # byte for byte. A full pass over the archive is a deliberate local run.
       - name: Validate the catalog
         run: |
           uv run --with 'rashid>=0.1.8,<0.2.0' \
-            rashid check data/ --schema --all
+            rashid check data/ --schema --data-scope local --all
 
       - name: Check for changes
         id: changes
         run: |
           git add data/catalog.json data/README.md data/AGENTS.md \
-            data/indirizzi data/indirizzi-h3 data/en
+            data/indirizzi data/indirizzi-h3 data/rilasci data/en
           if git diff --cached --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
@@ -105,6 +109,12 @@ jobs:
           rclone copy data/AGENTS.md r2:anncsu-data/ -P
           rclone sync data/indirizzi/ r2:anncsu-data/indirizzi/ -P
           rclone sync data/indirizzi-h3/ r2:anncsu-data/indirizzi-h3/ -P
+          # The archive's metadata only: copy with a filter, never sync. The
+          # ZIPs and raw Parquet already on the bucket are not in the checkout
+          # and a sync would delete them. en/rilasci/ is all metadata and is
+          # covered by the en/ sync below.
+          rclone copy data/rilasci/ r2:anncsu-data/rilasci/ \
+            --include "*.json" --include "*.md" -P
           rclone sync data/en/ r2:anncsu-data/en/ -P
 
       - name: Check the published catalog
@@ -113,7 +123,9 @@ jobs:
         run: |
           # Reports on range requests and CORS at the host. A problem here is
           # a bucket configuration issue, not a defect in the metadata just
-          # generated, so it does not fail the run.
+          # generated, so it does not fail the run. The byte checks stay local:
+          # the live probe still reaches the archive's absolute URLs, but
+          # without downloading gigabytes of ZIPs and raw Parquet.
           uv run --with 'rashid>=0.1.8,<0.2.0' \
-            rashid check data/ --live --all \
+            rashid check data/ --live --data-scope local --all \
             --live-base-url https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev
