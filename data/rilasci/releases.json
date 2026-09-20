@@ -1,0 +1,225 @@
+{
+  "releases": [
+    {
+      "date": "2025-09-03",
+      "origin": "reconstructed",
+      "note": "Ricostruzione dal parquet consolidato di mfortini/diff_ANNCSU; metodo verificato byte per byte sul rilascio 2026-09-15.",
+      "zip": {
+        "name": "indirizzarioItalia_20250903.zip",
+        "size": 172392855,
+        "sha256": "3904935882f3000176598e65202df4b5f5b5f736348a7fa23d06cb400a36b0e8"
+      },
+      "parquet": {
+        "name": "INDIR_ITA_20250903.parquet",
+        "size": 109903198,
+        "sha256": "aada3cdd43502b53452b6428c6a4ac075c0d17ea28ffc2d1a58c1b8e386b1dbf",
+        "rows": 27950169
+      },
+      "archived": "2026-09-20T22:39:04Z"
+    },
+    {
+      "date": "2025-10-10",
+      "origin": "reconstructed",
+      "note": "Ricostruzione dal parquet consolidato di mfortini/diff_ANNCSU; metodo verificato byte per byte sul rilascio 2026-09-15.",
+      "zip": {
+        "name": "indirizzarioItalia_20251010.zip",
+        "size": 173094013,
+        "sha256": "d7eceac2bfb354105c6aef761231962f6d825138867d7b12d9e089a3e85ee16e"
+      },
+      "parquet": {
+        "name": "INDIR_ITA_20251010.parquet",
+        "size": 110942044,
+        "sha256": "46e8e93c6daba2c3380b62ac3a11b3b1120e05c3c6aa03374466f32487ffaad8",
+        "rows": 27949296
+      },
+      "archived": "2026-09-20T22:39:04Z"
+    },
+    {
+      "date": "2025-11-04",
+      "origin": "reconstructed",
+      "note": "Ricostruzione dal parquet consolidato di mfortini/diff_ANNCSU; metodo verificato byte per byte sul rilascio 2026-09-15.",
+      "zip": {
+        "name": "indirizzarioItalia_20251104.zip",
+        "size": 174832924,
+        "sha256": "35a30d00af928179b7b291bbe792c25ca2634b221d1331f8f6e5cdad17884488"
+      },
+      "parquet": {
+        "name": "INDIR_ITA_20251104.parquet",
+        "size": 113122644,
+        "sha256": "b4ba16f9a15f2e5d7aa7948e70d414e68b1963e3dddcbbeb1e0c0ccf1f5c6c68",
+        "rows": 27956679
+      },
+      "archived": "2026-09-20T22:39:04Z"
+    },
+    {
+      "date": "2025-12-02",
+      "origin": "reconstructed",
+      "note": "Ricostruzione dal parquet consolidato di mfortini/diff_ANNCSU; metodo verificato byte per byte sul rilascio 2026-09-15.",
+      "zip": {
+        "name": "indirizzarioItalia_20251202.zip",
+        "size": 185677254,
+        "sha256": "36f4955c8ee9e8503611d4bf94ba19e312484078e96bc76e44d3ae5ff58bac76"
+      },
+      "parquet": {
+        "name": "INDIR_ITA_20251202.parquet",
+        "size": 128575762,
+        "sha256": "bf5d550315b576a7fcb9e0f2b63e1aef619601ce8df73e43ec76987a83682005",
+        "rows": 27964607
+      },
+      "archived": "2026-09-20T22:39:04Z"
+    },
+    {
+      "date": "2026-01-14",
+      "origin": "reconstructed",
+      "note": "Ricostruzione dal parquet consolidato di mfortini/diff_ANNCSU; metodo verificato byte per byte sul rilascio 2026-09-15.",
+      "zip": {
+        "name": "indirizzarioItalia_20260114.zip",
+        "size": 215361572,
+        "sha256": "36019d3b03ac7ff6cf4ead6da2cba5e195e9f3e63f3aeda426a1e228ce231043"
+      },
+      "parquet": {
+        "name": "INDIR_ITA_20260114.parquet",
+        "size": 160396456,
+        "sha256": "8da5218d229a8fb03150dc7e8e80dc0623c0db992cbfd04276406225f5ee2675",
+        "rows": 27862795
+      },
+      "archived": "2026-09-20T22:39:04Z"
+    },
+    {
+      "date": "2026-02-06",
+      "origin": "reconstructed",
+      "note": "Ricostruzione dal parquet consolidato di mfortini/diff_ANNCSU; metodo verificato byte per byte sul rilascio 2026-09-15.",
+      "zip": {
+        "name": "indirizzarioItalia_20260206.zip",
+        "size": 232065953,
+        "sha256": "30c22ed511b8c365d84838a31363f4d31d00a046b996eb4aa1c5c81328b73cb2"
+      },
+      "parquet": {
+        "name": "INDIR_ITA_20260206.parquet",
+        "size": 172113788,
+        "sha256": "4526d897d39623945098e62b909ec1b070051acfddb3a3b3d4020eb146b96670",
+        "rows": 27843626
+      },
+      "archived": "2026-09-20T22:39:04Z"
+    },
+    {
+      "date": "2026-03-06",
+      "origin": "reconstructed",
+      "note": "Ricostruzione dal parquet consolidato di mfortini/diff_ANNCSU; metodo verificato byte per byte sul rilascio 2026-09-15.",
+      "zip": {
+        "name": "indirizzarioItalia_20260306.zip",
+        "size": 276016803,
+        "sha256": "c80852efe2b037c45a7702c0243317931259a889d69adfb01775f352e032f2f0"
+      },
+      "parquet": {
+        "name": "INDIR_ITA_20260306.parquet",
+        "size": 209917466,
+        "sha256": "291456f19c7636853e7df4c06d36dbd69b38daeafb4111b0f86c2a43fe36b29a",
+        "rows": 27569011
+      },
+      "archived": "2026-09-20T22:39:04Z"
+    },
+    {
+      "date": "2026-04-06",
+      "origin": "reconstructed",
+      "note": "Ricostruzione dal parquet consolidato di mfortini/diff_ANNCSU; metodo verificato byte per byte sul rilascio 2026-09-15.",
+      "zip": {
+        "name": "indirizzarioItalia_20260406.zip",
+        "size": 309327409,
+        "sha256": "f49b4f82cfcb863741767f354aa24a07839e972908f4e8f84a8d9972a52ab9c3"
+      },
+      "parquet": {
+        "name": "INDIR_ITA_20260406.parquet",
+        "size": 242949786,
+        "sha256": "d4cfc6b3fd3a33aeb4149447664fff645caf3d4605834c01b96c7afe60632de7",
+        "rows": 27458420
+      },
+      "archived": "2026-09-20T22:39:04Z"
+    },
+    {
+      "date": "2026-05-04",
+      "origin": "reconstructed",
+      "note": "Ricostruzione dal parquet consolidato di mfortini/diff_ANNCSU; metodo verificato byte per byte sul rilascio 2026-09-15.",
+      "zip": {
+        "name": "indirizzarioItalia_20260504.zip",
+        "size": 321604367,
+        "sha256": "b1838119fbcf93e04fb5d81e1d03284be7162ea4d9cccd8faa0485c41f63387d"
+      },
+      "parquet": {
+        "name": "INDIR_ITA_20260504.parquet",
+        "size": 255192106,
+        "sha256": "d036cf2fff94ae4e810f96f3bf3115c75cb7424c84f4f7ed5edd4d9678b50dc6",
+        "rows": 27416925
+      },
+      "archived": "2026-09-20T22:39:04Z"
+    },
+    {
+      "date": "2026-06-02",
+      "origin": "reconstructed",
+      "note": "Ricostruzione dal parquet consolidato di mfortini/diff_ANNCSU; metodo verificato byte per byte sul rilascio 2026-09-15.",
+      "zip": {
+        "name": "indirizzarioItalia_20260602.zip",
+        "size": 323693215,
+        "sha256": "d1ef71d5b1099ac66cf7638f7547d1c3bc2957462930a1f53fe8ceee8804d9c1"
+      },
+      "parquet": {
+        "name": "INDIR_ITA_20260602.parquet",
+        "size": 257471860,
+        "sha256": "feed332c0ab851947f29a99ec3a04f8de7dd0a7dff3b1a6c2a22e9c140796253",
+        "rows": 27418271
+      },
+      "archived": "2026-09-20T22:39:04Z"
+    },
+    {
+      "date": "2026-07-03",
+      "origin": "reconstructed",
+      "note": "Ricostruzione dal parquet consolidato di mfortini/diff_ANNCSU; metodo verificato byte per byte sul rilascio 2026-09-15.",
+      "zip": {
+        "name": "indirizzarioItalia_20260703.zip",
+        "size": 324395610,
+        "sha256": "f07d0a0505fc1f0cf683d6e5ec29ba75156167302b3ad81207f23d504ffc7f04"
+      },
+      "parquet": {
+        "name": "INDIR_ITA_20260703.parquet",
+        "size": 258125201,
+        "sha256": "d32acfbc364916116d896671097396ba775c807f5930d901cfbf152e2759bb06",
+        "rows": 27405384
+      },
+      "archived": "2026-09-20T22:39:04Z"
+    },
+    {
+      "date": "2026-08-03",
+      "origin": "reconstructed",
+      "note": "Ricostruzione dal parquet consolidato di mfortini/diff_ANNCSU; metodo verificato byte per byte sul rilascio 2026-09-15.",
+      "zip": {
+        "name": "indirizzarioItalia_20260803.zip",
+        "size": 324696163,
+        "sha256": "38e7cb1c34ebc693d7e39f9362155792e462aa8549bbb1469c25f9c92f3f2a1c"
+      },
+      "parquet": {
+        "name": "INDIR_ITA_20260803.parquet",
+        "size": 258513226,
+        "sha256": "2174ae4cbce7f1ae9ede247ae91dbbe15c832f1f51eda3d2faba254b425af0a6",
+        "rows": 27405709
+      },
+      "archived": "2026-09-20T22:39:04Z"
+    },
+    {
+      "date": "2026-09-15",
+      "origin": "original",
+      "note": "Scarico dal portale ANNCSU del 2026-09-20.",
+      "zip": {
+        "name": "indirizzarioItalia_20260915.zip",
+        "size": 336089695,
+        "sha256": "5d1632be13ae951b215649a28b043a3da37c15efc8018e29ac1012ee1661966d"
+      },
+      "parquet": {
+        "name": "INDIR_ITA_20260915.parquet",
+        "size": 258893261,
+        "sha256": "b7023d24df1229cf2d2cfa656765fe24fa5762cced33537d81bc0cdfb3f3e868",
+        "rows": 27415954
+      },
+      "archived": "2026-09-20T22:39:04Z"
+    }
+  ]
+}
