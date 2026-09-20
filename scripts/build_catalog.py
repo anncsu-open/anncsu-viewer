@@ -542,6 +542,7 @@ COLLECTION_EXTENSIONS = [
     PROJECTION_SCHEMA,
     WEB_MAP_LINKS_SCHEMA,
     LANGUAGE_SCHEMA,
+    VERSION_SCHEMA,
 ]
 
 MONTHS = {
@@ -684,6 +685,11 @@ TEXTS = {
         "release_zip": "Archivio ZIP del rilascio",
         "release_parquet": "CSV del rilascio in Parquet, senza perdita",
         "keywords_rilasci": ["rilasci", "storico", "archivio"],
+        "georeferenced_sentence": (
+            "Questa collection contiene i $with_coords accessi georeferenziati "
+            "sui $total del rilascio del $date_human: gli accessi privi di "
+            "coordinate sono nell'archivio dei rilasci."
+        ),
         "stats_header": ("Statistica", "Valore"),
         "stats_total": "Accessi totali",
         "stats_oob": "Fuori dal confine comunale, oltre 110 m",
@@ -781,6 +787,11 @@ TEXTS = {
         "release_zip": "ZIP archive of the release",
         "release_parquet": "CSV of the release as Parquet, lossless",
         "keywords_rilasci": ["releases", "history", "archive"],
+        "georeferenced_sentence": (
+            "This collection holds the $with_coords georeferenced addresses out "
+            "of the $total in the $date_human release: addresses without "
+            "coordinates are in the release archive."
+        ),
         "stats_header": ("Statistic", "Value"),
         "stats_total": "Total addresses",
         "stats_oob": "Outside the comune boundary, beyond 110 m",
@@ -911,6 +922,42 @@ def statistics_sentence(facts: dict, lang: str) -> str:
     )
 
 
+def georeferenced_sentence(facts: dict, lang: str) -> str:
+    """How many of the release's addresses the enriched data keeps.
+
+    The enriched GeoParquet drops rows without coordinates, so a live
+    collection describes fewer addresses than the release it derives from.
+    Saying so, with both counts, is what keeps the version link honest.
+    """
+    current = facts["releases"][-1]
+    return Template(TEXTS[lang]["georeferenced_sentence"]).substitute(
+        with_coords=human_count(facts["row_count"], lang),
+        total=human_count(current["parquet"]["rows"], lang),
+        date_human=human_date(_release_datetime(current), lang),
+    )
+
+
+def _version_links(lang: str, facts: dict) -> list[dict]:
+    """derived_from the current release item, version-history the archive.
+
+    Both trees have the same shape, so the hrefs are the same in every
+    language: a live collection links the release item of its own tree.
+    """
+    current = facts["releases"][-1]["date"]
+    return [
+        {
+            "rel": "derived_from",
+            "href": f"../rilasci/{current}/{current}.json",
+            "type": "application/geo+json",
+        },
+        {
+            "rel": "version-history",
+            "href": "../rilasci/collection.json",
+            "type": "application/json",
+        },
+    ]
+
+
 def statistics_table(facts: dict, lang: str = SOURCE_LANG) -> str:
     """Render the global statistics as a Markdown table."""
     text = TEXTS[lang]
@@ -932,6 +979,38 @@ def statistics_table(facts: dict, lang: str = SOURCE_LANG) -> str:
         rows.append(
             f"| {name} | {human_count(count, lang)} "
             f"({human_percent(count, total, lang)}) |"
+        )
+    return "\n".join(rows)
+
+
+def human_size(size: int, lang: str = SOURCE_LANG) -> str:
+    """Bytes as MB with one decimal, language-formatted."""
+    text = f"{size / 1_000_000:.1f} MB"
+    return text if lang == "en" else text.replace(".", ",")
+
+
+def releases_table(facts: dict, lang: str = SOURCE_LANG) -> str:
+    """One row per release, newest first, with origin and file sizes."""
+    it = lang == "it"
+    header = (
+        "| Rilascio | Origine | Accessi | ZIP | Parquet |"
+        if it
+        else "| Release | Origin | Addresses | ZIP | Parquet |"
+    )
+    origin_names = {
+        "original": "originale" if it else "original",
+        "reconstructed": "ricostruito" if it else "reconstructed",
+    }
+    rows = [header, "|---|---|---|---|---|"]
+    for r in reversed(facts["releases"]):
+        date = r["date"]
+        rows.append(
+            f"| [{date}](./{date}/{date}.json) | {origin_names[r['origin']]} | "
+            f"{human_count(r['parquet']['rows'], lang)} | "
+            f"[{human_size(r['zip']['size'], lang)}]"
+            f"({release_asset_url(r, 'zip')}) | "
+            f"[{human_size(r['parquet']['size'], lang)}]"
+            f"({release_asset_url(r, 'parquet')}) |"
         )
     return "\n".join(rows)
 
@@ -1132,6 +1211,12 @@ def build_root(updated: str, lang: str = SOURCE_LANG) -> dict:
                 "type": "application/json",
                 "title": text["h3_title"],
             },
+            {
+                "rel": "child",
+                "href": "./rilasci/collection.json",
+                "type": "application/json",
+                "title": text["rilasci_title"],
+            },
             *_tree_alternates(lang, 0, "catalog.json"),
             _viewer_link(lang),
             {
@@ -1205,6 +1290,7 @@ def _collection_links(facts: dict, lang: str, collection_id: str) -> list[dict]:
         {"rel": "root", "href": "../catalog.json", "type": "application/json"},
         {"rel": "parent", "href": "../catalog.json", "type": "application/json"},
         _pmtiles_link(facts, lang),
+        *_version_links(lang, facts),
         *_tree_alternates(lang, 1, f"{collection_id}/collection.json"),
         _viewer_link(lang),
         *_source_links(lang),
@@ -1231,6 +1317,8 @@ def build_indirizzi(facts: dict, lang: str = SOURCE_LANG) -> dict:
         "title": text["indirizzi_title"],
         "description": Template(text["indirizzi_description"]).substitute(
             statistics=statistics_sentence(facts, lang)
+            + " "
+            + georeferenced_sentence(facts, lang)
         ),
         "license": LICENSE_ID,
         "keywords": list(text["keywords"]),
@@ -1238,6 +1326,7 @@ def build_indirizzi(facts: dict, lang: str = SOURCE_LANG) -> dict:
         "extent": _extent(facts),
         **_language_fields(lang),
         "updated": facts["updated"],
+        "version": facts["releases"][-1]["date"],
         "table:columns": _columns_for(facts, "table_columns", lang),
         "table:row_count": facts["row_count"],
         "table:primary_geometry": "geometry",
@@ -1289,7 +1378,9 @@ def build_indirizzi_h3(facts: dict, lang: str = SOURCE_LANG) -> dict:
             tile_count=human_count(facts["tile_count"], lang),
             resolution=H3_RESOLUTION,
             glob=glob,
-            statistics=statistics_sentence(facts, lang),
+            statistics=statistics_sentence(facts, lang)
+            + " "
+            + georeferenced_sentence(facts, lang),
         ),
         "license": LICENSE_ID,
         "keywords": [*text["keywords"], *text["keywords_h3"]],
@@ -1297,6 +1388,7 @@ def build_indirizzi_h3(facts: dict, lang: str = SOURCE_LANG) -> dict:
         "extent": _extent(facts),
         **_language_fields(lang),
         "updated": facts["updated"],
+        "version": facts["releases"][-1]["date"],
         "table:columns": _columns_for(facts, "tile_table_columns", lang),
         "table:row_count": facts["row_count"],
         "table:primary_geometry": "geometry",
@@ -1586,6 +1678,7 @@ def collect_facts(data_dir: Path) -> dict:
         "tile_count": inventory["file_count"],
         "tile_key": inventory["key"],
         "statistics": statistics,
+        "releases": load_releases(data_dir / "rilasci" / "releases.json"),
     }
     for lang in ALL_LANGS:
         suffix = "" if lang == SOURCE_LANG else f"_{lang}"
@@ -1593,6 +1686,7 @@ def collect_facts(data_dir: Path) -> dict:
         facts[f"tile_table_columns{suffix}"] = table_columns(
             sample_tile, COLUMNS_FILE, lang
         )
+        facts[f"raw_table_columns{suffix}"] = raw_table_columns(COLUMNS_FILE, lang)
     return facts
 
 
@@ -1675,6 +1769,40 @@ def _write_tree(data_dir: Path, facts: dict, lang: str) -> None:
                 template_name("collection.AGENTS.md", lang),
                 {"id": collection_id, "usage": usage},
             ),
+        )
+
+    # The release archive: a tabular collection and one item per release,
+    # built from the index alone. Its assets are absolute URLs to R2.
+    rilasci = tree / "rilasci"
+    document = build_rilasci(facts, lang)
+    write_json(rilasci / "collection.json", document)
+    last = facts["releases"][-1]
+    write_text(
+        rilasci / "README.md",
+        render_template(
+            template_name("rilasci.README.md", lang),
+            {
+                **shared,
+                "title": document["title"],
+                "description": document["description"],
+                "releases_table": releases_table(facts, lang),
+                "schema_table": schema_table(
+                    _columns_for(facts, "raw_table_columns", lang), lang
+                ),
+                "public_base": PUBLIC_BASE,
+                "last_date": last["date"],
+                "last_ymd": last["date"].replace("-", ""),
+            },
+        ),
+    )
+    write_text(
+        rilasci / "AGENTS.md",
+        render_template(template_name("rilasci.AGENTS.md", lang), {}),
+    )
+    for release in facts["releases"]:
+        write_json(
+            rilasci / release["date"] / f"{release['date']}.json",
+            build_release_item(release, facts["releases"], facts, lang),
         )
 
 
