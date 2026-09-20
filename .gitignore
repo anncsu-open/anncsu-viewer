@@ -34,3 +34,13 @@ coverage
 
 # Superpowers session artifacts
 docs/superpowers/
+
+# Python bytecode from running the scripts' tests
+__pycache__/
+
+# Release archive: ZIPs and raw Parquet live on R2 only. The LFS rules in
+# .gitattributes do not reach subdirectories, so without this a raw Parquet
+# would land in git as a plain blob.
+data/rilasci/**/*.zip
+data/rilasci/**/*.parquet
+data/rilasci/**/*.csv

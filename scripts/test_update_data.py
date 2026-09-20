@@ -36,13 +36,18 @@ from update_data import (
     _clean_tiles_dir,
     _validate_row_count,
     _validate_tile_row_count,
+    append_release,
+    archive_release,
     convert_to_pmtiles,
     csv_to_parquet,
+    csv_to_raw_parquet,
     enhance_parquet,
     generate_comuni_h3,
     get_remote_date,
     is_update_needed,
     partition_h3_tiles,
+    release_entry,
+    sha256_of,
 )
 
 
@@ -1045,3 +1050,186 @@ class TestConvertToPmtiles:
         assert layer_ids == ["addresses"]
         fields = set(metadata["vector_layers"][0]["fields"])
         assert {"ODONIMO", "CIVICO", "CODICE_ISTAT", "NOME_COMUNE"} <= fields
+
+
+# A raw ANNCSU CSV in miniature: the portal's 19 columns, `;` separated, no
+# quoting, decimal commas, empty fields for NULL. The rows exercise the cases
+# a lossy read would damage: quotes inside an odonym, a QUOTA without the
+# leading zero, empty trailing fields.
+RAW_HEADER = (
+    "CODICE_COMUNE;CODICE_ISTAT;PROGRESSIVO_NAZIONALE;CODICE_COMUNALE;ODONIMO;"
+    "LOCALITA';DIZIONE_LINGUA1;DIZIONE_LINGUA2;PROGRESSIVO_ACCESSO;"
+    "CODICE_COMUNALE_ACCESSO;CIVICO;ESPONENTE;SPECIFICITA;METRICO;PROGRESSIVO_SNC;"
+    "COORD_X_COMUNE;COORD_Y_COMUNE;QUOTA;METODO"
+)
+RAW_ROWS = [
+    'C556;030023;361273;;VIA SILVIO MARCUZZI "MONTES";;;;20107845;;1;1;;;;;;;',
+    "A008;068001;375741;27;CONTRADA COLLE COLUCCI;;;;27989210;;1;;;;;"
+    "13,9961659;42,219746;,5;4",
+    "H501;058091;1;;VIA ROMA;;;;3;;10;A;T;;;12,49;41,9;-,055;1",
+]
+
+
+def write_raw_csv(path: Path, rows=None) -> None:
+    path.write_text(
+        "\n".join([RAW_HEADER, *(rows or RAW_ROWS)]) + "\n", encoding="utf-8"
+    )
+
+
+class TestCsvToRawParquet:
+    def test_keeps_every_row_and_every_column_as_text(self, tmp_path):
+        import duckdb
+
+        csv_path = tmp_path / "INDIR_ITA_20260915.csv"
+        write_raw_csv(csv_path)
+        parquet = tmp_path / "INDIR_ITA_20260915.parquet"
+
+        rows = csv_to_raw_parquet(csv_path, parquet)
+
+        assert rows == 3
+        con = duckdb.connect()
+        schema = con.execute(
+            f"DESCRIBE SELECT * FROM read_parquet('{parquet}')"
+        ).fetchall()
+        assert [name for name, *_ in schema] == RAW_HEADER.split(";")
+        assert {ctype for _, ctype, *_ in schema} == {"VARCHAR"}
+
+    def test_preserves_quotes_decimal_commas_and_nulls(self, tmp_path):
+        import duckdb
+
+        csv_path = tmp_path / "INDIR_ITA_20260915.csv"
+        write_raw_csv(csv_path)
+        parquet = tmp_path / "INDIR_ITA_20260915.parquet"
+        csv_to_raw_parquet(csv_path, parquet)
+
+        con = duckdb.connect()
+        odonimo = con.execute(
+            f"SELECT ODONIMO FROM read_parquet('{parquet}') "
+            f"WHERE CODICE_COMUNE = 'C556'"
+        ).fetchone()[0]
+        quota, localita = con.execute(
+            f"SELECT QUOTA, \"LOCALITA'\" FROM read_parquet('{parquet}') "
+            f"WHERE CODICE_COMUNE = 'H501'"
+        ).fetchone()
+
+        assert odonimo == 'VIA SILVIO MARCUZZI "MONTES"'
+        assert quota == "-,055"
+        assert localita is None
+
+    def test_output_order_does_not_depend_on_csv_order(self, tmp_path):
+        a = tmp_path / "a.csv"
+        b = tmp_path / "b.csv"
+        write_raw_csv(a, RAW_ROWS)
+        write_raw_csv(b, list(reversed(RAW_ROWS)))
+        pa = tmp_path / "a.parquet"
+        pb = tmp_path / "b.parquet"
+
+        csv_to_raw_parquet(a, pa)
+        csv_to_raw_parquet(b, pb)
+
+        assert pa.read_bytes() == pb.read_bytes()
+
+
+class TestReleaseIndex:
+    def test_entry_records_facts_of_both_files(self, tmp_path):
+        zip_path = tmp_path / "indirizzarioItalia_20260915.zip"
+        zip_path.write_bytes(b"zip")
+        parquet = tmp_path / "INDIR_ITA_20260915.parquet"
+        parquet.write_bytes(b"parquet")
+
+        entry = release_entry(
+            "2026-09-15",
+            zip_path,
+            parquet,
+            3,
+            "original",
+            "Scarico dal portale.",
+            "2026-09-20T10:00:00Z",
+        )
+
+        assert entry["date"] == "2026-09-15"
+        assert entry["origin"] == "original"
+        assert entry["zip"] == {
+            "name": zip_path.name,
+            "size": 3,
+            "sha256": sha256_of(zip_path),
+        }
+        assert entry["parquet"]["rows"] == 3
+        assert entry["archived"] == "2026-09-20T10:00:00Z"
+
+    def test_sha256_is_plain_hex(self, tmp_path):
+        import hashlib
+
+        target = tmp_path / "f"
+        target.write_bytes(b"portolan")
+        assert sha256_of(target) == hashlib.sha256(b"portolan").hexdigest()
+
+    def test_append_keeps_the_index_sorted_and_replaces_a_same_date_entry(
+        self, tmp_path
+    ):
+        import json
+
+        index = tmp_path / "releases.json"
+        first = {
+            "date": "2026-09-15",
+            "origin": "original",
+            "note": "",
+            "zip": {},
+            "parquet": {},
+            "archived": "x",
+        }
+        older = {
+            "date": "2026-08-03",
+            "origin": "reconstructed",
+            "note": "",
+            "zip": {},
+            "parquet": {},
+            "archived": "x",
+        }
+        replacement = dict(first, note="rifatto")
+
+        append_release(index, first)
+        append_release(index, older)
+        append_release(index, replacement)
+
+        releases = json.loads(index.read_text())["releases"]
+        assert [r["date"] for r in releases] == ["2026-08-03", "2026-09-15"]
+        assert releases[1]["note"] == "rifatto"
+
+    def test_append_rejects_an_unknown_origin(self, tmp_path):
+        with pytest.raises(ValueError, match="origin"):
+            append_release(
+                tmp_path / "releases.json", {"date": "2026-09-15", "origin": "maybe"}
+            )
+
+
+class TestArchiveRelease:
+    def test_writes_zip_parquet_and_index_entry(self, tmp_path, monkeypatch):
+        import io
+        import json
+        import zipfile
+
+        monkeypatch.setattr(update_data, "RELEASES_DIR", tmp_path / "rilasci")
+        monkeypatch.setattr(
+            update_data, "RELEASES_FILE", tmp_path / "rilasci" / "releases.json"
+        )
+        csv_path = tmp_path / "INDIR_ITA_20260915.csv"
+        write_raw_csv(csv_path)
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w") as zf:
+            zf.write(csv_path, arcname=csv_path.name)
+
+        release_dir = archive_release(
+            buffer.getvalue(), csv_path, datetime(2026, 9, 15, tzinfo=timezone.utc)
+        )
+
+        assert release_dir == tmp_path / "rilasci" / "2026-09-15"
+        zip_path = release_dir / "indirizzarioItalia_20260915.zip"
+        assert zip_path.read_bytes() == buffer.getvalue()
+        assert (release_dir / "INDIR_ITA_20260915.parquet").exists()
+        index = json.loads((tmp_path / "rilasci" / "releases.json").read_text())
+        entry = index["releases"][0]
+        assert entry["date"] == "2026-09-15"
+        assert entry["origin"] == "original"
+        assert entry["parquet"]["rows"] == 3
+        assert entry["archived"].endswith("Z")
