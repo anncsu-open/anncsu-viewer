@@ -136,3 +136,8 @@ jobs:
           rclone copy data/comuni-h3.json r2:anncsu-data/ -P
           # Sync tiles directory (removes orphaned H3 cells)
           rclone sync data/tiles/ r2:anncsu-data/tiles/ --transfers=32 --checkers=32 -P
+          # This month's release: the ZIP as downloaded and the raw Parquet,
+          # into rilasci/<date>/. copy, never sync: the checkout holds only
+          # this month's files, a sync would delete every earlier release.
+          rclone copy data/rilasci/ r2:anncsu-data/rilasci/ \
+            --include "*/*.zip" --include "*/*.parquet" -P
