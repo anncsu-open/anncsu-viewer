@@ -28,6 +28,7 @@ from build_catalog import (
     PARTITION_SCHEMA,
     PORTOLAN_SCHEMA,
     PUBLIC_BASE,
+    RAW_COLUMNS,
     VIEWER_URL,
     build,
     build_indirizzi,
@@ -41,8 +42,10 @@ from build_catalog import (
     human_date,
     human_percent,
     load_columns,
+    load_releases,
     multihash_sha256,
     providers,
+    raw_table_columns,
     read_parquet_columns,
     render_template,
     render_thumbnail,
@@ -406,6 +409,53 @@ def fake_facts():
 
 def links_by_rel(document, rel):
     return [link for link in document["links"] if link["rel"] == rel]
+
+
+def fake_releases():
+    """Two releases shaped like releases.json entries."""
+    return [
+        {
+            "date": "2026-08-03",
+            "origin": "reconstructed",
+            "note": "Ricostruzione da diff_ANNCSU.",
+            "zip": {
+                "name": "indirizzarioItalia_20260803.zip",
+                "size": 324_000_000,
+                "sha256": "a" * 64,
+            },
+            "parquet": {
+                "name": "INDIR_ITA_20260803.parquet",
+                "size": 310_000_000,
+                "sha256": "b" * 64,
+                "rows": 27_400_000,
+            },
+            "archived": "2026-09-20T10:00:00Z",
+        },
+        {
+            "date": "2026-09-15",
+            "origin": "original",
+            "note": "Scarico dal portale ANNCSU del 2026-09-19.",
+            "zip": {
+                "name": "indirizzarioItalia_20260915.zip",
+                "size": 336_123_456,
+                "sha256": "c" * 64,
+            },
+            "parquet": {
+                "name": "INDIR_ITA_20260915.parquet",
+                "size": 320_000_000,
+                "sha256": "d" * 64,
+                "rows": 27_415_954,
+            },
+            "archived": "2026-09-20T10:00:00Z",
+        },
+    ]
+
+
+def write_releases(path, releases):
+    import json
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"releases": releases}, indent=2), encoding="utf-8")
 
 
 class TestProviders:
@@ -1259,6 +1309,76 @@ class TestDataUpdatedInGit:
             "HEAD's date is not when the parquet changed"
         )
         assert result == "2026-09-15T00:00:00Z"
+
+
+class TestLoadReleases:
+    def test_returns_entries_sorted_by_date(self, tmp_path):
+        path = tmp_path / "releases.json"
+        write_releases(path, list(reversed(fake_releases())))
+
+        releases = load_releases(path)
+
+        assert [r["date"] for r in releases] == ["2026-08-03", "2026-09-15"]
+
+    def test_rejects_a_duplicate_date(self, tmp_path):
+        path = tmp_path / "releases.json"
+        write_releases(path, [fake_releases()[0], fake_releases()[0]])
+
+        with pytest.raises(SystemExit, match="2026-08-03"):
+            load_releases(path)
+
+    def test_rejects_an_unknown_origin(self, tmp_path):
+        bad = fake_releases()[0]
+        bad["origin"] = "guessed"
+        path = tmp_path / "releases.json"
+        write_releases(path, [bad])
+
+        with pytest.raises(SystemExit, match="origin"):
+            load_releases(path)
+
+    def test_rejects_a_missing_field(self, tmp_path):
+        bad = fake_releases()[0]
+        del bad["parquet"]["rows"]
+        path = tmp_path / "releases.json"
+        write_releases(path, [bad])
+
+        with pytest.raises(SystemExit, match="rows"):
+            load_releases(path)
+
+    def test_fails_loudly_when_the_index_is_missing(self, tmp_path):
+        with pytest.raises(SystemExit, match="releases.json"):
+            load_releases(tmp_path / "releases.json")
+
+
+class TestRawTableColumns:
+    def test_lists_the_nineteen_csv_columns_in_order_as_varchar(self):
+        columns = raw_table_columns(COLUMNS_YAML)
+
+        assert [c["name"] for c in columns] == RAW_COLUMNS
+        assert len(columns) == 19
+        assert {c["type"] for c in columns} == {"varchar"}
+        assert all(c["description"].strip() for c in columns)
+
+    def test_uses_the_english_descriptions_when_asked(self):
+        columns = raw_table_columns(COLUMNS_YAML, lang="en")
+        by_name = {c["name"]: c["description"] for c in columns}
+        assert by_name["LOCALITA'"].startswith("Locality name")
+
+    def test_raw_only_columns_stay_out_of_the_enriched_schema_check(self, tmp_path):
+        parquet = tmp_path / "in.parquet"
+        write_parquet(parquet, "'x' AS CODICE_ISTAT")
+        yaml_path = tmp_path / "columns.yaml"
+        yaml_path.write_text(
+            "CODICE_ISTAT:\n  type: VARCHAR\n"
+            "  description: codice Istat\n  description_en: Istat code\n"
+            "COORD_X_COMUNE:\n  type: VARCHAR\n  raw_only: true\n"
+            "  description: longitudine testo\n  description_en: longitude text\n",
+            encoding="utf-8",
+        )
+
+        result = table_columns(parquet, yaml_path)
+
+        assert [c["name"] for c in result] == ["CODICE_ISTAT"]
 
 
 if __name__ == "__main__":

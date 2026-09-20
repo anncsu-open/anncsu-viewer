@@ -4,7 +4,9 @@
 # documentation:
 #   https://www.anncsu.gov.it/.allegati/metadata_indirizzario.json
 # Columns marked `derived: true` are added by scripts/update_data.py and are
-# not part of the upstream CSV.
+# not part of the upstream CSV. Columns marked `raw_only: true` exist in the
+# upstream CSV and in the raw archive Parquet but not in the enriched
+# GeoParquet, which replaces or drops them.
 #
 # `type` is the DuckDB type the column is expected to have. build_catalog.py
 # fails when it disagrees with the real parquet schema, and when a column lacks
@@ -278,3 +280,39 @@ h3_cell:
     Hexadecimal identifier of the resolution 5 H3 cell containing the
     address. Present only in the partitioned files, where it matches the
     directory and file name.
+
+"LOCALITA'":
+  type: VARCHAR
+  raw_only: true
+  description: >-
+    Denominazione della località, ove il Comune la registra. Presente solo nel
+    CSV originale e nel parquet grezzo dell'archivio: il GeoParquet
+    arricchito non la riporta.
+  description_en: >-
+    Locality name, where the comune records one. Present only in the original
+    CSV and in the raw archive Parquet: the enriched GeoParquet does not carry
+    it.
+
+COORD_X_COMUNE:
+  type: VARCHAR
+  raw_only: true
+  description: >-
+    Longitudine dell'accesso come la scrive il portale: gradi decimali con la
+    virgola come separatore, in ETRF2000. Nel GeoParquet arricchito diventa la
+    colonna longitude, numerica.
+  description_en: >-
+    Longitude of the access as the portal writes it: decimal degrees with a
+    comma as decimal separator, in ETRF2000. The enriched GeoParquet turns it
+    into the numeric longitude column.
+
+COORD_Y_COMUNE:
+  type: VARCHAR
+  raw_only: true
+  description: >-
+    Latitudine dell'accesso come la scrive il portale: gradi decimali con la
+    virgola come separatore, in ETRF2000. Nel GeoParquet arricchito diventa la
+    colonna latitude, numerica.
+  description_en: >-
+    Latitude of the access as the portal writes it: decimal degrees with a
+    comma as decimal separator, in ETRF2000. The enriched GeoParquet turns it
+    into the numeric latitude column.

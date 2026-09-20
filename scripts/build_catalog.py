@@ -47,6 +47,33 @@ PMTILES_FILE = DATA_DIR / "anncsu-indirizzi.pmtiles"
 COMUNI_H3_FILE = DATA_DIR / "comuni-h3.json"
 TILES_DIR = DATA_DIR / "tiles"
 MARKER_FILE = DATA_DIR / ".last_remote_date"
+RELEASES_DIR = DATA_DIR / "rilasci"
+RELEASES_FILE = RELEASES_DIR / "releases.json"
+
+# The upstream CSV columns, in file order. The raw archive Parquet keeps
+# exactly these, all as text.
+RAW_COLUMNS = [
+    "CODICE_COMUNE",
+    "CODICE_ISTAT",
+    "PROGRESSIVO_NAZIONALE",
+    "CODICE_COMUNALE",
+    "ODONIMO",
+    "LOCALITA'",
+    "DIZIONE_LINGUA1",
+    "DIZIONE_LINGUA2",
+    "PROGRESSIVO_ACCESSO",
+    "CODICE_COMUNALE_ACCESSO",
+    "CIVICO",
+    "ESPONENTE",
+    "SPECIFICITA",
+    "METRICO",
+    "PROGRESSIVO_SNC",
+    "COORD_X_COMUNE",
+    "COORD_Y_COMUNE",
+    "QUOTA",
+    "METODO",
+]
+RELEASE_ORIGINS = ("original", "reconstructed")
 
 PUBLIC_BASE = "https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev"
 REPO_URL = "https://github.com/anncsu-open/anncsu-viewer"
@@ -115,6 +142,7 @@ def load_columns(path: Path) -> dict[str, dict]:
             "description_en": " ".join(str(spec["description_en"]).split()),
             "derived": bool(spec.get("derived", False)),
             "tiles_only": bool(spec.get("tiles_only", False)),
+            "raw_only": bool(spec.get("raw_only", False)),
         }
     return columns
 
@@ -140,7 +168,8 @@ def table_columns(
     An upstream schema change must stop the build rather than produce a
     catalog that describes columns the data no longer has, or omits columns it
     gained. Columns flagged tiles_only are expected to be absent from a file
-    that is not a partition. ``lang`` selects the description language.
+    that is not a partition; columns flagged raw_only are expected to be
+    absent from any enriched file. ``lang`` selects the description language.
     """
     description_key = "description" if lang == "it" else f"description_{lang}"
     documented = load_columns(columns_path)
@@ -158,7 +187,7 @@ def table_columns(
     missing = [
         name
         for name, spec in documented.items()
-        if name not in actual_names and not spec["tiles_only"]
+        if name not in actual_names and not spec["tiles_only"] and not spec["raw_only"]
     ]
     if missing:
         raise SystemExit(
@@ -186,6 +215,73 @@ def table_columns(
         }
         for name, found in actual
     ]
+
+
+def raw_table_columns(columns_path: Path, lang: str = "it") -> list[dict]:
+    """table:columns for the raw archive Parquet: the 19 CSV columns as text.
+
+    The raw Parquet is a faithful copy of the CSV, so every column is VARCHAR
+    whatever columns.yaml says about the enriched schema. Descriptions still
+    come from columns.yaml, in the requested language.
+    """
+    description_key = "description" if lang == "it" else f"description_{lang}"
+    documented = load_columns(columns_path)
+    missing = [name for name in RAW_COLUMNS if name not in documented]
+    if missing:
+        raise SystemExit(
+            f"Raw CSV columns without documentation in {columns_path.name}: "
+            f"{', '.join(missing)}."
+        )
+    return [
+        {
+            "name": name,
+            "type": "varchar",
+            "description": documented[name][description_key],
+        }
+        for name in RAW_COLUMNS
+    ]
+
+
+def load_releases(path: Path) -> list[dict]:
+    """Load and validate the release index, oldest first.
+
+    The index is the only source of facts about the archive: the generator
+    never lists the bucket. A malformed entry stops the build rather than
+    producing an item that lies about a file.
+    """
+    if not path.exists():
+        raise SystemExit(
+            f"{path} not found. The release index is written by update_data.py "
+            f"and by rebuild_archive.py; the catalog cannot be built without it."
+        )
+    with open(path, encoding="utf-8") as handle:
+        releases = json.load(handle).get("releases", [])
+
+    required = {"date", "origin", "note", "zip", "parquet", "archived"}
+    file_keys = {"name", "size", "sha256"}
+    seen = set()
+    for entry in releases:
+        missing = required - entry.keys()
+        if missing:
+            raise SystemExit(f"Release entry missing {sorted(missing)}: {entry}")
+        if entry["origin"] not in RELEASE_ORIGINS:
+            raise SystemExit(
+                f"Release {entry['date']}: origin must be one of "
+                f"{RELEASE_ORIGINS}, got {entry['origin']!r}."
+            )
+        for key in ("zip", "parquet"):
+            wanted = file_keys | ({"rows"} if key == "parquet" else set())
+            lacking = wanted - entry[key].keys()
+            if lacking:
+                raise SystemExit(
+                    f"Release {entry['date']}: {key} entry missing {sorted(lacking)}."
+                )
+        if entry["date"] in seen:
+            raise SystemExit(f"Release {entry['date']} appears twice in the index.")
+        seen.add(entry["date"])
+        datetime.strptime(entry["date"], "%Y-%m-%d")
+
+    return sorted(releases, key=lambda entry: entry["date"])
 
 
 def multihash_sha256(path: Path) -> str:
