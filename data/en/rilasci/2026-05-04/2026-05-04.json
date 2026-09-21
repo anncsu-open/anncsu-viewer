@@ -14,7 +14,7 @@
   "properties": {
     "datetime": "2026-05-04T00:00:00Z",
     "title": "Release of 4 May 2026",
-    "description": "Release of 4 May 2026, 27,416,925 addresses, reconstructed from the consolidated parquet of mfortini/diff_ANNCSU, which keeps every monthly download with a presence flag per release. The reconstruction reproduces the portal's CSV and is verified byte for byte, row order aside, on the 15 September 2026 release, the only one whose original exists. Ricostruzione dal parquet consolidato di mfortini/diff_ANNCSU; metodo verificato byte per byte sul rilascio 2026-09-15.",
+    "description": "Release of 4 May 2026, 27,416,925 addresses, reconstructed from the consolidated parquet of [mfortini/diff_ANNCSU](https://github.com/mfortini/diff_ANNCSU), which keeps every monthly download with a presence flag per release. The reconstruction reproduces the portal's CSV and is verified byte for byte, row order aside, on the 15 September 2026 release, the only one whose original exists.",
     "version": "2026-05-04",
     "table:columns": [
       {

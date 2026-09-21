@@ -7,7 +7,7 @@
   ],
   "id": "anncsu",
   "title": "ANNCSU addresses",
-  "description": "The certified addresses of Italian comuni, from the National Archive of House Numbers and Urban Streets (ANNCSU), converted to cloud-native formats. The catalog publishes the same data in two shapes: one GeoParquet file for country-wide analysis, and a partition into H3 cells for reading one comune at a time without downloading everything.",
+  "description": "The certified addresses of Italian comuni, from the National Archive of House Numbers and Urban Streets (ANNCSU), converted to cloud-native formats from the [ANNCSU open data portal](https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/).\n\nThe catalog publishes three collections:\n\n- `indirizzi`: one GeoParquet file, for country-wide analysis.\n- `indirizzi-h3`: the same data partitioned into H3 cells, to read one comune at a time without downloading everything.\n- `rilasci`: the archive of monthly downloads, which the other two derive their current release from.",
   "language": {
     "code": "en",
     "name": "English",

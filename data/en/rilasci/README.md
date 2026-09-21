@@ -1,6 +1,13 @@
 # ANNCSU monthly releases
 
-Every monthly download of the national address register, from 3 September 2025 to 15 September 2026, as published by the ANNCSU portal: the original ZIP archive and a lossless Parquet copy of the CSV, with every row and the 19 original columns as text, coordinates included but no geometry. It is the history the indirizzi and indirizzi-h3 collections derive their current release from. The portal keeps only the latest download: releases before 15 September 2026 are reconstructed from the consolidated parquet of mfortini/diff_ANNCSU with a method verified byte for byte on the September release.
+Every monthly download of the national address register, from 3 September 2025 to 15 September 2026, as published by the [ANNCSU portal](https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/). The portal serves only the latest release: all of them are kept here.
+
+Every release has two files:
+
+- the **ZIP archive** as the portal distributes it;
+- a **lossless Parquet copy** of the CSV, with every row and the 19 original columns as text, coordinates included but no geometry.
+
+It is the history the `indirizzi` and `indirizzi-h3` collections derive their current release from. Releases before 15 September 2026 are reconstructed from the consolidated parquet of [mfortini/diff_ANNCSU](https://github.com/mfortini/diff_ANNCSU), with a method verified byte for byte on the September release.
 
 ## Releases
 

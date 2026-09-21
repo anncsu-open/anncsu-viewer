@@ -1,6 +1,13 @@
 # Rilasci mensili ANNCSU
 
-Ogni scarico mensile dell'indirizzario nazionale, dal 3 settembre 2025 al 15 settembre 2026, così come pubblicato dal portale ANNCSU: l'archivio ZIP originale e una copia Parquet senza perdita del CSV, con tutte le righe e le 19 colonne originali come testo, coordinate incluse ma senza geometria. È lo storico da cui le collection indirizzi e indirizzi-h3 derivano il rilascio corrente. Il portale conserva solo l'ultimo scarico: i rilasci precedenti al 15 settembre 2026 sono ricostruiti dal parquet consolidato di mfortini/diff_ANNCSU con un metodo verificato byte per byte sul rilascio di settembre.
+Ogni scarico mensile dell'indirizzario nazionale, dal 3 settembre 2025 al 15 settembre 2026, così come pubblicato dal [portale ANNCSU](https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/). Il portale serve solo l'ultimo rilascio: qui restano tutti.
+
+Ogni rilascio ha due file:
+
+- l'**archivio ZIP** come lo distribuisce il portale;
+- una **copia Parquet senza perdita** del CSV, con tutte le righe e le 19 colonne originali come testo, coordinate comprese ma senza geometria.
+
+È lo storico da cui le collection `indirizzi` e `indirizzi-h3` derivano il rilascio corrente. I rilasci precedenti al 15 settembre 2026 sono ricostruiti dal parquet consolidato di [mfortini/diff_ANNCSU](https://github.com/mfortini/diff_ANNCSU), con un metodo verificato byte per byte sul rilascio di settembre.
 
 ## Rilasci
 

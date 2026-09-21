@@ -14,7 +14,7 @@
   "properties": {
     "datetime": "2026-09-15T00:00:00Z",
     "title": "Rilascio del 15 settembre 2026",
-    "description": "Scarico originale dal portale ANNCSU del rilascio del 15 settembre 2026: 27.415.954 accessi. Lo ZIP è il file servito dal portale, il Parquet ne è la copia senza perdita. Scarico dal portale ANNCSU del 2026-09-20.",
+    "description": "Scarico originale dal [portale ANNCSU](https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/) del rilascio del 15 settembre 2026: 27.415.954 accessi. Lo ZIP è il file servito dal portale, il Parquet ne è la copia senza perdita.",
     "version": "2026-09-15",
     "table:columns": [
       {

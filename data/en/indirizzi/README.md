@@ -1,6 +1,6 @@
 # ANNCSU addresses, single file
 
-Every external access recorded in ANNCSU in one GeoParquet file, spatially sorted along a Hilbert curve and carrying a bbox column, so a reader can skip whole row groups without decoding geometries. Suited to analysis over the whole country. To read a single comune the partitioned collection is the better choice. Of 20,731,065 addresses, 51,423 (0.25%) fall more than 110 metres outside the boundary of the comune they are assigned to, according to Istat boundaries, and 0 have no boundary to compare against. This collection holds the 20,731,065 georeferenced addresses out of the 27,415,954 in the 15 September 2026 release: addresses without coordinates are in the release archive.
+Every external access recorded in ANNCSU in one GeoParquet file, spatially sorted along a Hilbert curve and carrying a bbox column, so a reader can skip whole row groups without decoding geometries. Suited to analysis over the whole country. To read a single comune the partitioned collection is the better choice. Of 20,731,065 addresses, 51,423 (0.25%) fall more than 110 metres outside the boundary of the comune they are assigned to, according to Istat boundaries, and 0 have no boundary to compare against. This collection holds the 20,731,065 georeferenced addresses out of the 27,415,954 in the 15 September 2026 release: addresses without coordinates are in the `rilasci` collection.
 
 Updated to the 15 September 2026 release, with 20,731,065 addresses.
 See the data on a map in the [web viewer](https://anncsu-open.github.io/anncsu-viewer/).

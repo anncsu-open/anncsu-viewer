@@ -14,7 +14,7 @@
   "properties": {
     "datetime": "2026-09-15T00:00:00Z",
     "title": "Release of 15 September 2026",
-    "description": "Original download from the ANNCSU portal of the 15 September 2026 release: 27,415,954 addresses. The ZIP is the file the portal served, the Parquet its lossless copy. Scarico dal portale ANNCSU del 2026-09-20.",
+    "description": "Original download from the [ANNCSU portal](https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/) of the 15 September 2026 release: 27,415,954 addresses. The ZIP is the file the portal served, the Parquet its lossless copy.",
     "version": "2026-09-15",
     "table:columns": [
       {

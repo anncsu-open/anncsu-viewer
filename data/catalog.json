@@ -7,7 +7,7 @@
   ],
   "id": "anncsu",
   "title": "Indirizzi ANNCSU",
-  "description": "Gli indirizzi certificati dei comuni italiani, dall'Archivio Nazionale dei Numeri Civici e delle Strade Urbane, convertiti in formati cloud-native. Il catalogo pubblica lo stesso insieme di dati in due forme: un unico file GeoParquet per l'analisi complessiva, e una partizione in celle H3 per leggere un comune alla volta senza scaricare tutto.",
+  "description": "Gli indirizzi certificati dei comuni italiani, dall'Archivio Nazionale dei Numeri Civici e delle Strade Urbane, convertiti in formati cloud-native a partire dal [portale open data ANNCSU](https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/).\n\nIl catalogo pubblica tre collection:\n\n- `indirizzi`: un unico file GeoParquet, per l'analisi sull'intero territorio nazionale.\n- `indirizzi-h3`: gli stessi dati partizionati in celle H3, per leggere un comune alla volta senza scaricare tutto.\n- `rilasci`: l'archivio degli scarichi mensili, da cui le altre due derivano il rilascio corrente.",
   "language": {
     "code": "it",
     "name": "Italiano",

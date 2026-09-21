@@ -14,7 +14,7 @@
   "properties": {
     "datetime": "2026-08-03T00:00:00Z",
     "title": "Rilascio del 3 agosto 2026",
-    "description": "Rilascio del 3 agosto 2026, 27.405.709 accessi, ricostruito dal parquet consolidato di mfortini/diff_ANNCSU, che conserva ogni scarico mensile con un flag di presenza per rilascio. Il metodo di ricostruzione riproduce il CSV del portale ed è verificato byte per byte, ordine delle righe escluso, sul rilascio del 15 settembre 2026, l'unico di cui esiste l'originale. Ricostruzione dal parquet consolidato di mfortini/diff_ANNCSU; metodo verificato byte per byte sul rilascio 2026-09-15.",
+    "description": "Rilascio del 3 agosto 2026, 27.405.709 accessi, ricostruito dal parquet consolidato di [mfortini/diff_ANNCSU](https://github.com/mfortini/diff_ANNCSU), che conserva ogni scarico mensile con un flag di presenza per rilascio. Il metodo di ricostruzione riproduce il CSV del portale ed è verificato byte per byte, ordine delle righe escluso, sul rilascio del 15 settembre 2026, l'unico di cui esiste l'originale.",
     "version": "2026-08-03",
     "table:columns": [
       {
