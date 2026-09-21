@@ -78,6 +78,8 @@ RELEASE_ORIGINS = ("original", "reconstructed")
 PUBLIC_BASE = "https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev"
 REPO_URL = "https://github.com/anncsu-open/anncsu-viewer"
 SOURCE_PORTAL = "https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/"
+# The consolidated parquet the twelve reconstructed releases come from.
+DIFF_ANNCSU_URL = "https://github.com/mfortini/diff_ANNCSU"
 LICENSE_ID = "CC-BY-4.0"
 VIEWER_URL = "https://anncsu-open.github.io/anncsu-viewer/"
 BROWSER_URL = (
@@ -599,10 +601,17 @@ TEXTS = {
         "root_description": (
             "Gli indirizzi certificati dei comuni italiani, dall'Archivio "
             "Nazionale dei Numeri Civici e delle Strade Urbane, convertiti in "
-            "formati cloud-native. Il catalogo pubblica lo stesso insieme di "
-            "dati in due forme: un unico file GeoParquet per l'analisi "
-            "complessiva, e una partizione in celle H3 per leggere un comune "
-            "alla volta senza scaricare tutto."
+            "formati cloud-native a partire dal [portale open data "
+            "ANNCSU]($portal).\n"
+            "\n"
+            "Il catalogo pubblica tre collection:\n"
+            "\n"
+            "- `indirizzi`: un unico file GeoParquet, per l'analisi "
+            "sull'intero territorio nazionale.\n"
+            "- `indirizzi-h3`: gli stessi dati partizionati in celle H3, per "
+            "leggere un comune alla volta senza scaricare tutto.\n"
+            "- `rilasci`: l'archivio degli scarichi mensili, da cui le altre "
+            "due derivano il rilascio corrente."
         ),
         "indirizzi_title": "Indirizzi ANNCSU, file unico",
         "indirizzi_description": (
@@ -659,28 +668,36 @@ TEXTS = {
         "rilasci_title": "Rilasci mensili ANNCSU",
         "rilasci_description": (
             "Ogni scarico mensile dell'indirizzario nazionale, dal $first al "
-            "$last, così come pubblicato dal portale ANNCSU: l'archivio ZIP "
-            "originale e una copia Parquet senza perdita del CSV, con tutte le "
-            "righe e le 19 colonne originali come testo, coordinate incluse ma "
-            "senza geometria. È lo storico da cui le collection indirizzi e "
-            "indirizzi-h3 derivano il rilascio corrente. Il portale conserva "
-            "solo l'ultimo scarico: i rilasci precedenti al 15 settembre 2026 "
-            "sono ricostruiti dal parquet consolidato di mfortini/diff_ANNCSU "
-            "con un metodo verificato byte per byte sul rilascio di settembre."
+            "$last, così come pubblicato dal [portale ANNCSU]($portal). Il "
+            "portale serve solo l'ultimo rilascio: qui restano tutti.\n"
+            "\n"
+            "Ogni rilascio ha due file:\n"
+            "\n"
+            "- l'**archivio ZIP** come lo distribuisce il portale;\n"
+            "- una **copia Parquet senza perdita** del CSV, con tutte le "
+            "righe e le 19 colonne originali come testo, coordinate comprese "
+            "ma senza geometria.\n"
+            "\n"
+            "È lo storico da cui le collection `indirizzi` e `indirizzi-h3` "
+            "derivano il rilascio corrente. I rilasci precedenti al 15 "
+            "settembre 2026 sono ricostruiti dal parquet consolidato di "
+            "[mfortini/diff_ANNCSU]($diff_anncsu), con un metodo verificato "
+            "byte per byte sul rilascio di settembre."
         ),
         "release_title": "Rilascio del $date_human",
         "release_original": (
-            "Scarico originale dal portale ANNCSU del rilascio del $date_human: "
-            "$rows accessi. Lo ZIP è il file servito dal portale, il Parquet ne "
-            "è la copia senza perdita. $note"
+            "Scarico originale dal [portale ANNCSU]($portal) del rilascio del "
+            "$date_human: $rows accessi. Lo ZIP è il file servito dal portale, "
+            "il Parquet ne è la copia senza perdita."
         ),
         "release_reconstructed": (
             "Rilascio del $date_human, $rows accessi, ricostruito dal parquet "
-            "consolidato di mfortini/diff_ANNCSU, che conserva ogni scarico "
-            "mensile con un flag di presenza per rilascio. Il metodo di "
-            "ricostruzione riproduce il CSV del portale ed è verificato "
-            "byte per byte, ordine delle righe escluso, sul rilascio del 15 "
-            "settembre 2026, l'unico di cui esiste l'originale. $note"
+            "consolidato di [mfortini/diff_ANNCSU]($diff_anncsu), che conserva "
+            "ogni scarico mensile con un flag di presenza per rilascio. Il "
+            "metodo di ricostruzione riproduce il CSV del portale ed è "
+            "verificato byte per byte, ordine delle righe escluso, sul "
+            "rilascio del 15 settembre 2026, l'unico di cui esiste "
+            "l'originale."
         ),
         "release_zip": "Archivio ZIP del rilascio",
         "release_parquet": "CSV del rilascio in Parquet, senza perdita",
@@ -688,7 +705,7 @@ TEXTS = {
         "georeferenced_sentence": (
             "Questa collection contiene i $with_coords accessi georeferenziati "
             "sui $total del rilascio del $date_human: gli accessi privi di "
-            "coordinate sono nell'archivio dei rilasci."
+            "coordinate sono nella collection `rilasci`."
         ),
         "stats_header": ("Statistica", "Valore"),
         "stats_total": "Accessi totali",
@@ -702,10 +719,16 @@ TEXTS = {
         "root_description": (
             "The certified addresses of Italian comuni, from the National "
             "Archive of House Numbers and Urban Streets (ANNCSU), converted to "
-            "cloud-native formats. The catalog publishes the same data in two "
-            "shapes: one GeoParquet file for country-wide analysis, and a "
-            "partition into H3 cells for reading one comune at a time without "
-            "downloading everything."
+            "cloud-native formats from the [ANNCSU open data "
+            "portal]($portal).\n"
+            "\n"
+            "The catalog publishes three collections:\n"
+            "\n"
+            "- `indirizzi`: one GeoParquet file, for country-wide analysis.\n"
+            "- `indirizzi-h3`: the same data partitioned into H3 cells, to "
+            "read one comune at a time without downloading everything.\n"
+            "- `rilasci`: the archive of monthly downloads, which the other "
+            "two derive their current release from."
         ),
         "indirizzi_title": "ANNCSU addresses, single file",
         "indirizzi_description": (
@@ -760,29 +783,36 @@ TEXTS = {
         "rilasci_title": "ANNCSU monthly releases",
         "rilasci_description": (
             "Every monthly download of the national address register, from "
-            "$first to $last, as published by the ANNCSU portal: the original "
-            "ZIP archive and a lossless Parquet copy of the CSV, with every row "
-            "and the 19 original columns as text, coordinates included but no "
-            "geometry. It is the history the indirizzi and indirizzi-h3 "
-            "collections derive their current release from. The portal keeps "
-            "only the latest download: releases before 15 September 2026 are "
-            "reconstructed from the consolidated parquet of "
-            "mfortini/diff_ANNCSU with a method verified byte for byte on the "
-            "September release."
+            "$first to $last, as published by the [ANNCSU portal]($portal). "
+            "The portal serves only the latest release: all of them are kept "
+            "here.\n"
+            "\n"
+            "Every release has two files:\n"
+            "\n"
+            "- the **ZIP archive** as the portal distributes it;\n"
+            "- a **lossless Parquet copy** of the CSV, with every row and the "
+            "19 original columns as text, coordinates included but no "
+            "geometry.\n"
+            "\n"
+            "It is the history the `indirizzi` and `indirizzi-h3` collections "
+            "derive their current release from. Releases before 15 September "
+            "2026 are reconstructed from the consolidated parquet of "
+            "[mfortini/diff_ANNCSU]($diff_anncsu), with a method verified byte "
+            "for byte on the September release."
         ),
         "release_title": "Release of $date_human",
         "release_original": (
-            "Original download from the ANNCSU portal of the $date_human "
-            "release: $rows addresses. The ZIP is the file the portal served, "
-            "the Parquet its lossless copy. $note"
+            "Original download from the [ANNCSU portal]($portal) of the "
+            "$date_human release: $rows addresses. The ZIP is the file the "
+            "portal served, the Parquet its lossless copy."
         ),
         "release_reconstructed": (
             "Release of $date_human, $rows addresses, reconstructed from the "
-            "consolidated parquet of mfortini/diff_ANNCSU, which keeps every "
-            "monthly download with a presence flag per release. The "
-            "reconstruction reproduces the portal's CSV and is verified byte "
-            "for byte, row order aside, on the 15 September 2026 release, the "
-            "only one whose original exists. $note"
+            "consolidated parquet of [mfortini/diff_ANNCSU]($diff_anncsu), "
+            "which keeps every monthly download with a presence flag per "
+            "release. The reconstruction reproduces the portal's CSV and is "
+            "verified byte for byte, row order aside, on the 15 September 2026 "
+            "release, the only one whose original exists."
         ),
         "release_zip": "ZIP archive of the release",
         "release_parquet": "CSV of the release as Parquet, lossless",
@@ -790,7 +820,7 @@ TEXTS = {
         "georeferenced_sentence": (
             "This collection holds the $with_coords georeferenced addresses out "
             "of the $total in the $date_human release: addresses without "
-            "coordinates are in the release archive."
+            "coordinates are in the `rilasci` collection."
         ),
         "stats_header": ("Statistic", "Value"),
         "stats_total": "Total addresses",
@@ -1189,7 +1219,9 @@ def build_root(updated: str, lang: str = SOURCE_LANG) -> dict:
         "stac_extensions": [PORTOLAN_SCHEMA, LANGUAGE_SCHEMA],
         "id": "anncsu",
         "title": text["root_title"],
-        "description": text["root_description"],
+        "description": Template(text["root_description"]).substitute(
+            portal=SOURCE_PORTAL
+        ),
         **_language_fields(lang),
         "updated": updated,
         "links": [
@@ -1445,6 +1477,13 @@ def _release_datetime(release: dict) -> str:
 
 
 def _release_description(release: dict, lang: str) -> str:
+    """The item's prose, built from the template alone.
+
+    The index's ``note`` stays out of it: for a reconstruction it repeats what
+    the template already says, and it is written in Italian, so rendering it
+    put an Italian sentence in the English tree. It remains in releases.json
+    as a remark for whoever reads the index.
+    """
     text = TEXTS[lang]
     key = (
         "release_original"
@@ -1456,7 +1495,8 @@ def _release_description(release: dict, lang: str) -> str:
         .substitute(
             date_human=human_date(_release_datetime(release), lang),
             rows=human_count(release["parquet"]["rows"], lang),
-            note=release.get("note", ""),
+            portal=SOURCE_PORTAL,
+            diff_anncsu=DIFF_ANNCSU_URL,
         )
         .strip()
     )
@@ -1591,6 +1631,8 @@ def build_rilasci(facts: dict, lang: str = SOURCE_LANG) -> dict:
         "description": Template(text["rilasci_description"]).substitute(
             first=human_date(_release_datetime(first), lang),
             last=human_date(_release_datetime(last), lang),
+            portal=SOURCE_PORTAL,
+            diff_anncsu=DIFF_ANNCSU_URL,
         ),
         "license": LICENSE_ID,
         "keywords": [*text["keywords"], *text["keywords_rilasci"]],

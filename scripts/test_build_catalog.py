@@ -27,8 +27,10 @@ import build_catalog
 from build_catalog import (
     PARTITION_SCHEMA,
     PORTOLAN_SCHEMA,
+    DIFF_ANNCSU_URL,
     PUBLIC_BASE,
     RAW_COLUMNS,
+    SOURCE_PORTAL,
     VERSION_SCHEMA,
     VIEWER_URL,
     build,
@@ -1632,10 +1634,96 @@ class TestRootLinksTheArchive:
         assert children["./rilasci/collection.json"]["title"].strip()
 
 
+class TestDescriptionFormatting:
+    """Descriptions are CommonMark, so lists and links really render.
+
+    STAC declares description fields as CommonMark and the browser renders
+    them, as does every README, which substitutes the same text. What matters
+    here is that no placeholder leaks through and that the markup is the
+    shape a reader expects.
+    """
+
+    @pytest.mark.parametrize("lang", ["it", "en"])
+    def test_root_lists_every_collection_and_links_the_portal(self, lang):
+        description = build_root("2026-09-15T00:00:00Z", lang=lang)["description"]
+
+        assert "$" not in description, "an unsubstituted placeholder reached the output"
+        assert description.count("\n- ") == 3, "one bullet per collection"
+        for name in ("indirizzi", "indirizzi-h3", "rilasci"):
+            assert f"`{name}`" in description
+        assert f"]({SOURCE_PORTAL})" in description
+
+    @pytest.mark.parametrize("lang", ["it", "en"])
+    def test_archive_lists_the_two_files_and_links_the_reconstruction_source(
+        self, lang
+    ):
+        description = build_rilasci(fake_facts(), lang=lang)["description"]
+
+        assert "$" not in description
+        assert description.count("\n- ") == 2, "one bullet per file of a release"
+        assert f"[mfortini/diff_ANNCSU]({DIFF_ANNCSU_URL})" in description
+
+    def test_reconstructed_item_links_the_reconstruction_source(self):
+        releases = fake_releases()
+
+        item = build_release_item(releases[0], releases, fake_facts())
+
+        description = item["properties"]["description"]
+        assert f"[mfortini/diff_ANNCSU]({DIFF_ANNCSU_URL})" in description
+        assert "$" not in description
+
+    def test_original_item_links_the_portal_it_came_from(self):
+        releases = fake_releases()
+
+        item = build_release_item(releases[1], releases, fake_facts())
+
+        description = item["properties"]["description"]
+        assert f"]({SOURCE_PORTAL})" in description
+        assert "$" not in description
+
+    @pytest.mark.parametrize("builder", [build_indirizzi, build_indirizzi_h3])
+    def test_live_collections_name_the_archive_as_code(self, builder):
+        description = builder(fake_facts())["description"]
+        assert "`rilasci`" in description
+
+    @pytest.mark.parametrize("index", [0, 1])
+    def test_item_description_does_not_repeat_the_index_note(self, index):
+        """The note is a machine-readable remark, not prose for the reader.
+
+        Rendering it appended the same claim twice for a reconstruction, whose
+        template already explains the reconstruction.
+        """
+        releases = fake_releases()
+
+        item = build_release_item(releases[index], releases, fake_facts())
+
+        assert releases[index]["note"] not in item["properties"]["description"]
+
+    @pytest.mark.parametrize("index", [0, 1])
+    def test_english_item_description_is_entirely_english(self, index):
+        """The note in the index is Italian; it must not leak into en/."""
+        releases = fake_releases()
+
+        item = build_release_item(releases[index], releases, fake_facts(), lang="en")
+
+        description = item["properties"]["description"]
+        for italian in ("Scarico", "Ricostruzione", "rilascio"):
+            assert italian not in description
+
+
 @pytest.mark.skipif(
     shutil.which("tippecanoe") is None, reason="tippecanoe not installed"
 )
 class TestArchiveBuild:
+    def test_root_readme_points_at_every_collection(
+        self, fixture_data_dir, fixture_columns
+    ):
+        build(fixture_data_dir)
+        for tree in ("", "en/"):
+            readme = (fixture_data_dir / tree / "README.md").read_text()
+            for target in ("./indirizzi/", "./indirizzi-h3/", "./rilasci/"):
+                assert target in readme, f"{tree}README.md does not link {target}"
+
     def test_writes_the_archive_in_both_trees(self, fixture_data_dir, fixture_columns):
         build(fixture_data_dir)
         for tree in ("", "en/"):
