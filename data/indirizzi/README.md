@@ -1,15 +1,15 @@
 # Indirizzi ANNCSU, file unico
 
-Tutti gli accessi esterni censiti in ANNCSU in un unico file GeoParquet, ordinato spazialmente secondo una curva di Hilbert e corredato di colonna bbox, così che un lettore possa scartare interi gruppi di righe senza decodificare le geometrie. Adatto all'analisi sull'intero territorio nazionale. Per leggere un singolo comune conviene la collection partizionata. Su 20.731.065 accessi, 51.423 (0,25%) cadono oltre 110 metri fuori dal confine del comune a cui sono attribuiti secondo i confini Istat, e 0 non hanno un confine di riferimento. Questa collection contiene i 20.731.065 accessi georeferenziati sui 27.415.954 del rilascio del 15 settembre 2026: gli accessi privi di coordinate sono nella collection `rilasci`.
+Tutti gli accessi esterni censiti in ANNCSU in un unico file GeoParquet, ordinato spazialmente secondo una curva di Hilbert e corredato di colonna bbox, così che un lettore possa scartare interi gruppi di righe senza decodificare le geometrie. Adatto all'analisi sull'intero territorio nazionale. Per leggere un singolo comune conviene la collection partizionata. Su 20.728.959 accessi, 48.527 (0,23%) cadono oltre 110 metri fuori dal confine del comune a cui sono attribuiti secondo i confini Istat, e 0 non hanno un confine di riferimento. Questa collection contiene i 20.728.959 accessi georeferenziati sui 27.413.752 del rilascio del 2 novembre 2026: gli accessi privi di coordinate sono nella collection `rilasci`.
 
-Aggiornato al 15 settembre 2026, con 20.731.065 indirizzi. I dati si
+Aggiornato al 2 novembre 2026, con 20.728.959 indirizzi. I dati si
 vedono sulla mappa nel [visualizzatore web](https://anncsu-open.github.io/anncsu-viewer/).
 
 > **Nota sulla visualizzazione.** Nel Portolan Browser, come in STAC Browser
 > da cui deriva, l'estensione temporale di questa collection compare come
 > "fino ad ora" senza la data di inizio in tutte le lingue dell'interfaccia
 > diverse dall'inglese. È un difetto del browser, non del catalogo:
-> l'intervallo dichiarato in `extent.temporal` inizia il 15 settembre 2026
+> l'intervallo dichiarato in `extent.temporal` inizia il 2 novembre 2026
 > ed è aperto, e si legge per intero con l'interfaccia in inglese o nel JSON
 > tramite Source.
 
@@ -29,15 +29,15 @@ LIMIT 10;
 
 | Statistica | Valore |
 |---|---|
-| Accessi totali | 20.731.065 |
-| Fuori dal confine comunale, oltre 110 m | 51.423 (0,25%) |
+| Accessi totali | 20.728.959 |
+| Fuori dal confine comunale, oltre 110 m | 48.527 (0,23%) |
 | Senza confine comunale di riferimento | 0 |
-| Comuni con almeno un accesso | 5.493 |
-| Metodo 1, rilevazione strumentale sul campo, accuratezza inferiore a 5 m | 1.714.163 (8,27%) |
-| Metodo 2, rilevazione strumentale sul campo, accuratezza pari o superiore a 5 m | 290.652 (1,40%) |
-| Metodo 3, derivazione indiretta da base dati territoriale, accuratezza stimata inferiore a 5 m | 7.125.819 (34,37%) |
-| Metodo 4, derivazione indiretta da base dati territoriale, accuratezza stimata pari o superiore a 5 m | 10.894.269 (52,55%) |
-| Metodo 5, derivazione indiretta tramite le funzioni del Portale per i Comuni | 706.162 (3,41%) |
+| Comuni con almeno un accesso | 5.502 |
+| Metodo 1, rilevazione strumentale sul campo, accuratezza inferiore a 5 m | 1.721.955 (8,31%) |
+| Metodo 2, rilevazione strumentale sul campo, accuratezza pari o superiore a 5 m | 290.658 (1,40%) |
+| Metodo 3, derivazione indiretta da base dati territoriale, accuratezza stimata inferiore a 5 m | 7.118.388 (34,34%) |
+| Metodo 4, derivazione indiretta da base dati territoriale, accuratezza stimata pari o superiore a 5 m | 10.892.898 (52,55%) |
+| Metodo 5, derivazione indiretta tramite le funzioni del Portale per i Comuni | 705.060 (3,40%) |
 
 ## Schema
 

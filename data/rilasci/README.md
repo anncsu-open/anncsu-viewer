@@ -1,6 +1,6 @@
 # Rilasci mensili ANNCSU
 
-Ogni scarico mensile dell'indirizzario nazionale, dal 3 settembre 2025 al 15 settembre 2026, così come pubblicato dal [portale ANNCSU](https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/). Il portale serve solo l'ultimo rilascio: qui restano tutti.
+Ogni scarico mensile dell'indirizzario nazionale, dal 3 settembre 2025 al 2 novembre 2026, così come pubblicato dal [portale ANNCSU](https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/). Il portale serve solo l'ultimo rilascio: qui restano tutti.
 
 Ogni rilascio ha due file:
 
@@ -13,6 +13,7 @@ Ogni rilascio ha due file:
 
 | Rilascio | Origine | Accessi | ZIP | Parquet |
 |---|---|---|---|---|
+| [2026-11-02](./2026-11-02/2026-11-02.json) | originale | 27.413.752 | [336,3 MB](https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/rilasci/2026-11-02/indirizzarioItalia_20261102.zip) | [259,3 MB](https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/rilasci/2026-11-02/INDIR_ITA_20261102.parquet) |
 | [2026-09-15](./2026-09-15/2026-09-15.json) | originale | 27.415.954 | [336,1 MB](https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/rilasci/2026-09-15/indirizzarioItalia_20260915.zip) | [258,9 MB](https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/rilasci/2026-09-15/INDIR_ITA_20260915.parquet) |
 | [2026-08-03](./2026-08-03/2026-08-03.json) | ricostruito | 27.405.709 | [324,7 MB](https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/rilasci/2026-08-03/indirizzarioItalia_20260803.zip) | [258,5 MB](https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/rilasci/2026-08-03/INDIR_ITA_20260803.parquet) |
 | [2026-07-03](./2026-07-03/2026-07-03.json) | ricostruito | 27.405.384 | [324,4 MB](https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/rilasci/2026-07-03/indirizzarioItalia_20260703.zip) | [258,1 MB](https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/rilasci/2026-07-03/INDIR_ITA_20260703.parquet) |
@@ -38,7 +39,7 @@ Istat e progressivi, e si interroga via HTTP:
 ```sql
 INSTALL httpfs; LOAD httpfs;
 SELECT count(*) FILTER (WHERE COORD_X_COMUNE IS NULL) AS senza_coordinate
-FROM read_parquet('https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/rilasci/2026-09-15/INDIR_ITA_20260915.parquet');
+FROM read_parquet('https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/rilasci/2026-11-02/INDIR_ITA_20261102.parquet');
 ```
 
 Per confrontare due rilasci si uniscono sui `PROGRESSIVO_ACCESSO`, univoci in

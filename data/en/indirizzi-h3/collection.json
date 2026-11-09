@@ -13,7 +13,7 @@
   ],
   "id": "indirizzi-h3",
   "title": "ANNCSU addresses, partitioned by H3 cell",
-  "description": "The same addresses as the indirizzi collection, split into 1,348 files by the resolution 5 H3 cell that contains them, in Hive layout tiles/h3_cell=<cell>/<cell>.parquet. Every file is under a megabyte, so a client can read one comune without downloading the national file. The bulk-access glob is https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/tiles/h3_cell=*/*.parquet, but HTTPS offers no listing: to know which cells you need, use the comuni-h3.json index, registered as a metadata asset. Of 20,731,065 addresses, 51,423 (0.25%) fall more than 110 metres outside the boundary of the comune they are assigned to, according to Istat boundaries, and 0 have no boundary to compare against. This collection holds the 20,731,065 georeferenced addresses out of the 27,415,954 in the 15 September 2026 release: addresses without coordinates are in the `rilasci` collection.",
+  "description": "The same addresses as the indirizzi collection, split into 1,340 files by the resolution 5 H3 cell that contains them, in Hive layout tiles/h3_cell=<cell>/<cell>.parquet. Every file is under a megabyte, so a client can read one comune without downloading the national file. The bulk-access glob is https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/tiles/h3_cell=*/*.parquet, but HTTPS offers no listing: to know which cells you need, use the comuni-h3.json index, registered as a metadata asset. Of 20,728,959 addresses, 48,527 (0.23%) fall more than 110 metres outside the boundary of the comune they are assigned to, according to Istat boundaries, and 0 have no boundary to compare against. This collection holds the 20,728,959 georeferenced addresses out of the 27,413,752 in the 2 November 2026 release: addresses without coordinates are in the `rilasci` collection.",
   "license": "CC-BY-4.0",
   "keywords": [
     "addresses",
@@ -69,7 +69,7 @@
     "temporal": {
       "interval": [
         [
-          "2026-09-15T00:00:00Z",
+          "2026-11-02T00:00:00Z",
           null
         ]
       ]
@@ -87,8 +87,8 @@
       "alternate": "Italian"
     }
   ],
-  "updated": "2026-09-19T15:07:48Z",
-  "version": "2026-09-15",
+  "updated": "2026-11-09T16:12:58Z",
+  "version": "2026-11-02",
   "table:columns": [
     {
       "name": "CODICE_COMUNE",
@@ -211,7 +211,7 @@
       "description": "Hexadecimal identifier of the resolution 5 H3 cell containing the address. Present only in the partitioned files, where it matches the directory and file name."
     }
   ],
-  "table:row_count": 20731065,
+  "table:row_count": 20728959,
   "table:primary_geometry": "geometry",
   "partition:scheme": "hive",
   "partition:strategy": "h3",
@@ -222,7 +222,7 @@
       "description": "H3 cell at resolution 5 containing the address."
     }
   ],
-  "partition:file_count": 1348,
+  "partition:file_count": 1340,
   "partition:glob": "https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/tiles/h3_cell=*/*.parquet",
   "assets": {
     "cell-index": {
@@ -233,8 +233,8 @@
       "roles": [
         "metadata"
       ],
-      "file:size": 608099,
-      "file:checksum": "12206e2e22fa51ade8873182b8441a175efe70ac879fbe42c964dfec4b7308c42cb6"
+      "file:size": 605513,
+      "file:checksum": "1220314d49ffe43a16af9808dc954fd5d99f2b3f906ef4977e7778ad970bda4d0ab5"
     },
     "style-indirizzi-h3": {
       "href": "../../indirizzi-h3/styles/indirizzi-h3.json",
@@ -255,8 +255,8 @@
       "roles": [
         "thumbnail"
       ],
-      "file:size": 330866,
-      "file:checksum": "12208b9147b71d795c5a240079c1baba1cd66c4ec7e2273e0201ae81f032dc2262ad"
+      "file:size": 330901,
+      "file:checksum": "1220c041dec1bdf284ae2c564ccbaac996ffa67d106dd9f885266bcb3509a81ab833"
     }
   },
   "links": [
@@ -281,7 +281,7 @@
     },
     {
       "rel": "derived_from",
-      "href": "../rilasci/2026-09-15/2026-09-15.json",
+      "href": "../rilasci/2026-11-02/2026-11-02.json",
       "type": "application/geo+json"
     },
     {

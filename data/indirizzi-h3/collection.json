@@ -13,7 +13,7 @@
   ],
   "id": "indirizzi-h3",
   "title": "Indirizzi ANNCSU, partizionati per cella H3",
-  "description": "Gli stessi indirizzi della collection indirizzi, ripartiti in 1.348 file secondo la cella H3 di risoluzione 5 che li contiene, con struttura Hive tiles/h3_cell=<cella>/<cella>.parquet. Ogni file pesa meno di un megabyte, quindi un client può leggere un comune senza scaricare il file nazionale. Il glob di accesso massivo è https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/tiles/h3_cell=*/*.parquet, ma su HTTPS non esiste il listing: per sapere quali celle servono si usa l'indice comuni-h3.json, registrato come asset di metadati. Su 20.731.065 accessi, 51.423 (0,25%) cadono oltre 110 metri fuori dal confine del comune a cui sono attribuiti secondo i confini Istat, e 0 non hanno un confine di riferimento. Questa collection contiene i 20.731.065 accessi georeferenziati sui 27.415.954 del rilascio del 15 settembre 2026: gli accessi privi di coordinate sono nella collection `rilasci`.",
+  "description": "Gli stessi indirizzi della collection indirizzi, ripartiti in 1.340 file secondo la cella H3 di risoluzione 5 che li contiene, con struttura Hive tiles/h3_cell=<cella>/<cella>.parquet. Ogni file pesa meno di un megabyte, quindi un client può leggere un comune senza scaricare il file nazionale. Il glob di accesso massivo è https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/tiles/h3_cell=*/*.parquet, ma su HTTPS non esiste il listing: per sapere quali celle servono si usa l'indice comuni-h3.json, registrato come asset di metadati. Su 20.728.959 accessi, 48.527 (0,23%) cadono oltre 110 metri fuori dal confine del comune a cui sono attribuiti secondo i confini Istat, e 0 non hanno un confine di riferimento. Questa collection contiene i 20.728.959 accessi georeferenziati sui 27.413.752 del rilascio del 2 novembre 2026: gli accessi privi di coordinate sono nella collection `rilasci`.",
   "license": "CC-BY-4.0",
   "keywords": [
     "indirizzi",
@@ -69,7 +69,7 @@
     "temporal": {
       "interval": [
         [
-          "2026-09-15T00:00:00Z",
+          "2026-11-02T00:00:00Z",
           null
         ]
       ]
@@ -87,8 +87,8 @@
       "alternate": "Inglese"
     }
   ],
-  "updated": "2026-09-19T15:07:48Z",
-  "version": "2026-09-15",
+  "updated": "2026-11-09T16:12:58Z",
+  "version": "2026-11-02",
   "table:columns": [
     {
       "name": "CODICE_COMUNE",
@@ -211,7 +211,7 @@
       "description": "Identificativo esadecimale della cella H3 di risoluzione 5 che contiene l'indirizzo. Presente solo nei file partizionati, dove coincide con il nome della directory e del file."
     }
   ],
-  "table:row_count": 20731065,
+  "table:row_count": 20728959,
   "table:primary_geometry": "geometry",
   "partition:scheme": "hive",
   "partition:strategy": "h3",
@@ -222,7 +222,7 @@
       "description": "Cella H3 di risoluzione 5 che contiene l'indirizzo."
     }
   ],
-  "partition:file_count": 1348,
+  "partition:file_count": 1340,
   "partition:glob": "https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/tiles/h3_cell=*/*.parquet",
   "assets": {
     "cell-index": {
@@ -233,8 +233,8 @@
       "roles": [
         "metadata"
       ],
-      "file:size": 608099,
-      "file:checksum": "12206e2e22fa51ade8873182b8441a175efe70ac879fbe42c964dfec4b7308c42cb6"
+      "file:size": 605513,
+      "file:checksum": "1220314d49ffe43a16af9808dc954fd5d99f2b3f906ef4977e7778ad970bda4d0ab5"
     },
     "style-indirizzi-h3": {
       "href": "./styles/indirizzi-h3.json",
@@ -255,8 +255,8 @@
       "roles": [
         "thumbnail"
       ],
-      "file:size": 330866,
-      "file:checksum": "12208b9147b71d795c5a240079c1baba1cd66c4ec7e2273e0201ae81f032dc2262ad"
+      "file:size": 330901,
+      "file:checksum": "1220c041dec1bdf284ae2c564ccbaac996ffa67d106dd9f885266bcb3509a81ab833"
     }
   },
   "links": [
@@ -281,7 +281,7 @@
     },
     {
       "rel": "derived_from",
-      "href": "../rilasci/2026-09-15/2026-09-15.json",
+      "href": "../rilasci/2026-11-02/2026-11-02.json",
       "type": "application/geo+json"
     },
     {

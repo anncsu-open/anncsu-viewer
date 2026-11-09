@@ -12,7 +12,7 @@
   ],
   "id": "indirizzi",
   "title": "Indirizzi ANNCSU, file unico",
-  "description": "Tutti gli accessi esterni censiti in ANNCSU in un unico file GeoParquet, ordinato spazialmente secondo una curva di Hilbert e corredato di colonna bbox, così che un lettore possa scartare interi gruppi di righe senza decodificare le geometrie. Adatto all'analisi sull'intero territorio nazionale. Per leggere un singolo comune conviene la collection partizionata. Su 20.731.065 accessi, 51.423 (0,25%) cadono oltre 110 metri fuori dal confine del comune a cui sono attribuiti secondo i confini Istat, e 0 non hanno un confine di riferimento. Questa collection contiene i 20.731.065 accessi georeferenziati sui 27.415.954 del rilascio del 15 settembre 2026: gli accessi privi di coordinate sono nella collection `rilasci`.",
+  "description": "Tutti gli accessi esterni censiti in ANNCSU in un unico file GeoParquet, ordinato spazialmente secondo una curva di Hilbert e corredato di colonna bbox, così che un lettore possa scartare interi gruppi di righe senza decodificare le geometrie. Adatto all'analisi sull'intero territorio nazionale. Per leggere un singolo comune conviene la collection partizionata. Su 20.728.959 accessi, 48.527 (0,23%) cadono oltre 110 metri fuori dal confine del comune a cui sono attribuiti secondo i confini Istat, e 0 non hanno un confine di riferimento. Questa collection contiene i 20.728.959 accessi georeferenziati sui 27.413.752 del rilascio del 2 novembre 2026: gli accessi privi di coordinate sono nella collection `rilasci`.",
   "license": "CC-BY-4.0",
   "keywords": [
     "indirizzi",
@@ -66,7 +66,7 @@
     "temporal": {
       "interval": [
         [
-          "2026-09-15T00:00:00Z",
+          "2026-11-02T00:00:00Z",
           null
         ]
       ]
@@ -84,8 +84,8 @@
       "alternate": "Inglese"
     }
   ],
-  "updated": "2026-09-19T15:07:48Z",
-  "version": "2026-09-15",
+  "updated": "2026-11-09T16:12:58Z",
+  "version": "2026-11-02",
   "table:columns": [
     {
       "name": "CODICE_COMUNE",
@@ -203,7 +203,7 @@
       "description": "Punto costruito dalla pipeline a partire da longitudine e latitudine. Dichiarato in OGC:CRS84. La fonte esprime le coordinate in ETRF2000, che differisce da WGS84 per meno di un metro in Italia, quindi lo scarto è trascurabile rispetto alla precisione degli indirizzi."
     }
   ],
-  "table:row_count": 20731065,
+  "table:row_count": 20728959,
   "table:primary_geometry": "geometry",
   "assets": {
     "data": {
@@ -214,8 +214,8 @@
         "data"
       ],
       "proj:code": "OGC:CRS84",
-      "file:size": 1059267903,
-      "file:checksum": "122075f778b597b110cd7e63e4c3a3353a22983e73e8a938f10f84a58472fb7dde6f"
+      "file:size": 1060383339,
+      "file:checksum": "12204a5f341039795f0a264266f6ccfe4548baf9a1c2b019d2f24d60f31178cfa53d"
     },
     "visual": {
       "href": "../anncsu-indirizzi.pmtiles",
@@ -224,8 +224,8 @@
       "roles": [
         "visual"
       ],
-      "file:size": 333155352,
-      "file:checksum": "1220fc4d822927fd668df682b3f3c6f14493081c294d48c996d0d4bc1039814d1802"
+      "file:size": 333111383,
+      "file:checksum": "122018a5bc421fe2da5ae2f7861f71b38fa28228264bcb3c1c221231756583b88503"
     },
     "style-indirizzi": {
       "href": "./styles/indirizzi.json",
@@ -246,8 +246,8 @@
       "roles": [
         "thumbnail"
       ],
-      "file:size": 330866,
-      "file:checksum": "12208b9147b71d795c5a240079c1baba1cd66c4ec7e2273e0201ae81f032dc2262ad"
+      "file:size": 330901,
+      "file:checksum": "1220c041dec1bdf284ae2c564ccbaac996ffa67d106dd9f885266bcb3509a81ab833"
     }
   },
   "links": [
@@ -272,7 +272,7 @@
     },
     {
       "rel": "derived_from",
-      "href": "../rilasci/2026-09-15/2026-09-15.json",
+      "href": "../rilasci/2026-11-02/2026-11-02.json",
       "type": "application/geo+json"
     },
     {

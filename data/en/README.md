@@ -4,7 +4,7 @@ The certified addresses of Italian comuni, from the National Archive of House
 Numbers and Urban Streets (ANNCSU), converted to cloud-native formats and
 published as a STAC catalog following the Portolan profile.
 
-Updated to the 15 September 2026 release, with 20,731,065 addresses.
+Updated to the 2 November 2026 release, with 20,728,959 addresses.
 Browse the catalog in the [Portolan Browser](https://browser.portolan-sdi.org/#/external/pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/catalog.json) and see the data on
 a map in the [web viewer](https://anncsu-open.github.io/anncsu-viewer/).
 
@@ -26,15 +26,15 @@ translation of the catalog; the Italian source tree is one level up, at
 
 | Statistic | Value |
 |---|---|
-| Total addresses | 20,731,065 |
-| Outside the comune boundary, beyond 110 m | 51,423 (0.25%) |
+| Total addresses | 20,728,959 |
+| Outside the comune boundary, beyond 110 m | 48,527 (0.23%) |
 | Without a comune boundary to compare against | 0 |
-| Comuni with at least one address | 5,493 |
-| Method 1, field survey with instruments, accuracy below 5 m | 1,714,163 (8.27%) |
-| Method 2, field survey with instruments, accuracy of 5 m or more | 290,652 (1.40%) |
-| Method 3, indirect derivation from a spatial database, estimated accuracy below 5 m | 7,125,819 (34.37%) |
-| Method 4, indirect derivation from a spatial database, estimated accuracy of 5 m or more | 10,894,269 (52.55%) |
-| Method 5, indirect derivation through the functions of the Portale per i Comuni | 706,162 (3.41%) |
+| Comuni with at least one address | 5,502 |
+| Method 1, field survey with instruments, accuracy below 5 m | 1,721,955 (8.31%) |
+| Method 2, field survey with instruments, accuracy of 5 m or more | 290,658 (1.40%) |
+| Method 3, indirect derivation from a spatial database, estimated accuracy below 5 m | 7,118,388 (34.34%) |
+| Method 4, indirect derivation from a spatial database, estimated accuracy of 5 m or more | 10,892,898 (52.55%) |
+| Method 5, indirect derivation through the functions of the Portale per i Comuni | 705,060 (3.40%) |
 
 ## Licence
 

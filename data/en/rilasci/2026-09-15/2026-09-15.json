@@ -171,6 +171,11 @@
       "type": "application/geo+json"
     },
     {
+      "rel": "successor-version",
+      "href": "../2026-11-02/2026-11-02.json",
+      "type": "application/geo+json"
+    },
+    {
       "rel": "alternate",
       "href": "../../../rilasci/2026-09-15/2026-09-15.json",
       "type": "application/geo+json",

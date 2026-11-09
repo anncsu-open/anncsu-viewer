@@ -4,7 +4,7 @@ Gli indirizzi certificati dei comuni italiani, dall'Archivio Nazionale dei
 Numeri Civici e delle Strade Urbane, convertiti in formati cloud-native e
 pubblicati come catalogo STAC secondo il profilo Portolan.
 
-Aggiornato al 15 settembre 2026, con 20.731.065 indirizzi. Il catalogo
+Aggiornato al 2 novembre 2026, con 20.728.959 indirizzi. Il catalogo
 si può esplorare nel [Portolan Browser](https://browser.portolan-sdi.org/#/external/pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/catalog.json) e i dati si vedono sulla
 mappa nel [visualizzatore web](https://anncsu-open.github.io/anncsu-viewer/).
 
@@ -25,15 +25,15 @@ inglese di questo catalogo è in [`en/`](./en/).
 
 | Statistica | Valore |
 |---|---|
-| Accessi totali | 20.731.065 |
-| Fuori dal confine comunale, oltre 110 m | 51.423 (0,25%) |
+| Accessi totali | 20.728.959 |
+| Fuori dal confine comunale, oltre 110 m | 48.527 (0,23%) |
 | Senza confine comunale di riferimento | 0 |
-| Comuni con almeno un accesso | 5.493 |
-| Metodo 1, rilevazione strumentale sul campo, accuratezza inferiore a 5 m | 1.714.163 (8,27%) |
-| Metodo 2, rilevazione strumentale sul campo, accuratezza pari o superiore a 5 m | 290.652 (1,40%) |
-| Metodo 3, derivazione indiretta da base dati territoriale, accuratezza stimata inferiore a 5 m | 7.125.819 (34,37%) |
-| Metodo 4, derivazione indiretta da base dati territoriale, accuratezza stimata pari o superiore a 5 m | 10.894.269 (52,55%) |
-| Metodo 5, derivazione indiretta tramite le funzioni del Portale per i Comuni | 706.162 (3,41%) |
+| Comuni con almeno un accesso | 5.502 |
+| Metodo 1, rilevazione strumentale sul campo, accuratezza inferiore a 5 m | 1.721.955 (8,31%) |
+| Metodo 2, rilevazione strumentale sul campo, accuratezza pari o superiore a 5 m | 290.658 (1,40%) |
+| Metodo 3, derivazione indiretta da base dati territoriale, accuratezza stimata inferiore a 5 m | 7.118.388 (34,34%) |
+| Metodo 4, derivazione indiretta da base dati territoriale, accuratezza stimata pari o superiore a 5 m | 10.892.898 (52,55%) |
+| Metodo 5, derivazione indiretta tramite le funzioni del Portale per i Comuni | 705.060 (3,40%) |
 
 ## Licenza
 

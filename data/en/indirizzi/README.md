@@ -1,15 +1,15 @@
 # ANNCSU addresses, single file
 
-Every external access recorded in ANNCSU in one GeoParquet file, spatially sorted along a Hilbert curve and carrying a bbox column, so a reader can skip whole row groups without decoding geometries. Suited to analysis over the whole country. To read a single comune the partitioned collection is the better choice. Of 20,731,065 addresses, 51,423 (0.25%) fall more than 110 metres outside the boundary of the comune they are assigned to, according to Istat boundaries, and 0 have no boundary to compare against. This collection holds the 20,731,065 georeferenced addresses out of the 27,415,954 in the 15 September 2026 release: addresses without coordinates are in the `rilasci` collection.
+Every external access recorded in ANNCSU in one GeoParquet file, spatially sorted along a Hilbert curve and carrying a bbox column, so a reader can skip whole row groups without decoding geometries. Suited to analysis over the whole country. To read a single comune the partitioned collection is the better choice. Of 20,728,959 addresses, 48,527 (0.23%) fall more than 110 metres outside the boundary of the comune they are assigned to, according to Istat boundaries, and 0 have no boundary to compare against. This collection holds the 20,728,959 georeferenced addresses out of the 27,413,752 in the 2 November 2026 release: addresses without coordinates are in the `rilasci` collection.
 
-Updated to the 15 September 2026 release, with 20,731,065 addresses.
+Updated to the 2 November 2026 release, with 20,728,959 addresses.
 See the data on a map in the [web viewer](https://anncsu-open.github.io/anncsu-viewer/).
 
 > **Display note.** In the Portolan Browser, as in the STAC Browser it derives
 > from, the temporal extent of this collection is rendered as "until present"
 > without its start date in every interface language other than English. It is
 > a defect of the browser, not of the catalog: the interval declared in
-> `extent.temporal` starts on 15 September 2026 and is open-ended, and reads
+> `extent.temporal` starts on 2 November 2026 and is open-ended, and reads
 > in full with the English interface or in the JSON through Source.
 
 ## How to read it
@@ -28,15 +28,15 @@ LIMIT 10;
 
 | Statistic | Value |
 |---|---|
-| Total addresses | 20,731,065 |
-| Outside the comune boundary, beyond 110 m | 51,423 (0.25%) |
+| Total addresses | 20,728,959 |
+| Outside the comune boundary, beyond 110 m | 48,527 (0.23%) |
 | Without a comune boundary to compare against | 0 |
-| Comuni with at least one address | 5,493 |
-| Method 1, field survey with instruments, accuracy below 5 m | 1,714,163 (8.27%) |
-| Method 2, field survey with instruments, accuracy of 5 m or more | 290,652 (1.40%) |
-| Method 3, indirect derivation from a spatial database, estimated accuracy below 5 m | 7,125,819 (34.37%) |
-| Method 4, indirect derivation from a spatial database, estimated accuracy of 5 m or more | 10,894,269 (52.55%) |
-| Method 5, indirect derivation through the functions of the Portale per i Comuni | 706,162 (3.41%) |
+| Comuni with at least one address | 5,502 |
+| Method 1, field survey with instruments, accuracy below 5 m | 1,721,955 (8.31%) |
+| Method 2, field survey with instruments, accuracy of 5 m or more | 290,658 (1.40%) |
+| Method 3, indirect derivation from a spatial database, estimated accuracy below 5 m | 7,118,388 (34.34%) |
+| Method 4, indirect derivation from a spatial database, estimated accuracy of 5 m or more | 10,892,898 (52.55%) |
+| Method 5, indirect derivation through the functions of the Portale per i Comuni | 705,060 (3.40%) |
 
 ## Schema
 

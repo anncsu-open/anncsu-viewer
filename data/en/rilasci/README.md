@@ -1,6 +1,6 @@
 # ANNCSU monthly releases
 
-Every monthly download of the national address register, from 3 September 2025 to 15 September 2026, as published by the [ANNCSU portal](https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/). The portal serves only the latest release: all of them are kept here.
+Every monthly download of the national address register, from 3 September 2025 to 2 November 2026, as published by the [ANNCSU portal](https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/). The portal serves only the latest release: all of them are kept here.
 
 Every release has two files:
 
@@ -13,6 +13,7 @@ It is the history the `indirizzi` and `indirizzi-h3` collections derive their cu
 
 | Release | Origin | Addresses | ZIP | Parquet |
 |---|---|---|---|---|
+| [2026-11-02](./2026-11-02/2026-11-02.json) | original | 27,413,752 | [336.3 MB](https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/rilasci/2026-11-02/indirizzarioItalia_20261102.zip) | [259.3 MB](https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/rilasci/2026-11-02/INDIR_ITA_20261102.parquet) |
 | [2026-09-15](./2026-09-15/2026-09-15.json) | original | 27,415,954 | [336.1 MB](https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/rilasci/2026-09-15/indirizzarioItalia_20260915.zip) | [258.9 MB](https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/rilasci/2026-09-15/INDIR_ITA_20260915.parquet) |
 | [2026-08-03](./2026-08-03/2026-08-03.json) | reconstructed | 27,405,709 | [324.7 MB](https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/rilasci/2026-08-03/indirizzarioItalia_20260803.zip) | [258.5 MB](https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/rilasci/2026-08-03/INDIR_ITA_20260803.parquet) |
 | [2026-07-03](./2026-07-03/2026-07-03.json) | reconstructed | 27,405,384 | [324.4 MB](https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/rilasci/2026-07-03/indirizzarioItalia_20260703.zip) | [258.1 MB](https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/rilasci/2026-07-03/INDIR_ITA_20260703.parquet) |
@@ -38,7 +39,7 @@ can be queried over HTTP:
 ```sql
 INSTALL httpfs; LOAD httpfs;
 SELECT count(*) FILTER (WHERE COORD_X_COMUNE IS NULL) AS without_coordinates
-FROM read_parquet('https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/rilasci/2026-09-15/INDIR_ITA_20260915.parquet');
+FROM read_parquet('https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/rilasci/2026-11-02/INDIR_ITA_20261102.parquet');
 ```
 
 To compare two releases, join them on `PROGRESSIVO_ACCESSO`, unique within
