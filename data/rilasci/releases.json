@@ -220,6 +220,23 @@
         "rows": 27415954
       },
       "archived": "2026-09-20T22:39:04Z"
+    },
+    {
+      "date": "2026-11-02",
+      "origin": "original",
+      "note": "Scarico dal portale ANNCSU.",
+      "zip": {
+        "name": "indirizzarioItalia_20261102.zip",
+        "size": 336334007,
+        "sha256": "d2220dc3d92af0c12b42e5d238a536253ab290cd6a4f5b5419ee125a745bb01a"
+      },
+      "parquet": {
+        "name": "INDIR_ITA_20261102.parquet",
+        "size": 259271122,
+        "sha256": "d74575af21fe2c9e725fc2a43f355ad261341b3498a44323558a67955e0b5e23",
+        "rows": 27413752
+      },
+      "archived": "2026-11-09T15:45:05Z"
     }
   ]
 }
