@@ -91,6 +91,38 @@ Releases before 15 September 2026 are reconstructions from
 every monthly download when the portal did not; the method is verified byte
 for byte against the one original we hold. Each item says which it is.
 
+## Street register
+
+The `stradario` collection keeps the ANNCSU street register, one row per street
+(`PROGRESSIVO_NAZIONALE`), including the streets that have no civici and so
+never appear in the address data. It has the same shape as `rilasci`: one
+directory per release date under `stradario/` and one item per release,
+chained with the STAC version extension. A release downloaded from the portal
+keeps its ZIP and a lossless Parquet copy with all columns as text. The portal
+serves only the latest release. As far as we found, the only earlier copies
+published elsewhere are the 2025-01-28 Parquet in ondata/archivio_anncsu and a
+Wayback Machine capture of 2026-01-14; mfortini/diff_ANNCSU holds none.
+
+Four releases are held today. 2025-08-04 is a local copy of the portal's ZIP
+saved in August 2025, 2026-01-14 a Wayback Machine capture of it, and
+2026-11-02 a download from the portal. 2025-01-28 has no ZIP: it is a Parquet
+published by [ondata/archivio_anncsu](https://github.com/ondata/archivio_anncsu),
+converted to the same text columns. Each item says which origin it has.
+
+```shell
+curl -s https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/stradario/collection.json \
+  | jq -r '.links[] | select(.rel == "item") | .title'
+```
+
+```sql
+INSTALL httpfs; LOAD httpfs;
+SELECT count(*) AS strade
+FROM read_parquet('https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/stradario/2026-11-02/STRAD_ITA_20261102.parquet');
+```
+
+How it is archived is in
+[docs/how-the-stradario-is-archived.md](docs/how-the-stradario-is-archived.md).
+
 ## Working on the catalog
 
 Regenerate it from whatever is currently in `data/`:
@@ -143,14 +175,22 @@ data/                                  = the public bucket root
 │   └── styles/indirizzi.json
 ├── indirizzi-h3/                      collection: the same data, split into tiles
 │   └── ...                            same shape
-└── rilasci/                           collection: the monthly release archive
+├── rilasci/                           collection: the monthly release archive
+│   ├── collection.json
+│   ├── README.md, AGENTS.md
+│   ├── releases.json                  the index the items are built from
+│   └── <date>/                        one directory per release
+│       ├── <date>.json                item
+│       ├── indirizzarioItalia_*.zip   R2 only, not in git
+│       └── INDIR_ITA_*.parquet        R2 only, not in git
+└── stradario/                         collection: the street register archive
     ├── collection.json
     ├── README.md, AGENTS.md
     ├── releases.json                  the index the items are built from
     └── <date>/                        one directory per release
         ├── <date>.json                item
-        ├── indirizzarioItalia_*.zip   R2 only, not in git
-        └── INDIR_ITA_*.parquet        R2 only, not in git
+        ├── stradarioItalia_*.zip      R2 only, not in git (none for 2025-01-28)
+        └── STRAD_ITA_*.parquet        R2 only, not in git
 ```
 
 Data files stay where they are, so the frontend, the sync, and every published
@@ -194,9 +234,10 @@ has no description, or when the file describes a column that is gone.
 
 ## How it gets published
 
-A workflow runs after "Update ANNCSU Data" finishes, and can also be started by
-hand. It generates the catalog, validates it, commits when something changed,
-uploads only the catalog files, then checks the result against the live bucket.
+The workflow is called by "Update ANNCSU Data" once the civici part has
+succeeded, and can also be started by hand. It generates the catalog, validates
+it, commits when something changed, uploads only the catalog files, then checks
+the result against the live bucket.
 
 Validation is the gate: on failure nothing is committed and nothing is uploaded.
 

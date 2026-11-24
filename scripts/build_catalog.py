@@ -75,6 +75,23 @@ RAW_COLUMNS = [
 ]
 RELEASE_ORIGINS = ("original", "reconstructed")
 
+# The stradario CSV columns, in file order. TOTALE_ACCESSI is the access count
+# the portal computes from the civici of the same release.
+STRAD_COLUMNS = [
+    "CODICE_COMUNE",
+    "CODICE_ISTAT",
+    "PROGRESSIVO_NAZIONALE",
+    "CODICE_COMUNALE",
+    "ODONIMO",
+    "LOCALITA'",
+    "TOTALE_ACCESSI",
+    "DIZIONE_LINGUA1",
+    "DIZIONE_LINGUA2",
+]
+# A third-party copy comes from someone else's Parquet: the portal's ZIP is
+# not available for it.
+STRADARIO_ORIGINS = ("original", "third-party")
+
 PUBLIC_BASE = "https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev"
 # The same bucket through R2's S3 API. A partition glob needs a scheme that
 # supports listing (PORTO-FMT-064), and listing this bucket needs R2
@@ -249,12 +266,23 @@ def raw_table_columns(columns_path: Path, lang: str = "it") -> list[dict]:
     whatever columns.yaml says about the enriched schema. Descriptions still
     come from columns.yaml, in the requested language.
     """
+    return _text_table_columns(columns_path, RAW_COLUMNS, "Raw CSV", lang)
+
+
+def stradario_table_columns(columns_path: Path, lang: str = "it") -> list[dict]:
+    """table:columns for the stradario Parquet: the nine CSV columns as text."""
+    return _text_table_columns(columns_path, STRAD_COLUMNS, "Stradario CSV", lang)
+
+
+def _text_table_columns(
+    columns_path: Path, names: list[str], label: str, lang: str
+) -> list[dict]:
     description_key = "description" if lang == "it" else f"description_{lang}"
     documented = load_columns(columns_path)
-    missing = [name for name in RAW_COLUMNS if name not in documented]
+    missing = [name for name in names if name not in documented]
     if missing:
         raise SystemExit(
-            f"Raw CSV columns without documentation in {columns_path.name}: "
+            f"{label} columns without documentation in {columns_path.name}: "
             f"{', '.join(missing)}."
         )
     return [
@@ -263,16 +291,21 @@ def raw_table_columns(columns_path: Path, lang: str = "it") -> list[dict]:
             "type": "varchar",
             "description": documented[name][description_key],
         }
-        for name in RAW_COLUMNS
+        for name in names
     ]
 
 
-def load_releases(path: Path) -> list[dict]:
+def load_releases(
+    path: Path,
+    origins: tuple[str, ...] = RELEASE_ORIGINS,
+    zip_optional: frozenset[str] = frozenset(),
+) -> list[dict]:
     """Load and validate the release index, oldest first.
 
     The index is the only source of facts about the archive: the generator
     never lists the bucket. A malformed entry stops the build rather than
-    producing an item that lies about a file.
+    producing an item that lies about a file. ``zip_optional`` names the
+    origins whose ``zip`` may be null; for every other origin it is required.
     """
     if not path.exists():
         raise SystemExit(
@@ -289,12 +322,20 @@ def load_releases(path: Path) -> list[dict]:
         missing = required - entry.keys()
         if missing:
             raise SystemExit(f"Release entry missing {sorted(missing)}: {entry}")
-        if entry["origin"] not in RELEASE_ORIGINS:
+        if entry["origin"] not in origins:
             raise SystemExit(
                 f"Release {entry['date']}: origin must be one of "
-                f"{RELEASE_ORIGINS}, got {entry['origin']!r}."
+                f"{origins}, got {entry['origin']!r}."
             )
         for key in ("zip", "parquet"):
+            if key == "zip" and entry["origin"] in zip_optional:
+                if entry["zip"] is None:
+                    continue
+            if entry[key] is None:
+                raise SystemExit(
+                    f"Release {entry['date']}: {key} entry missing for an "
+                    f"origin that requires it."
+                )
             wanted = file_keys | ({"rows"} if key == "parquet" else set())
             lacking = wanted - entry[key].keys()
             if lacking:
@@ -626,14 +667,16 @@ TEXTS = {
             "formati cloud-native a partire dal [portale open data "
             "ANNCSU]($portal).\n"
             "\n"
-            "Il catalogo pubblica tre collection:\n"
+            "Il catalogo pubblica quattro collection:\n"
             "\n"
             "- `indirizzi`: un unico file GeoParquet, per l'analisi "
             "sull'intero territorio nazionale.\n"
             "- `indirizzi-h3`: gli stessi dati partizionati in celle H3, per "
             "leggere un comune alla volta senza scaricare tutto.\n"
             "- `rilasci`: l'archivio degli scarichi mensili, da cui le altre "
-            "due derivano il rilascio corrente."
+            "due derivano il rilascio corrente.\n"
+            "- `stradario`: l'archivio dello stradario nazionale, l'elenco "
+            "delle strade con il numero dei loro accessi."
         ),
         "indirizzi_title": "Indirizzi ANNCSU, file unico",
         "indirizzi_description": (
@@ -758,6 +801,61 @@ TEXTS = {
             "ancora quello del $still_served."
         ),
         "keywords_rilasci": ["rilasci", "storico", "archivio"],
+        "keywords_stradario": ["stradario", "strade", "storico"],
+        "related_civici": "Civici dello stesso rilascio",
+        "related_stradario": "Stradario dello stesso rilascio",
+        "stradario_title": "Stradario ANNCSU",
+        "stradario_description": (
+            "I rilasci dello stradario nazionale ANNCSU conservati qui. Il "
+            "[portale ANNCSU]($portal) serve solo l'ultimo rilascio, quindi "
+            "l'archivio contiene i rilasci elencati e non tutti i mesi.\n"
+            "\n"
+            "Un rilascio scaricato dal portale ha due file: lo **ZIP** come lo "
+            "distribuisce il portale e una **copia Parquet senza perdita** del "
+            "CSV, con tutte le righe e le 9 colonne originali come testo. I "
+            "rilasci che vengono da ondata/archivio_anncsu hanno solo il "
+            "Parquet, e non si può dire che siano senza perdita: la loro "
+            "completezza rispetto al CSV originale non è verificabile.\n"
+            "\n"
+            "`TOTALE_ACCESSI` è calcolato dal portale sui civici dello stesso "
+            "rilascio.\n"
+            "\n"
+            "I rilasci di cui non sopravvive lo stradario originale non sono "
+            "pubblicati. La parte ricavabile, cioè le strade con almeno un "
+            "accesso, si ottiene raggruppando i civici della collection "
+            "`rilasci`."
+        ),
+        "stradario_release_title": "Stradario del $date_human",
+        "stradario_original": (
+            "Stradario del rilascio del $date_human, $rows strade, dallo ZIP "
+            "originale del [portale ANNCSU]($portal)."
+        ),
+        "stradario_third_party": (
+            "Stradario del rilascio del $date_human, $rows strade, dalla copia "
+            "Parquet conservata da ondata/archivio_anncsu. Lo ZIP del portale "
+            "non è disponibile."
+        ),
+        "stradario_parquet": "CSV dello stradario in Parquet, senza perdita",
+        "stradario_parquet_description": (
+            "Il CSV dello stradario in Parquet senza perdita: tutte le righe e "
+            "le 9 colonne originali come testo."
+        ),
+        "stradario_third_party_parquet": (
+            "Copia Parquet del CSV da ondata/archivio_anncsu"
+        ),
+        "stradario_third_party_parquet_description": (
+            "Lo stradario in Parquet, con tutte le colonne come testo, "
+            "ricavato dal Parquet di ondata/archivio_anncsu. Le due colonne "
+            "che ondata aveva salvato come interi (BIGINT) sono state "
+            "riconvertite in testo: sui tre originali che abbiamo, la stessa "
+            "conversione restituisce il testo identico. La completezza "
+            "rispetto al CSV originale non è verificabile."
+        ),
+        "stradario_zip": "Archivio ZIP dello stradario",
+        "stradario_zip_description": (
+            "Lo ZIP così come l'ha servito il portale ANNCSU, con dentro il CSV "
+            "dello stradario."
+        ),
         "georeferenced_sentence": (
             "Questa collection contiene i $with_coords accessi georeferenziati "
             "sui $total del rilascio del $date_human: gli accessi privi di "
@@ -778,13 +876,15 @@ TEXTS = {
             "cloud-native formats from the [ANNCSU open data "
             "portal]($portal).\n"
             "\n"
-            "The catalog publishes three collections:\n"
+            "The catalog publishes four collections:\n"
             "\n"
             "- `indirizzi`: one GeoParquet file, for country-wide analysis.\n"
             "- `indirizzi-h3`: the same data partitioned into H3 cells, to "
             "read one comune at a time without downloading everything.\n"
             "- `rilasci`: the archive of monthly downloads, which the other "
-            "two derive their current release from."
+            "two derive their current release from.\n"
+            "- `stradario`: the archive of the national street register, the "
+            "list of streets with their number of accesses."
         ),
         "indirizzi_title": "ANNCSU addresses, single file",
         "indirizzi_description": (
@@ -905,6 +1005,61 @@ TEXTS = {
             "$still_served release."
         ),
         "keywords_rilasci": ["releases", "history", "archive"],
+        "keywords_stradario": ["street register", "streets", "history"],
+        "related_civici": "House numbers of the same release",
+        "related_stradario": "Street register of the same release",
+        "stradario_title": "ANNCSU street register",
+        "stradario_description": (
+            "The releases of the ANNCSU national street register kept here. "
+            "The [ANNCSU portal]($portal) serves only the latest release, so "
+            "the archive holds the releases listed, not every month.\n"
+            "\n"
+            "A release downloaded from the portal has two files: the **ZIP** "
+            "as the portal distributes it and a **lossless Parquet copy** of "
+            "the CSV, with every row and the 9 original columns as text. "
+            "Releases that come from ondata/archivio_anncsu have only the "
+            "Parquet and cannot be called lossless: their completeness "
+            "against the original CSV cannot be verified.\n"
+            "\n"
+            "`TOTALE_ACCESSI` is computed by the portal from the house numbers "
+            "of the same release.\n"
+            "\n"
+            "Releases for which no original street register survives are not "
+            "published. The part that can be derived, the streets with at "
+            "least one access, comes from grouping the house numbers of the "
+            "`rilasci` collection."
+        ),
+        "stradario_release_title": "Street register of $date_human",
+        "stradario_original": (
+            "Street register of the $date_human release, $rows streets, from "
+            "the original ZIP of the [ANNCSU portal]($portal)."
+        ),
+        "stradario_third_party": (
+            "Street register of the $date_human release, $rows streets, from "
+            "the Parquet copy kept by ondata/archivio_anncsu. The portal's ZIP "
+            "is not available."
+        ),
+        "stradario_parquet": "Street register CSV as Parquet, lossless",
+        "stradario_parquet_description": (
+            "The street register CSV as lossless Parquet: every row and the 9 "
+            "original columns as text."
+        ),
+        "stradario_third_party_parquet": (
+            "Parquet copy of the CSV from ondata/archivio_anncsu"
+        ),
+        "stradario_third_party_parquet_description": (
+            "The street register as Parquet with every column as text, taken "
+            "from the Parquet of ondata/archivio_anncsu. The two columns "
+            "ondata stored as integers (BIGINT) were converted back to text: "
+            "on the three originals we hold, the same conversion gives back "
+            "identical text. Completeness against the original CSV cannot be "
+            "verified."
+        ),
+        "stradario_zip": "ZIP archive of the street register",
+        "stradario_zip_description": (
+            "The ZIP as the ANNCSU portal served it, holding the street "
+            "register CSV."
+        ),
         "georeferenced_sentence": (
             "This collection holds the $with_coords georeferenced addresses out "
             "of the $total in the $date_human release: addresses without "
@@ -1156,6 +1311,37 @@ def releases_table(facts: dict, lang: str = SOURCE_LANG) -> str:
     return "\n".join(rows)
 
 
+def stradario_releases_table(facts: dict, lang: str = SOURCE_LANG) -> str:
+    """One row per stradario release, newest first; the ZIP may be missing."""
+    it = lang == "it"
+    header = (
+        "| Rilascio | Origine | Strade | ZIP | Parquet |"
+        if it
+        else "| Release | Origin | Streets | ZIP | Parquet |"
+    )
+    origin_names = {
+        "original": "originale" if it else "original",
+        "third-party": "terza parte" if it else "third-party",
+    }
+    rows = [header, "|---|---|---|---|---|"]
+    for r in reversed(facts["stradario"]):
+        date = r["date"]
+        if r["zip"] is None:
+            zip_cell = "-"
+        else:
+            zip_cell = (
+                f"[{human_size(r['zip']['size'], lang)}]"
+                f"({release_asset_url(r, 'zip', prefix='stradario')})"
+            )
+        rows.append(
+            f"| [{date}](./{date}/{date}.json) | {origin_names[r['origin']]} | "
+            f"{human_count(r['parquet']['rows'], lang)} | {zip_cell} | "
+            f"[{human_size(r['parquet']['size'], lang)}]"
+            f"({release_asset_url(r, 'parquet', prefix='stradario')}) |"
+        )
+    return "\n".join(rows)
+
+
 def schema_table(columns: list[dict], lang: str = SOURCE_LANG) -> str:
     """Render table:columns as a Markdown table.
 
@@ -1359,6 +1545,12 @@ def build_root(updated: str, lang: str = SOURCE_LANG) -> dict:
                 "href": "./rilasci/collection.json",
                 "type": "application/json",
                 "title": text["rilasci_title"],
+            },
+            {
+                "rel": "child",
+                "href": "./stradario/collection.json",
+                "type": "application/json",
+                "title": text["stradario_title"],
             },
             *_tree_alternates(lang, 0, "catalog.json"),
             _viewer_link(lang),
@@ -1576,14 +1768,14 @@ def build_indirizzi_h3(facts: dict, lang: str = SOURCE_LANG) -> dict:
 # --- writing -----------------------------------------------------------------
 
 
-def release_asset_url(release: dict, key: str) -> str:
+def release_asset_url(release: dict, key: str, prefix: str = "rilasci") -> str:
     """Absolute URL of a release file on R2.
 
     Only the archive uses absolute hrefs: its files are never in the checkout,
     so a relative href could not be verified and would break the tree for
     local validation.
     """
-    return f"{PUBLIC_BASE}/rilasci/{release['date']}/{release[key]['name']}"
+    return f"{PUBLIC_BASE}/{prefix}/{release['date']}/{release[key]['name']}"
 
 
 def _release_datetime(release: dict) -> str:
@@ -1662,6 +1854,15 @@ def build_release_item(
         lang, 2, f"rilasci/{date}/{date}.json", "application/geo+json"
     )
     links += _source_links(lang)
+    if any(r["date"] == date for r in facts.get("stradario", [])):
+        links.append(
+            {
+                "rel": "related",
+                "href": f"../../stradario/{date}/{date}.json",
+                "type": "application/geo+json",
+                "title": text["related_stradario"],
+            }
+        )
 
     return {
         "type": "Feature",
@@ -1785,6 +1986,192 @@ def build_rilasci(facts: dict, lang: str = SOURCE_LANG) -> dict:
     }
 
 
+def _stradario_description(release: dict, lang: str) -> str:
+    text = TEXTS[lang]
+    key = (
+        "stradario_original"
+        if release["origin"] == "original"
+        else "stradario_third_party"
+    )
+    return (
+        Template(text[key])
+        .substitute(
+            date_human=human_date(_release_datetime(release), lang),
+            rows=human_count(release["parquet"]["rows"], lang),
+            portal=SOURCE_PORTAL,
+        )
+        .strip()
+    )
+
+
+def build_stradario_item(
+    release: dict, releases: list[dict], facts: dict, lang: str = SOURCE_LANG
+) -> dict:
+    """One release of the stradario as a tabular STAC item.
+
+    Shaped like build_release_item: no geometry, no bbox. A third-party
+    release has no ZIP, so it has no source asset.
+    """
+    text = TEXTS[lang]
+    date = release["date"]
+    ordered = [r["date"] for r in releases]
+    position = ordered.index(date)
+    links = [
+        {"rel": "root", "href": "../../catalog.json", "type": "application/json"},
+        {"rel": "parent", "href": "../collection.json", "type": "application/json"},
+        {
+            "rel": "collection",
+            "href": "../collection.json",
+            "type": "application/json",
+        },
+    ]
+    if position > 0:
+        prev = ordered[position - 1]
+        links.append(
+            {
+                "rel": "predecessor-version",
+                "href": f"../{prev}/{prev}.json",
+                "type": "application/geo+json",
+            }
+        )
+    if position < len(ordered) - 1:
+        nxt = ordered[position + 1]
+        links.append(
+            {
+                "rel": "successor-version",
+                "href": f"../{nxt}/{nxt}.json",
+                "type": "application/geo+json",
+            }
+        )
+    links += _tree_alternates(
+        lang, 2, f"stradario/{date}/{date}.json", "application/geo+json"
+    )
+    links += _source_links(lang)
+    if any(r["date"] == date for r in facts["releases"]):
+        links.append(
+            {
+                "rel": "related",
+                "href": f"../../rilasci/{date}/{date}.json",
+                "type": "application/geo+json",
+                "title": text["related_civici"],
+            }
+        )
+
+    suffix = "" if release["origin"] == "original" else "third_party_"
+    assets = {
+        "data": {
+            "href": release_asset_url(release, "parquet", prefix="stradario"),
+            "type": "application/vnd.apache.parquet",
+            "title": text[f"stradario_{suffix}parquet"],
+            "description": text[f"stradario_{suffix}parquet_description"],
+            "roles": ["data"],
+            "file:size": release["parquet"]["size"],
+            "file:checksum": "1220" + release["parquet"]["sha256"],
+        }
+    }
+    if release["zip"] is not None:
+        assets["source"] = {
+            "href": release_asset_url(release, "zip", prefix="stradario"),
+            "type": "application/zip",
+            "title": text["stradario_zip"],
+            "description": text["stradario_zip_description"],
+            "roles": ["source"],
+            "file:size": release["zip"]["size"],
+            "file:checksum": "1220" + release["zip"]["sha256"],
+        }
+
+    return {
+        "type": "Feature",
+        "stac_version": "1.1.0",
+        "stac_extensions": [
+            PORTOLAN_SCHEMA,
+            FILE_SCHEMA,
+            TABLE_SCHEMA,
+            VERSION_SCHEMA,
+            LANGUAGE_SCHEMA,
+        ],
+        "id": date,
+        "collection": "stradario",
+        "geometry": None,
+        "properties": {
+            "datetime": _release_datetime(release),
+            "title": Template(text["stradario_release_title"]).substitute(
+                date_human=human_date(_release_datetime(release), lang)
+            ),
+            "description": _stradario_description(release, lang),
+            "version": date,
+            "table:columns": _columns_for(facts, "stradario_table_columns", lang),
+            "table:row_count": release["parquet"]["rows"],
+            **_language_fields(lang),
+        },
+        "assets": assets,
+        "links": links,
+    }
+
+
+def build_stradario(facts: dict, lang: str = SOURCE_LANG) -> dict:
+    """The stradario archive, a tabular collection with one item per release.
+
+    ``updated`` is the latest ``archived`` in the stradario index, so it does
+    not depend on which workflow last ran.
+    """
+    text = TEXTS[lang]
+    releases = facts["stradario"]
+    first, last = releases[0], releases[-1]
+    item_links = [
+        {
+            "rel": "item",
+            "href": f"./{r['date']}/{r['date']}.json",
+            "type": "application/geo+json",
+            "title": Template(text["stradario_release_title"]).substitute(
+                date_human=human_date(_release_datetime(r), lang)
+            ),
+        }
+        for r in releases
+    ]
+    return {
+        "type": "Collection",
+        "stac_version": "1.1.0",
+        "stac_extensions": [
+            PORTOLAN_SCHEMA,
+            FILE_SCHEMA,
+            TABLE_SCHEMA,
+            VERSION_SCHEMA,
+            LANGUAGE_SCHEMA,
+        ],
+        "id": "stradario",
+        "title": text["stradario_title"],
+        "description": Template(text["stradario_description"]).substitute(
+            portal=SOURCE_PORTAL
+        ),
+        "license": LICENSE_ID,
+        "keywords": [*text["keywords"], *text["keywords_stradario"]],
+        "providers": providers(),
+        "extent": {
+            "spatial": {"bbox": [facts["bbox"]]},
+            "temporal": {"interval": [[_release_datetime(first), None]]},
+        },
+        **_language_fields(lang),
+        "updated": max(r["archived"] for r in releases),
+        "table:columns": _columns_for(facts, "stradario_table_columns", lang),
+        "assets": {},
+        "links": [
+            {"rel": "root", "href": "../catalog.json", "type": "application/json"},
+            {"rel": "parent", "href": "../catalog.json", "type": "application/json"},
+            *item_links,
+            {
+                "rel": "latest-version",
+                "href": f"./{last['date']}/{last['date']}.json",
+                "type": "application/geo+json",
+            },
+            *_tree_alternates(lang, 1, "stradario/collection.json"),
+            _viewer_link(lang),
+            *_source_links(lang),
+            *_documentation_links(lang),
+        ],
+    }
+
+
 def write_json(path: Path, document: dict) -> None:
     """Write a STAC document deterministically and atomically.
 
@@ -1844,7 +2231,17 @@ def collect_facts(data_dir: Path) -> dict:
         "tile_key": inventory["key"],
         "statistics": statistics,
         "releases": load_releases(data_dir / "rilasci" / "releases.json"),
+        "stradario": load_releases(
+            data_dir / "stradario" / "releases.json",
+            origins=STRADARIO_ORIGINS,
+            zip_optional=frozenset({"third-party"}),
+        ),
     }
+    if not facts["stradario"]:
+        raise SystemExit(
+            f"{data_dir / 'stradario' / 'releases.json'} lists no releases: "
+            f"the stradario collection cannot describe an empty archive."
+        )
     for lang in ALL_LANGS:
         suffix = "" if lang == SOURCE_LANG else f"_{lang}"
         facts[f"table_columns{suffix}"] = table_columns(parquet, COLUMNS_FILE, lang)
@@ -1852,6 +2249,9 @@ def collect_facts(data_dir: Path) -> dict:
             sample_tile, COLUMNS_FILE, lang
         )
         facts[f"raw_table_columns{suffix}"] = raw_table_columns(COLUMNS_FILE, lang)
+        facts[f"stradario_table_columns{suffix}"] = stradario_table_columns(
+            COLUMNS_FILE, lang
+        )
     return facts
 
 
@@ -1980,6 +2380,40 @@ def _write_tree(data_dir: Path, facts: dict, lang: str) -> None:
         write_json(
             rilasci / release["date"] / f"{release['date']}.json",
             build_release_item(release, facts["releases"], facts, lang),
+        )
+
+    # The street register archive, written the same way. The query in its
+    # README rebuilds the streets of a release from the civici above.
+    stradario = tree / "stradario"
+    document = build_stradario(facts, lang)
+    write_json(stradario / "collection.json", document)
+    write_text(
+        stradario / "README.md",
+        render_template(
+            template_name("stradario.README.md", lang),
+            {
+                **shared,
+                "title": document["title"],
+                "description": document["description"],
+                "releases_table": stradario_releases_table(facts, lang),
+                "schema_table": schema_table(
+                    _columns_for(facts, "stradario_table_columns", lang), lang
+                ),
+                "public_base": PUBLIC_BASE,
+            },
+        ),
+    )
+    write_text(
+        stradario / "AGENTS.md",
+        render_template(
+            template_name("stradario.AGENTS.md", lang),
+            {"portolan_version": PORTOLAN_VERSION},
+        ),
+    )
+    for release in facts["stradario"]:
+        write_json(
+            stradario / release["date"] / f"{release['date']}.json",
+            build_stradario_item(release, facts["stradario"], facts, lang),
         )
 
 

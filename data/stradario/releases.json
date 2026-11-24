@@ -1,0 +1,68 @@
+{
+  "releases": [
+    {
+      "date": "2025-01-28",
+      "origin": "third-party",
+      "note": "Parquet di ondata/archivio_anncsu (output/STRAD_ITA_20250128.parquet); lo ZIP originale non è disponibile.",
+      "zip": null,
+      "parquet": {
+        "name": "STRAD_ITA_20250128.parquet",
+        "size": 11282782,
+        "sha256": "ec3b5cc23624ae14c9b0ad1762aefa26d4f88ea3059242dcf0e973e0f3c38ca8",
+        "rows": 1212812
+      },
+      "archived": "2026-11-24T16:00:02Z"
+    },
+    {
+      "date": "2025-08-04",
+      "origin": "original",
+      "note": "Copia locale dello ZIP del portale, salvata ad agosto 2025.",
+      "zip": {
+        "name": "stradarioItalia_20250804.zip",
+        "size": 13781868,
+        "sha256": "b5cf479154fde61c723e0165ad532529e5bcf46e7baf0da001f5d2034e72fafe"
+      },
+      "parquet": {
+        "name": "STRAD_ITA_20250804.parquet",
+        "size": 11328153,
+        "sha256": "d94fcd0f2f1e532a5a4c0cb4f5273793edc6164d381f75d58ba47c6676146e98",
+        "rows": 1214161
+      },
+      "archived": "2026-11-24T16:00:03Z"
+    },
+    {
+      "date": "2026-01-14",
+      "origin": "original",
+      "note": "Cattura della Wayback Machine del 2026-01-18.",
+      "zip": {
+        "name": "stradarioItalia_20260114.zip",
+        "size": 13841967,
+        "sha256": "ba0caba1a54dfe2d8e5fa3fc60f01a5fb41e1d43b4728ef263d73b840bbaffb1"
+      },
+      "parquet": {
+        "name": "STRAD_ITA_20260114.parquet",
+        "size": 11400700,
+        "sha256": "0aeff1d607e8da8f251b2952ddfc4558873b344a02b1ca02625058231f2609f4",
+        "rows": 1217062
+      },
+      "archived": "2026-11-24T16:00:04Z"
+    },
+    {
+      "date": "2026-11-02",
+      "origin": "original",
+      "note": "Scarico dal portale ANNCSU del 2026-11-24.",
+      "zip": {
+        "name": "stradarioItalia_20261102.zip",
+        "size": 13920082,
+        "sha256": "e6a481987a069dcf7a981a16793258996ccaa2617266983ae97fc68edd2e9862"
+      },
+      "parquet": {
+        "name": "STRAD_ITA_20261102.parquet",
+        "size": 11472921,
+        "sha256": "77ac60805c2c86b2097d236e37879288490af6f0fe29bb49720174404de426b7",
+        "rows": 1221302
+      },
+      "archived": "2026-11-24T16:00:05Z"
+    }
+  ]
+}

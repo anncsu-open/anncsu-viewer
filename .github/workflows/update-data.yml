@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '0 6 * * 1'  # Every Monday at 06:00 UTC
   workflow_dispatch:
+    inputs:
+      force_stradario_failure:
+        description: "Make the stradario step fail, to check that the civici and the catalog still run and the run turns red"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -11,19 +16,79 @@ permissions:
 jobs:
   update-data:
     runs-on: ubuntu-latest
+    # The stradario step has continue-on-error, so its conclusion is always
+    # success. The outcome keeps the real result for the report job.
+    outputs:
+      stradario: ${{ steps.stradario.outcome }}
     steps:
       - uses: actions/checkout@v4
         with:
           lfs: true
-
-      - name: Install tippecanoe
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq tippecanoe
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
 
       - name: Install rclone (early, for live log shipping)
         run: curl -fsSL https://rclone.org/install.sh | sudo bash
+
+      # The stradario goes first and on its own: archive, upload and commit
+      # happen here, before the civici start, so a civici failure later in the
+      # run (an exception, a runner killed during enrichment) cannot lose a
+      # release the portal may replace. continue-on-error keeps a stradario
+      # failure from stopping the civici; the report job turns the run red at
+      # the end. One step for all three actions, so its outcome covers them.
+      - name: Archive the stradario
+        id: stradario
+        continue-on-error: true
+        timeout-minutes: 30
+        env:
+          PYTHONUNBUFFERED: "1"
+          ANNCSU_FORCE_STRADARIO_FAILURE: ${{ inputs.force_stradario_failure && '1' || '' }}
+          RCLONE_CONFIG_R2_TYPE: s3
+          RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+          RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          RCLONE_CONFIG_R2_ENDPOINT: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          RCLONE_CONFIG_R2_ACL: private
+          # The token cannot create buckets; stop rclone from trying to when it
+          # uploads a new object (the _debug log never reached R2 because of it).
+          RCLONE_CONFIG_R2_NO_CHECK_BUCKET: "true"
+        run: |
+          set -euo pipefail
+          uv run scripts/update_data.py --stradario
+
+          # Nothing changed means the portal has no new release: stop here.
+          if [ -z "$(git status --porcelain data/stradario)" ]; then
+            echo "Stradario already up to date"
+            exit 0
+          fi
+
+          # Upload before the commit: the index must never point at files
+          # that are not on R2. copy, never sync: the checkout holds only
+          # this release, a sync would delete every earlier one.
+          rclone copy data/stradario/ r2:anncsu-data/stradario/ \
+            --include "*/*.zip" --include "*/*.parquet" -P
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/stradario/releases.json
+          git commit -m "Update ANNCSU stradario"
+          git pull --rebase origin "$GITHUB_REF_NAME"
+          git push
+
+      # A failed parse or upload must not lose a release the portal will stop
+      # serving.
+      - name: Keep the stradario ZIP of a failed run
+        if: steps.stradario.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: stradario-zip
+          path: data/stradario/*/*.zip
+          if-no-files-found: ignore
+          retention-days: 90
+
+      - name: Install tippecanoe
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq tippecanoe
 
       - name: Run update script
         env:
@@ -101,7 +166,11 @@ jobs:
       - name: Check for changes
         id: changes
         run: |
-          git add data/
+          # The stradario has its own step and commit. If that step failed
+          # after archiving but before uploading, its index must not ride
+          # along with the civici: it would point at files not on R2. The
+          # runner discards it and the next run archives that release again.
+          git add data/ ':!data/stradario'
           if git diff --cached --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
@@ -141,3 +210,26 @@ jobs:
           # this month's files, a sync would delete every earlier release.
           rclone copy data/rilasci/ r2:anncsu-data/rilasci/ \
             --include "*/*.zip" --include "*/*.parquet" -P
+
+  # The catalog is built whenever the civici part succeeded, whatever happened
+  # to the stradario. It runs in this workflow instead of on a workflow_run
+  # trigger, so a green run does not build the catalog twice.
+  catalog:
+    needs: update-data
+    permissions:
+      contents: write
+    uses: ./.github/workflows/build-catalog.yml
+    with:
+      force_upload: false
+    secrets: inherit
+
+  # Turns the run red after the catalog if the stradario step failed, so the
+  # failure is never silent and never holds back the civici catalog.
+  report:
+    needs: [update-data, catalog]
+    if: always() && needs.update-data.outputs.stradario == 'failure'
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "::error::The stradario step failed. Read the update-data job log for the error."
+          exit 1

@@ -15,10 +15,12 @@ mappa nel [visualizzatore web]($viewer_url).
 | [Indirizzi ANNCSU, file unico](./indirizzi/) | Analisi sull'intero territorio nazionale |
 | [Indirizzi ANNCSU, partizionati per cella H3](./indirizzi-h3/) | Leggere un comune senza scaricare tutto |
 | [Rilasci mensili ANNCSU](./rilasci/) | Recuperare uno scarico passato, o confrontare due rilasci |
+| [Stradario ANNCSU](./stradario/) | Le strade con il numero dei loro accessi, per ogni rilascio conservato |
 
 Le prime due descrivono gli stessi dati in due forme di accesso, e contengono
 i soli indirizzi georeferenziati del rilascio corrente. La terza conserva ogni
-scarico mensile per intero, comprese le righe senza coordinate. Una versione in
+scarico mensile per intero, comprese le righe senza coordinate. La quarta
+conserva lo stradario nazionale. Una versione in
 inglese di questo catalogo è in [`en/`](./en/).
 
 ## Statistiche

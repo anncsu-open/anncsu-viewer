@@ -1,0 +1,151 @@
+{
+  "type": "Feature",
+  "stac_version": "1.1.0",
+  "stac_extensions": [
+    "https://schemas.portolan-sdi.org/portolan/v0.3.0/schema.json",
+    "https://stac-extensions.github.io/file/v2.1.0/schema.json",
+    "https://stac-extensions.github.io/table/v1.2.0/schema.json",
+    "https://stac-extensions.github.io/version/v1.2.0/schema.json",
+    "https://stac-extensions.github.io/language/v1.0.0/schema.json"
+  ],
+  "id": "2026-11-02",
+  "collection": "stradario",
+  "geometry": null,
+  "properties": {
+    "datetime": "2026-11-02T00:00:00Z",
+    "title": "Stradario del 2 novembre 2026",
+    "description": "Stradario del rilascio del 2 novembre 2026, 1.221.302 strade, dallo ZIP originale del [portale ANNCSU](https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/).",
+    "version": "2026-11-02",
+    "table:columns": [
+      {
+        "name": "CODICE_COMUNE",
+        "type": "varchar",
+        "description": "Codice amministrativo assegnato ai Comuni italiani dall'Agenzia delle Entrate e utilizzato nella composizione dei codici fiscali."
+      },
+      {
+        "name": "CODICE_ISTAT",
+        "type": "varchar",
+        "description": "Codice amministrativo assegnato ai Comuni italiani dall'Istat. Sei cifre. È la chiave di join con l'elenco dei comuni e con i confini ISTAT."
+      },
+      {
+        "name": "PROGRESSIVO_NAZIONALE",
+        "type": "varchar",
+        "description": "Codice progressivo univoco nazionale, identificativo dell'area di circolazione."
+      },
+      {
+        "name": "CODICE_COMUNALE",
+        "type": "varchar",
+        "description": "Codice dell'odonimo fornito dal Comune. Identificativo utilizzato dal Comune ove presente."
+      },
+      {
+        "name": "ODONIMO",
+        "type": "varchar",
+        "description": "Denominazione completa dell'area di circolazione, composta da DUG e DUF. La DUG è la Denominazione Urbanistica Generica, cioè la tipologia come via o piazza; la DUF è la Denominazione Ufficiale attribuita dal Comune ai sensi delle norme vigenti."
+      },
+      {
+        "name": "LOCALITA'",
+        "type": "varchar",
+        "description": "Denominazione della località, ove il Comune la registra. Presente solo nel CSV originale e nel parquet grezzo dell'archivio: il GeoParquet arricchito non la riporta."
+      },
+      {
+        "name": "TOTALE_ACCESSI",
+        "type": "varchar",
+        "description": "Numero di accessi (civici) della strada nello stesso rilascio, calcolato da ANNCSU a partire dai civici. Coincide con il conteggio dei civici del portale strada per strada. Presente solo nello stradario."
+      },
+      {
+        "name": "DIZIONE_LINGUA1",
+        "type": "varchar",
+        "description": "Odonimo registrato in una prima lingua diversa dall'italiano, secondo le norme in materia di bilinguismo e sull'uso delle lingue delle minoranze linguistiche riconosciute."
+      },
+      {
+        "name": "DIZIONE_LINGUA2",
+        "type": "varchar",
+        "description": "Odonimo registrato in una seconda lingua diversa dall'italiano, secondo le norme in materia di bilinguismo e sull'uso delle lingue delle minoranze linguistiche riconosciute."
+      }
+    ],
+    "table:row_count": 1221302,
+    "language": {
+      "code": "it",
+      "name": "Italiano",
+      "alternate": "Italian"
+    },
+    "languages": [
+      {
+        "code": "en",
+        "name": "English",
+        "alternate": "Inglese"
+      }
+    ]
+  },
+  "assets": {
+    "data": {
+      "href": "https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/stradario/2026-11-02/STRAD_ITA_20261102.parquet",
+      "type": "application/vnd.apache.parquet",
+      "title": "CSV dello stradario in Parquet, senza perdita",
+      "description": "Il CSV dello stradario in Parquet senza perdita: tutte le righe e le 9 colonne originali come testo.",
+      "roles": [
+        "data"
+      ],
+      "file:size": 11472921,
+      "file:checksum": "122077ac60805c2c86b2097d236e37879288490af6f0fe29bb49720174404de426b7"
+    },
+    "source": {
+      "href": "https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/stradario/2026-11-02/stradarioItalia_20261102.zip",
+      "type": "application/zip",
+      "title": "Archivio ZIP dello stradario",
+      "description": "Lo ZIP così come l'ha servito il portale ANNCSU, con dentro il CSV dello stradario.",
+      "roles": [
+        "source"
+      ],
+      "file:size": 13920082,
+      "file:checksum": "1220e6a481987a069dcf7a981a16793258996ccaa2617266983ae97fc68edd2e9862"
+    }
+  },
+  "links": [
+    {
+      "rel": "root",
+      "href": "../../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "parent",
+      "href": "../collection.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "collection",
+      "href": "../collection.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "predecessor-version",
+      "href": "../2026-01-14/2026-01-14.json",
+      "type": "application/geo+json"
+    },
+    {
+      "rel": "alternate",
+      "href": "../../en/stradario/2026-11-02/2026-11-02.json",
+      "type": "application/geo+json",
+      "title": "Inglese",
+      "hreflang": "en"
+    },
+    {
+      "rel": "via",
+      "href": "https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/",
+      "type": "text/html",
+      "title": "Portale open data ANNCSU"
+    },
+    {
+      "rel": "license",
+      "href": "https://creativecommons.org/licenses/by/4.0/deed.it",
+      "type": "text/html",
+      "title": "Creative Commons Attribuzione 4.0 Internazionale"
+    },
+    {
+      "rel": "related",
+      "href": "../../rilasci/2026-11-02/2026-11-02.json",
+      "type": "application/geo+json",
+      "title": "Civici dello stesso rilascio"
+    }
+  ]
+}

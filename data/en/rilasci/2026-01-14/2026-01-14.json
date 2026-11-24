@@ -195,6 +195,12 @@
       "href": "https://creativecommons.org/licenses/by/4.0/",
       "type": "text/html",
       "title": "Creative Commons Attribution 4.0 International"
+    },
+    {
+      "rel": "related",
+      "href": "../../stradario/2026-01-14/2026-01-14.json",
+      "type": "application/geo+json",
+      "title": "Street register of the same release"
     }
   ]
 }
