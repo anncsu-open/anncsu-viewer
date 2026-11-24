@@ -9,6 +9,8 @@ Ogni rilascio ha due file:
 
 È lo storico da cui le collection `indirizzi` e `indirizzi-h3` derivano il rilascio corrente. I rilasci precedenti al 15 settembre 2026 sono ricostruiti dal parquet consolidato di [mfortini/diff_ANNCSU](https://github.com/mfortini/diff_ANNCSU), con un metodo verificato byte per byte sul rilascio di settembre.
 
+A ottobre 2026 ANNCSU non ha pubblicato alcun rilascio: ai controlli settimanali dal 5 ottobre 2026 al 2 novembre 2026 il portale serviva ancora quello del 15 settembre 2026.
+
 ## Rilasci
 
 | Rilascio | Origine | Accessi | ZIP | Parquet |

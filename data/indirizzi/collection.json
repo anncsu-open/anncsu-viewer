@@ -2,7 +2,7 @@
   "type": "Collection",
   "stac_version": "1.1.0",
   "stac_extensions": [
-    "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json",
+    "https://schemas.portolan-sdi.org/portolan/v0.3.0/schema.json",
     "https://stac-extensions.github.io/file/v2.1.0/schema.json",
     "https://stac-extensions.github.io/table/v1.2.0/schema.json",
     "https://stac-extensions.github.io/projection/v2.0.0/schema.json",
@@ -210,6 +210,7 @@
       "href": "../anncsu-indirizzi.parquet",
       "type": "application/vnd.apache.parquet",
       "title": "Indirizzi ANNCSU (GeoParquet)",
+      "description": "Gli accessi georeferenziati del rilascio corrente in GeoParquet 1.1, ordinati lungo una curva di Hilbert, con una colonna bbox per scartare i gruppi di righe fuori dall'area cercata.",
       "roles": [
         "data"
       ],
@@ -221,6 +222,7 @@
       "href": "../anncsu-indirizzi.pmtiles",
       "type": "application/vnd.pmtiles",
       "title": "Indirizzi ANNCSU (PMTiles)",
+      "description": "Tile vettoriali generate dal GeoParquet di questa collection, per la mappa. Ogni punto porta odonimo, civico, esponente, comune e distanza dal confine comunale.",
       "roles": [
         "visual"
       ],
@@ -243,6 +245,7 @@
       "href": "./thumbnail.png",
       "type": "image/png",
       "title": "Densità degli indirizzi sul territorio nazionale",
+      "description": "Anteprima PNG disegnata dai dati nel colore dello stile predefinito: ogni pixel è tanto più intenso quanto più fitti sono gli indirizzi.",
       "roles": [
         "thumbnail"
       ],

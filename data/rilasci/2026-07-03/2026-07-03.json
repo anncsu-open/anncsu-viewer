@@ -2,7 +2,7 @@
   "type": "Feature",
   "stac_version": "1.1.0",
   "stac_extensions": [
-    "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json",
+    "https://schemas.portolan-sdi.org/portolan/v0.3.0/schema.json",
     "https://stac-extensions.github.io/file/v2.1.0/schema.json",
     "https://stac-extensions.github.io/table/v1.2.0/schema.json",
     "https://stac-extensions.github.io/version/v1.2.0/schema.json",
@@ -132,6 +132,7 @@
       "href": "https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/rilasci/2026-07-03/INDIR_ITA_20260703.parquet",
       "type": "application/vnd.apache.parquet",
       "title": "CSV del rilascio in Parquet, senza perdita",
+      "description": "Il CSV del rilascio in Parquet senza perdita: tutte le righe e le 19 colonne originali come testo, ordinate per CODICE_ISTAT, PROGRESSIVO_NAZIONALE e PROGRESSIVO_ACCESSO.",
       "roles": [
         "data"
       ],
@@ -142,6 +143,7 @@
       "href": "https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/rilasci/2026-07-03/indirizzarioItalia_20260703.zip",
       "type": "application/zip",
       "title": "Archivio ZIP del rilascio",
+      "description": "ZIP con il CSV del rilascio ricostruito, nello stesso formato del portale ANNCSU.",
       "roles": [
         "source"
       ],

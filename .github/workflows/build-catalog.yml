@@ -58,7 +58,7 @@ jobs:
       # byte for byte. A full pass over the archive is a deliberate local run.
       - name: Validate the catalog
         run: |
-          uv run --with 'rashid>=0.1.8,<0.2.0' \
+          uv run --with 'rashid>=0.4.0,<0.5.0' \
             rashid check data/ --schema --data-scope local --all
 
       - name: Check for changes
@@ -126,6 +126,6 @@ jobs:
           # generated, so it does not fail the run. The byte checks stay local:
           # the live probe still reaches the archive's absolute URLs, but
           # without downloading gigabytes of ZIPs and raw Parquet.
-          uv run --with 'rashid>=0.1.8,<0.2.0' \
+          uv run --with 'rashid>=0.4.0,<0.5.0' \
             rashid check data/ --live --data-scope local --all \
             --live-base-url https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev

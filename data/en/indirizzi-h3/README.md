@@ -1,6 +1,6 @@
 # ANNCSU addresses, partitioned by H3 cell
 
-The same addresses as the indirizzi collection, split into 1,340 files by the resolution 5 H3 cell that contains them, in Hive layout tiles/h3_cell=<cell>/<cell>.parquet. Every file is under a megabyte, so a client can read one comune without downloading the national file. The bulk-access glob is https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/tiles/h3_cell=*/*.parquet, but HTTPS offers no listing: to know which cells you need, use the comuni-h3.json index, registered as a metadata asset. Of 20,728,959 addresses, 48,527 (0.23%) fall more than 110 metres outside the boundary of the comune they are assigned to, according to Istat boundaries, and 0 have no boundary to compare against. This collection holds the 20,728,959 georeferenced addresses out of the 27,413,752 in the 2 November 2026 release: addresses without coordinates are in the `rilasci` collection.
+The same addresses as the indirizzi collection, split into 1,340 files by the resolution 5 H3 cell that contains them, in Hive layout tiles/h3_cell=<cell>/<cell>.parquet. Every file is under a megabyte, so a client can read one comune without downloading the national file. The bulk-access glob is s3://anncsu-data/tiles/h3_cell=*/*.parquet, on the S3 API of Cloudflare R2, where listing the files needs credentials. Every file is readable over HTTPS without credentials. To know which cells you need, use the comuni-h3.json index, registered as a metadata asset. Of 20,728,959 addresses, 48,527 (0.23%) fall more than 110 metres outside the boundary of the comune they are assigned to, according to Istat boundaries, and 0 have no boundary to compare against. This collection holds the 20,728,959 georeferenced addresses out of the 27,413,752 in the 2 November 2026 release: addresses without coordinates are in the `rilasci` collection.
 
 Updated to the 2 November 2026 release, with 20,728,959 addresses.
 See the data on a map in the [web viewer](https://anncsu-open.github.io/anncsu-viewer/).
@@ -14,7 +14,7 @@ See the data on a map in the [web viewer](https://anncsu-open.github.io/anncsu-v
 
 ## How to read it
 
-The data is split by resolution 5 H3 cell, in Hive layout. The bulk-access glob is `https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/tiles/h3_cell=*/*.parquet`, but HTTPS offers no directory listing, so a reader cannot expand it on its own. To know which cells you need, read the `comuni-h3.json` index, which maps every comune to its cells.
+The data is split by resolution 5 H3 cell, in Hive layout. The bulk-access glob is `s3://anncsu-data/tiles/h3_cell=*/*.parquet`, on the S3 API of Cloudflare R2: listing the files needs R2 credentials, which the catalog does not hand out. Every file is readable over HTTPS without credentials. To know which cells you need, read the `comuni-h3.json` index, which maps every comune to its cells.
 
 ```shell
 curl -s https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/comuni-h3.json \

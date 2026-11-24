@@ -234,8 +234,8 @@ uv run scripts/generate_comuni_h3.py # Map municipalities to H3 cells
 ```
 
 Dependencies resolved automatically by `uv`:
-- `duckdb` (>=1.5.5) — CSV loading, spatial extension, parquet export, bbox + Hilbert sort
-- `geoparquet-io` (>=1.5.0) — H3 partitioning, GeoParquet to PMTiles conversion (PMTiles is in core since 1.1.0; the separate `gpio-pmtiles` plugin is deprecated)
+- `duckdb` (==2.0.0) — CSV loading, spatial extension, parquet export, bbox + Hilbert sort. Every script pins the same version, and `scripts/test_dependencies.py` checks it. The pin is 2.0.0 because the `h3` community extension is not yet published for 2.0.1
+- `geoparquet-io` (>=1.8.0) — H3 partitioning, GeoParquet to PMTiles conversion (PMTiles is in core since 1.1.0; the separate `gpio-pmtiles` plugin is deprecated). It caps DuckDB below 1.6 because of the S2 `geography` extension, which this project does not use, so the scripts lift the cap with `override-dependencies` in their `[tool.uv]` block
 - `httpx` — HTTP client with range request support
 
 ## GitHub Action Schedule

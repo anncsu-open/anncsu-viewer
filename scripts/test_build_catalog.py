@@ -1,16 +1,20 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#     "duckdb>=1.5.5",
-#     "geoparquet-io>=1.5.0",
+#     "duckdb==2.0.0",
+#     "geoparquet-io>=1.8.0",
 #     "httpx",
 #     "pillow",
 #     "pmtiles",
 #     "pytest",
 #     "pyyaml",
-#     "rashid>=0.1.8,<0.2.0",
+#     "rashid>=0.4.0,<0.5.0",
 #     "typer",
 # ]
+# [tool.uv]
+# # geoparquet-io caps DuckDB below 1.6 for the S2 extension, which this
+# # project does not use. See scripts/test_dependencies.py.
+# override-dependencies = ["duckdb==2.0.0"]
 # ///
 """Tests for build_catalog.py, the Portolan catalog generator.
 
@@ -492,6 +496,13 @@ class TestBuildRoot:
         root = build_root("2026-09-15T00:00:00Z")
         assert PORTOLAN_SCHEMA in root["stac_extensions"]
 
+    def test_declares_portolan_v0_3_0(self):
+        root = build_root("2026-09-15T00:00:00Z")
+        assert (
+            "https://schemas.portolan-sdi.org/portolan/v0.3.0/schema.json"
+            in root["stac_extensions"]
+        )
+
     def test_has_a_title_and_description(self):
         root = build_root("2026-09-15T00:00:00Z")
         assert root["title"].strip()
@@ -607,11 +618,22 @@ class TestBuildIndirizziH3:
         ]
         assert collection["partition:file_count"] == 1348
 
-    def test_the_glob_points_at_the_published_tiles(self):
+    def test_the_glob_is_the_listable_bucket_url(self):
+        # PORTO-FMT-064: HTTPS cannot be listed, so the glob names the bucket.
         collection = build_indirizzi_h3(fake_facts())
         assert collection["partition:glob"] == (
-            f"{PUBLIC_BASE}/tiles/h3_cell=*/*.parquet"
+            "s3://anncsu-data/tiles/h3_cell=*/*.parquet"
         )
+
+    @pytest.mark.parametrize("lang", ["it", "en"])
+    def test_keeps_the_account_endpoint_out_of_the_catalog(self, lang):
+        # The S3 endpoint of R2 carries the Cloudflare account id, which stays
+        # private: storage:schemes (PORTO-FMT-066, a SHOULD) is left out.
+        import json
+
+        collection = build_indirizzi_h3(fake_facts(), lang=lang)
+        assert "storage:schemes" not in collection
+        assert "r2.cloudflarestorage.com" not in json.dumps(collection)
 
     def test_has_no_data_asset_because_the_data_is_behind_the_glob(self):
         collection = build_indirizzi_h3(fake_facts())
@@ -912,6 +934,28 @@ class TestBuild:
         ]:
             assert (fixture_data_dir / relative).exists(), relative
 
+    def test_agents_files_name_the_declared_profile_version(
+        self, fixture_data_dir, fixture_columns
+    ):
+        build(fixture_data_dir)
+        agents = sorted(fixture_data_dir.rglob("AGENTS.md"))
+        assert len(agents) == 8
+        for path in agents:
+            text = path.read_text(encoding="utf-8")
+            assert "v0.3.0" in text and "v0.2.0" not in text, path
+
+    @pytest.mark.parametrize("tree", ["", "en/"])
+    def test_partitioned_docs_show_the_bucket_glob(
+        self, fixture_data_dir, fixture_columns, tree
+    ):
+        build(fixture_data_dir)
+        for name in ("README.md", "AGENTS.md"):
+            text = (fixture_data_dir / tree / "indirizzi-h3" / name).read_text(
+                encoding="utf-8"
+            )
+            assert "s3://anncsu-data/tiles/h3_cell=*/*.parquet" in text, name
+            assert f"{PUBLIC_BASE}/tiles/h3_cell=*" not in text, name
+
     def test_is_byte_identical_on_a_second_run(self, fixture_data_dir, fixture_columns):
         build(fixture_data_dir)
         first = generated_files(fixture_data_dir)
@@ -1187,8 +1231,8 @@ class TestLanguageTrees:
     def test_english_partitioned_collection_keeps_the_index_and_glob(self):
         collection = build_indirizzi_h3(fake_facts(), lang="en")
         assert collection["assets"]["cell-index"]["href"] == "../../comuni-h3.json"
-        assert (
-            collection["partition:glob"] == f"{PUBLIC_BASE}/tiles/h3_cell=*/*.parquet"
+        assert collection["partition:glob"] == (
+            "s3://anncsu-data/tiles/h3_cell=*/*.parquet"
         )
         assert collection["partition:keys"][0]["description"].startswith("H3 cell")
 
@@ -1544,6 +1588,47 @@ class TestBuildReleaseItem:
         ]
         assert alternate[0]["href"] == "../../en/rilasci/2026-09-15/2026-09-15.json"
         assert alternate[0]["hreflang"] == "en"
+
+
+class TestAssetsAreDescribed:
+    """PORTO-CORE-088: every asset SHOULD have a title and a description."""
+
+    @pytest.mark.parametrize("builder", [build_indirizzi, build_indirizzi_h3])
+    def test_collection_assets_in_both_languages(self, builder):
+        italian = builder(fake_facts())["assets"]
+        english = builder(fake_facts(), lang="en")["assets"]
+        for key in italian:
+            for asset in (italian[key], english[key]):
+                assert asset.get("title", "").strip(), key
+                assert asset.get("description", "").strip(), key
+            assert italian[key]["description"] != english[key]["description"], key
+
+    def test_release_item_assets_in_both_languages(self):
+        releases = fake_releases()
+        for release in releases:
+            italian = build_release_item(release, releases, fake_facts())["assets"]
+            english = build_release_item(
+                release, releases, fake_facts(), lang="en"
+            )["assets"]
+            for key in italian:
+                for asset in (italian[key], english[key]):
+                    assert asset.get("title", "").strip(), key
+                    assert asset.get("description", "").strip(), key
+                assert italian[key]["description"] != english[key]["description"]
+
+
+class TestMonthsWithoutARelease:
+    """ANNCSU skipped October 2026, and the archive description says so."""
+
+    def test_italian_archive_names_the_month(self):
+        description = build_rilasci(fake_facts())["description"]
+        assert "ottobre 2026" in description
+        assert "15 settembre 2026" in description
+
+    def test_english_archive_names_the_month(self):
+        description = build_rilasci(fake_facts(), lang="en")["description"]
+        assert "October 2026" in description
+        assert "15 September 2026" in description
 
 
 class TestBuildRilasci:

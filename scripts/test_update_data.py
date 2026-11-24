@@ -1,13 +1,17 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#     "duckdb>=1.5.5",
-#     "geoparquet-io>=1.5.0",
+#     "duckdb==2.0.0",
+#     "geoparquet-io>=1.8.0",
 #     "httpx",
 #     "pytest",
 #     "respx",
 #     "typer",
 # ]
+# [tool.uv]
+# # geoparquet-io caps DuckDB below 1.6 for the S2 extension, which this
+# # project does not use. See scripts/test_dependencies.py.
+# override-dependencies = ["duckdb==2.0.0"]
 # ///
 """Tests for update_data.py server availability and download resilience.
 
@@ -1233,3 +1237,13 @@ class TestArchiveRelease:
         assert entry["origin"] == "original"
         assert entry["parquet"]["rows"] == 3
         assert entry["archived"].endswith("Z")
+
+
+if __name__ == "__main__":
+    # respx and anyio register as pytest plugins and are already imported
+    # when this module runs as a script, so pytest cannot rewrite them.
+    raise SystemExit(
+        pytest.main(
+            [__file__, "-v", "-W", "ignore::pytest.PytestAssertRewriteWarning"]
+        )
+    )

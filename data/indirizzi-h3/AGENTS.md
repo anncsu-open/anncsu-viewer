@@ -1,11 +1,11 @@
 # Istruzioni per agenti
 
 Collection `indirizzi-h3` del catalogo ANNCSU, conforme al profilo
-[Portolan](https://github.com/portolan-sdi/portolan-spec) v0.2.0.
+[Portolan](https://github.com/portolan-sdi/portolan-spec) v0.3.0.
 
 ## Accesso ai dati
 
-I dati sono divisi per cella H3 di risoluzione 5, con struttura Hive. Il glob di accesso massivo è `https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/tiles/h3_cell=*/*.parquet`, ma su HTTPS non esiste il listing delle directory, quindi un lettore non può espanderlo da solo. Per sapere quali celle servono si legge l'indice `comuni-h3.json`, che mappa ogni comune sulle sue celle.
+I dati sono divisi per cella H3 di risoluzione 5, con struttura Hive. Il glob di accesso massivo è `s3://anncsu-data/tiles/h3_cell=*/*.parquet`, sull'API S3 di Cloudflare R2: elencare i file richiede credenziali R2, che il catalogo non distribuisce. Ogni file è leggibile via HTTPS senza credenziali, e per sapere quali celle servono si legge l'indice `comuni-h3.json`, che mappa ogni comune sulle sue celle.
 
 ```shell
 curl -s https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/comuni-h3.json \

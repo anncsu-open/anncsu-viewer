@@ -1,11 +1,15 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#     "geoparquet-io>=1.5.0",
-#     "duckdb>=1.5.5",
+#     "geoparquet-io>=1.8.0",
+#     "duckdb==2.0.0",
 #     "httpx",
 #     "typer",
 # ]
+# [tool.uv]
+# # geoparquet-io caps DuckDB below 1.6 for the S2 extension, which this
+# # project does not use. See scripts/test_dependencies.py.
+# override-dependencies = ["duckdb==2.0.0"]
 # ///
 """Download ANNCSU Italian address dataset and convert to GeoParquet.
 

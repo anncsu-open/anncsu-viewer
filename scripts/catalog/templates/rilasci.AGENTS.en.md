@@ -2,7 +2,7 @@
 
 Collection `rilasci` of the ANNCSU catalog: the archive of monthly downloads,
 conforming to the [Portolan](https://github.com/portolan-sdi/portolan-spec)
-profile v0.2.0. It is a tabular collection: items have no geometry and the
+profile $portolan_version. It is a tabular collection: items have no geometry and the
 files have no geometry column; coordinates are text in `COORD_X_COMUNE` and
 `COORD_Y_COMUNE`, with a decimal comma.
 

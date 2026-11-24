@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#     "duckdb>=1.5.5",
+#     "duckdb==2.0.0",
 #     "pytest",
 # ]
 # ///
@@ -179,3 +179,7 @@ class TestBoundariesParquet:
             ORDER BY c.gap_m DESC
         """).fetchall()
         assert gaps == [], f"Genuine topological gaps found: {gaps}"
+
+
+if __name__ == "__main__":
+    raise SystemExit(pytest.main([__file__, "-v"]))
