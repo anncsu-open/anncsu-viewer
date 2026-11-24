@@ -1382,6 +1382,28 @@ class TestEnglishBuild:
                 "the fixture's 200 rows should appear in the statistics"
             )
 
+    def test_root_readmes_link_portolan_browser_italia_next_to_the_browser(
+        self, fixture_data_dir, fixture_columns
+    ):
+        build(fixture_data_dir)
+        url = (
+            "https://anncsu-open.github.io/portolan-browser-it/#/external/"
+            "pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/catalog.json"
+        )
+        for readme in (
+            fixture_data_dir / "README.md",
+            fixture_data_dir / "en" / "README.md",
+        ):
+            text = readme.read_text()
+            assert f"[Portolan Browser Italia]({url})" in text, readme
+            # In the same paragraph as the official browser's link.
+            paragraph = next(
+                block
+                for block in text.split("\n\n")
+                if "browser.portolan-sdi.org" in block
+            )
+            assert url in paragraph, readme
+
     def test_collection_readmes_warn_about_the_browser_temporal_extent_bug(
         self, fixture_data_dir, fixture_columns
     ):

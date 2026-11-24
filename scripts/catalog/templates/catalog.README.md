@@ -5,8 +5,10 @@ Numeri Civici e delle Strade Urbane, convertiti in formati cloud-native e
 pubblicati come catalogo STAC secondo il profilo Portolan.
 
 Aggiornato al $dataset_date_human, con $row_count_human indirizzi. Il catalogo
-si può esplorare nel [Portolan Browser]($browser_url) e i dati si vedono sulla
-mappa nel [visualizzatore web]($viewer_url).
+si può esplorare nel [Portolan Browser]($browser_url) o in
+[Portolan Browser Italia]($browser_it_url), che raccoglie i cataloghi italiani
+con il tema di Designers Italia. I dati si vedono sulla mappa nel
+[visualizzatore web]($viewer_url).
 
 ## Cosa contiene
 

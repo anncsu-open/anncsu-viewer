@@ -5,8 +5,10 @@ Numeri Civici e delle Strade Urbane, convertiti in formati cloud-native e
 pubblicati come catalogo STAC secondo il profilo Portolan.
 
 Aggiornato al 2 novembre 2026, con 20.728.959 indirizzi. Il catalogo
-si può esplorare nel [Portolan Browser](https://browser.portolan-sdi.org/#/external/pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/catalog.json) e i dati si vedono sulla
-mappa nel [visualizzatore web](https://anncsu-open.github.io/anncsu-viewer/).
+si può esplorare nel [Portolan Browser](https://browser.portolan-sdi.org/#/external/pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/catalog.json) o in
+[Portolan Browser Italia](https://anncsu-open.github.io/portolan-browser-it/#/external/pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/catalog.json), che raccoglie i cataloghi italiani
+con il tema di Designers Italia. I dati si vedono sulla mappa nel
+[visualizzatore web](https://anncsu-open.github.io/anncsu-viewer/).
 
 ## Cosa contiene
 
