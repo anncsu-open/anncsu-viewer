@@ -12,7 +12,8 @@
     "lint": "eslint . --fix",
     "format": "prettier --write src/",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@duckdb/duckdb-wasm": "1.33.1-dev124.0",
@@ -24,6 +25,7 @@
     "vue": "^3.5.46"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "@tsconfig/node22": "^22.0.7",
     "@types/geojson": "^7946.0.16",
     "@types/node": "^22.20.5",

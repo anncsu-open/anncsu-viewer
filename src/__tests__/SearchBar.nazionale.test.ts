@@ -727,3 +727,114 @@ describe('SearchBar (nazionale mode - unified search)', () => {
     expect(store.selectedCoordinates).toBeNull()
   })
 })
+
+type QueryResult = Awaited<ReturnType<typeof executeQueryWithBuffers>>
+
+// A promise the test resolves when it wants the data to arrive.
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((r) => (resolve = r))
+  return { promise, resolve }
+}
+
+describe('SearchBar (nazionale mode) - typing before the data arrives', () => {
+  let pinia: ReturnType<typeof createPinia>
+
+  beforeEach(() => {
+    pinia = createPinia()
+    setActivePinia(pinia)
+    vi.clearAllMocks()
+  })
+
+  function mockFetch(comuni: Promise<typeof mockComuni>) {
+    globalThis.fetch = vi.fn().mockImplementation((url: string) =>
+      url.includes('comuni-h3.json')
+        ? Promise.resolve({ ok: true, json: () => comuni })
+        : Promise.resolve({ ok: true, arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)) }),
+    ) as unknown as typeof fetch
+  }
+
+  async function selectVacone(wrapper: ReturnType<typeof mount>) {
+    const input = wrapper.find('[data-testid="unified-search-input"]')
+    await input.setValue('Vacone')
+    await flushPromises()
+    await wrapper.findAll('[data-testid="comune-suggestion"]')[0].trigger('click')
+    await flushPromises()
+    await input.trigger('focus')
+    return input
+  }
+
+  const addressTexts = (wrapper: ReturnType<typeof mount>) =>
+    wrapper.findAll('[data-testid="address-suggestion"]').map((s) => s.text())
+
+  it('suggests a comune typed before the comuni list arrives, once it does', async () => {
+    const comuni = deferred<typeof mockComuni>()
+    mockFetch(comuni.promise)
+    const wrapper = mount(SearchBar, { global: { plugins: [pinia] } })
+    await flushPromises()
+
+    const input = wrapper.find('[data-testid="unified-search-input"]')
+    await input.trigger('focus')
+    await input.setValue('Vacone')
+    await flushPromises()
+    expect(wrapper.findAll('[data-testid="comune-suggestion"]')).toHaveLength(0)
+
+    comuni.resolve(mockComuni)
+    await flushPromises()
+    const suggestions = wrapper.findAll('[data-testid="comune-suggestion"]')
+    expect(suggestions.map((s) => s.text())).toEqual(['Vacone'])
+  })
+
+  it('does not open the suggestions when the list arrives after the input lost focus', async () => {
+    const comuni = deferred<typeof mockComuni>()
+    mockFetch(comuni.promise)
+    const wrapper = mount(SearchBar, { global: { plugins: [pinia] } })
+    await flushPromises()
+
+    const input = wrapper.find('[data-testid="unified-search-input"]')
+    await input.trigger('focus')
+    await input.setValue('Vacone')
+    await input.trigger('blur')
+    await new Promise((resolve) => setTimeout(resolve, 250))
+
+    comuni.resolve(mockComuni)
+    await flushPromises()
+    expect(wrapper.findAll('[data-testid="comune-suggestion"]')).toHaveLength(0)
+  })
+
+  it('suggests addresses typed while the comune loads, once they arrive', async () => {
+    mockFetch(Promise.resolve(mockComuni))
+    const addresses = deferred<QueryResult>()
+    mockedExecuteQueryWithBuffers.mockReturnValueOnce(addresses.promise)
+    const wrapper = mount(SearchBar, { global: { plugins: [pinia] } })
+    await flushPromises()
+    const input = await selectVacone(wrapper)
+
+    await input.setValue('VIA ROMA')
+    await flushPromises()
+    expect(addressTexts(wrapper)).toEqual([])
+
+    addresses.resolve(mockAddressFeatures as unknown as QueryResult)
+    await flushPromises()
+    expect(addressTexts(wrapper)).toEqual(['VIA ROMA 1', 'VIA ROMA 1 A', 'VIA ROMA 1 B'])
+  })
+
+  it('does not keep the empty result of a search made while the comune loads', async () => {
+    mockFetch(Promise.resolve(mockComuni))
+    const addresses = deferred<QueryResult>()
+    mockedExecuteQueryWithBuffers.mockReturnValueOnce(addresses.promise)
+    const wrapper = mount(SearchBar, { global: { plugins: [pinia] } })
+    await flushPromises()
+    const input = await selectVacone(wrapper)
+    await input.setValue('VIA ROMA')
+    await flushPromises()
+    addresses.resolve(mockAddressFeatures as unknown as QueryResult)
+    await flushPromises()
+
+    await input.setValue('VIA')
+    await flushPromises()
+    await input.setValue('VIA ROMA')
+    await flushPromises()
+    expect(addressTexts(wrapper)).toEqual(['VIA ROMA 1', 'VIA ROMA 1 A', 'VIA ROMA 1 B'])
+  })
+})
