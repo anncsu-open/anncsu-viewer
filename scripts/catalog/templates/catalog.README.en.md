@@ -5,8 +5,10 @@ Numbers and Urban Streets (ANNCSU), converted to cloud-native formats and
 published as a STAC catalog following the Portolan profile.
 
 Updated to the $dataset_date_human release, with $row_count_human addresses.
-Browse the catalog in the [Portolan Browser]($browser_url) and see the data on
-a map in the [web viewer]($viewer_url).
+Browse the catalog in the [Portolan Browser]($browser_url) or in
+[Portolan Browser Italia]($browser_it_url), which gathers the Italian catalogs
+with the Designers Italia look, and see the data on a map in the
+[web viewer]($viewer_url).
 
 ## What it contains
 

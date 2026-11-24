@@ -110,6 +110,13 @@ BROWSER_URL = (
     + PUBLIC_BASE.removeprefix("https://")
     + "/catalog.json"
 )
+# The same catalog in Portolan Browser Italia, which lists the Italian
+# catalogs of the registry with the Designers Italia look.
+BROWSER_IT_URL = (
+    "https://anncsu-open.github.io/portolan-browser-it/#/external/"
+    + PUBLIC_BASE.removeprefix("https://")
+    + "/catalog.json"
+)
 
 PORTOLAN_VERSION = "v0.3.0"
 PORTOLAN_SCHEMA = (
@@ -2292,6 +2299,7 @@ def _write_tree(data_dir: Path, facts: dict, lang: str) -> None:
         "repo_url": REPO_URL,
         "viewer_url": VIEWER_URL,
         "browser_url": BROWSER_URL,
+        "browser_it_url": BROWSER_IT_URL,
         "statistics_table": statistics_table(facts, lang),
     }
 

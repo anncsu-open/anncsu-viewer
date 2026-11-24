@@ -5,8 +5,10 @@ Numbers and Urban Streets (ANNCSU), converted to cloud-native formats and
 published as a STAC catalog following the Portolan profile.
 
 Updated to the 2 November 2026 release, with 20,728,959 addresses.
-Browse the catalog in the [Portolan Browser](https://browser.portolan-sdi.org/#/external/pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/catalog.json) and see the data on
-a map in the [web viewer](https://anncsu-open.github.io/anncsu-viewer/).
+Browse the catalog in the [Portolan Browser](https://browser.portolan-sdi.org/#/external/pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/catalog.json) or in
+[Portolan Browser Italia](https://anncsu-open.github.io/portolan-browser-it/#/external/pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/catalog.json), which gathers the Italian catalogs
+with the Designers Italia look, and see the data on a map in the
+[web viewer](https://anncsu-open.github.io/anncsu-viewer/).
 
 ## What it contains
 
