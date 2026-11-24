@@ -1,7 +1,7 @@
 # Instructions for agents
 
 Collection `indirizzi` of the ANNCSU catalog, conforming to the
-[Portolan](https://github.com/portolan-sdi/portolan-spec) profile v0.2.0.
+[Portolan](https://github.com/portolan-sdi/portolan-spec) profile v0.3.0.
 This is the English translation; the Italian source collection is the
 `alternate` link with `hreflang: it`, and the data assets live in that tree.
 

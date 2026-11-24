@@ -1,7 +1,7 @@
 # Istruzioni per agenti
 
 Questo è un catalogo STAC 1.1.0 conforme al profilo
-[Portolan](https://github.com/portolan-sdi/portolan-spec) v0.2.0.
+[Portolan](https://github.com/portolan-sdi/portolan-spec) $portolan_version.
 
 ## Come leggerlo
 
@@ -17,10 +17,11 @@ GeoParquet da circa un gigabyte, ordinato spazialmente: conviene per
 aggregazioni nazionali. `indirizzi-h3` espone gli stessi dati partizionati in
 file da meno di un megabyte: conviene per un singolo comune o una singola area.
 
-Il campo `partition:glob` di `indirizzi-h3` non è espandibile su HTTPS, perché
-il protocollo non offre il listing delle directory. Per sapere quali celle
-servono, leggi l'asset `cell-index`, cioè `comuni-h3.json`, che mappa ogni
-comune sulle celle che ne contengono gli indirizzi.
+Il campo `partition:glob` di `indirizzi-h3` punta al bucket con lo schema
+`s3://`, sull'API S3 di Cloudflare R2: elencare i file richiede credenziali R2,
+che il catalogo non distribuisce. Ogni file è leggibile via HTTPS. Per
+sapere quali celle servono, leggi l'asset `cell-index`, cioè `comuni-h3.json`,
+che mappa ogni comune sulle celle che ne contengono gli indirizzi.
 
 Le descrizioni delle colonne sono in `table:columns` su ogni collection.
 

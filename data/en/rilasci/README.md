@@ -9,6 +9,8 @@ Every release has two files:
 
 It is the history the `indirizzi` and `indirizzi-h3` collections derive their current release from. Releases before 15 September 2026 are reconstructed from the consolidated parquet of [mfortini/diff_ANNCSU](https://github.com/mfortini/diff_ANNCSU), with a method verified byte for byte on the September release.
 
+ANNCSU published no release in October 2026: at the weekly checks from 5 October 2026 to 2 November 2026 the portal was still serving the 15 September 2026 release.
+
 ## Releases
 
 | Release | Origin | Addresses | ZIP | Parquet |

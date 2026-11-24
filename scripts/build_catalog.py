@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#     "duckdb>=1.5.5",
+#     "duckdb==2.0.0",
 #     "pillow",
 #     "pmtiles",
 #     "pyyaml",
@@ -76,6 +76,12 @@ RAW_COLUMNS = [
 RELEASE_ORIGINS = ("original", "reconstructed")
 
 PUBLIC_BASE = "https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev"
+# The same bucket through R2's S3 API. A partition glob needs a scheme that
+# supports listing (PORTO-FMT-064), and listing this bucket needs R2
+# credentials. The S3 endpoint carries the Cloudflare account id, so
+# storage:schemes (PORTO-FMT-066, a SHOULD) is left out on purpose;
+# docs/how-to-portolan.md records the deviation.
+BUCKET_URL = "s3://anncsu-data"
 REPO_URL = "https://github.com/anncsu-open/anncsu-viewer"
 SOURCE_PORTAL = "https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/"
 # The consolidated parquet the twelve reconstructed releases come from.
@@ -88,7 +94,10 @@ BROWSER_URL = (
     + "/catalog.json"
 )
 
-PORTOLAN_SCHEMA = "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json"
+PORTOLAN_VERSION = "v0.3.0"
+PORTOLAN_SCHEMA = (
+    f"https://schemas.portolan-sdi.org/portolan/{PORTOLAN_VERSION}/schema.json"
+)
 PARTITION_SCHEMA = (
     "https://schemas.portolan-sdi.org/incubating/partition/v1.0.0/schema.json"
 )
@@ -101,6 +110,19 @@ WEB_MAP_LINKS_SCHEMA = (
 )
 
 H3_RESOLUTION = 5
+
+# Months in which ANNCSU published no release. A gap in releases.json could
+# also be a release the pipeline missed, so an entry goes here only after
+# checking that the weekly runs found the previous release still served and
+# that mfortini/diff_ANNCSU has nothing for the month.
+MONTHS_WITHOUT_RELEASE = [
+    {
+        "month": "2026-10",
+        "still_served": "2026-09-15",
+        "first_check": "2026-10-05",
+        "last_check": "2026-11-02",
+    },
+]
 
 
 def stac_type(duckdb_type: str) -> str:
@@ -629,10 +651,11 @@ TEXTS = {
             "che li contiene, con struttura Hive "
             "tiles/h3_cell=<cella>/<cella>.parquet. Ogni file pesa meno di un "
             "megabyte, quindi un client può leggere un comune senza scaricare "
-            "il file nazionale. Il glob di accesso massivo è $glob, ma su "
-            "HTTPS non esiste il listing: per sapere quali celle servono si "
-            "usa l'indice comuni-h3.json, registrato come asset di metadati. "
-            "$statistics"
+            "il file nazionale. Il glob di accesso massivo è $glob, sull'API "
+            "S3 di Cloudflare R2, dove elencare i file richiede credenziali. "
+            "Ogni file è leggibile via HTTPS senza credenziali, e per sapere "
+            "quali celle servono si usa l'indice comuni-h3.json, registrato "
+            "come asset di metadati. $statistics"
         ),
         "statistics_sentence": (
             "Su $total accessi, $oob ($pct) cadono oltre 110 metri fuori dal "
@@ -648,7 +671,17 @@ TEXTS = {
         "viewer": "Visualizzatore web",
         "other_tree": {"en": "Inglese"},
         "data_title": "Indirizzi ANNCSU (GeoParquet)",
+        "data_description": (
+            "Gli accessi georeferenziati del rilascio corrente in GeoParquet "
+            "1.1, ordinati lungo una curva di Hilbert, con una colonna bbox per "
+            "scartare i gruppi di righe fuori dall'area cercata."
+        ),
         "visual_title": "Indirizzi ANNCSU (PMTiles)",
+        "visual_description": (
+            "Tile vettoriali generate dal GeoParquet di questa collection, per "
+            "la mappa. Ogni punto porta odonimo, civico, esponente, comune e "
+            "distanza dal confine comunale."
+        ),
         "pmtiles_link": "Tile vettoriali per la mappa",
         "style_indirizzi_title": "Punti indirizzo",
         "style_indirizzi_description": "Tutti gli accessi come punti uniformi.",
@@ -657,6 +690,11 @@ TEXTS = {
             "Gli accessi colorati per posizione rispetto al confine comunale."
         ),
         "thumbnail": "Densità degli indirizzi sul territorio nazionale",
+        "thumbnail_description": (
+            "Anteprima PNG disegnata dai dati nel colore dello stile "
+            "predefinito: ogni pixel è tanto più intenso quanto più fitti sono "
+            "gli indirizzi."
+        ),
         "cell_index_title": "Indice delle celle H3 per comune",
         "cell_index_description": (
             "Per ogni comune, l'elenco delle celle H3 che ne contengono gli "
@@ -700,7 +738,25 @@ TEXTS = {
             "l'originale."
         ),
         "release_zip": "Archivio ZIP del rilascio",
+        "release_zip_original": (
+            "Lo ZIP così come l'ha servito il portale ANNCSU, con dentro il CSV "
+            "del rilascio."
+        ),
+        "release_zip_reconstructed": (
+            "ZIP con il CSV del rilascio ricostruito, nello stesso formato del "
+            "portale ANNCSU."
+        ),
         "release_parquet": "CSV del rilascio in Parquet, senza perdita",
+        "release_parquet_description": (
+            "Il CSV del rilascio in Parquet senza perdita: tutte le righe e le "
+            "19 colonne originali come testo, ordinate per CODICE_ISTAT, "
+            "PROGRESSIVO_NAZIONALE e PROGRESSIVO_ACCESSO."
+        ),
+        "month_without_release": (
+            "A $month ANNCSU non ha pubblicato alcun rilascio: ai controlli "
+            "settimanali dal $first_check al $last_check il portale serviva "
+            "ancora quello del $still_served."
+        ),
         "keywords_rilasci": ["rilasci", "storico", "archivio"],
         "georeferenced_sentence": (
             "Questa collection contiene i $with_coords accessi georeferenziati "
@@ -745,9 +801,10 @@ TEXTS = {
             "contains them, in Hive layout tiles/h3_cell=<cell>/<cell>.parquet. "
             "Every file is under a megabyte, so a client can read one comune "
             "without downloading the national file. The bulk-access glob is "
-            "$glob, but HTTPS offers no listing: to know which cells you need, "
-            "use the comuni-h3.json index, registered as a metadata asset. "
-            "$statistics"
+            "$glob, on the S3 API of Cloudflare R2, where listing the files "
+            "needs credentials. Every file is readable over HTTPS without "
+            "credentials. To know which cells you need, use the comuni-h3.json "
+            "index, registered as a metadata asset. $statistics"
         ),
         "statistics_sentence": (
             "Of $total addresses, $oob ($pct) fall more than 110 metres outside "
@@ -763,7 +820,17 @@ TEXTS = {
         "viewer": "Web viewer",
         "other_tree": {"it": "Italian"},
         "data_title": "ANNCSU addresses (GeoParquet)",
+        "data_description": (
+            "The georeferenced addresses of the current release as GeoParquet "
+            "1.1, sorted along a Hilbert curve, with a bbox column for skipping "
+            "row groups outside the area searched."
+        ),
         "visual_title": "ANNCSU addresses (PMTiles)",
+        "visual_description": (
+            "Vector tiles generated from this collection's GeoParquet, for the "
+            "map. Every point carries street name, house number, suffix, comune "
+            "and distance from the comune boundary."
+        ),
         "pmtiles_link": "Vector tiles for the map",
         "style_indirizzi_title": "Address points",
         "style_indirizzi_description": "Every access as a uniform point.",
@@ -772,6 +839,10 @@ TEXTS = {
             "Accesses coloured by their position against the comune boundary."
         ),
         "thumbnail": "Address density over the country",
+        "thumbnail_description": (
+            "PNG preview drawn from the data in the default style's colour: the "
+            "denser the addresses, the more intense the pixel."
+        ),
         "cell_index_title": "Index of H3 cells per comune",
         "cell_index_description": (
             "For every comune, the list of H3 cells containing its addresses. "
@@ -815,7 +886,24 @@ TEXTS = {
             "release, the only one whose original exists."
         ),
         "release_zip": "ZIP archive of the release",
+        "release_zip_original": (
+            "The ZIP as the ANNCSU portal served it, holding the release CSV."
+        ),
+        "release_zip_reconstructed": (
+            "ZIP holding the reconstructed release CSV, in the ANNCSU portal's "
+            "format."
+        ),
         "release_parquet": "CSV of the release as Parquet, lossless",
+        "release_parquet_description": (
+            "The release CSV as lossless Parquet: every row and the 19 original "
+            "columns as text, sorted by CODICE_ISTAT, PROGRESSIVO_NAZIONALE and "
+            "PROGRESSIVO_ACCESSO."
+        ),
+        "month_without_release": (
+            "ANNCSU published no release in $month: at the weekly checks from "
+            "$first_check to $last_check the portal was still serving the "
+            "$still_served release."
+        ),
         "keywords_rilasci": ["releases", "history", "archive"],
         "georeferenced_sentence": (
             "This collection holds the $with_coords georeferenced addresses out "
@@ -872,9 +960,10 @@ USAGE = {
         "indirizzi-h3": (
             "I dati sono divisi per cella H3 di risoluzione 5, con struttura "
             "Hive. Il glob di accesso massivo è "
-            "`$public_base/tiles/h3_cell=*/*.parquet`, ma su HTTPS non esiste il "
-            "listing delle directory, quindi un lettore non può espanderlo da "
-            "solo. Per sapere quali celle servono si legge l'indice "
+            "`$bucket_url/tiles/h3_cell=*/*.parquet`, sull'API S3 di Cloudflare "
+            "R2: elencare i file richiede credenziali R2, che il catalogo non "
+            "distribuisce. Ogni file è leggibile via HTTPS senza credenziali, "
+            "e per sapere quali celle servono si legge l'indice "
             "`comuni-h3.json`, che mappa ogni comune sulle sue celle.\n\n"
             "```shell\n"
             "curl -s $public_base/comuni-h3.json \\\n"
@@ -903,10 +992,12 @@ USAGE = {
         ),
         "indirizzi-h3": (
             "The data is split by resolution 5 H3 cell, in Hive layout. The "
-            "bulk-access glob is `$public_base/tiles/h3_cell=*/*.parquet`, but "
-            "HTTPS offers no directory listing, so a reader cannot expand it on "
-            "its own. To know which cells you need, read the `comuni-h3.json` "
-            "index, which maps every comune to its cells.\n\n"
+            "bulk-access glob is `$bucket_url/tiles/h3_cell=*/*.parquet`, on "
+            "the S3 API of Cloudflare R2: listing the files needs R2 "
+            "credentials, which the catalog does not hand out. Every file is "
+            "readable over HTTPS without credentials. To know which cells you "
+            "need, read the `comuni-h3.json` index, which maps every comune to "
+            "its cells.\n\n"
             "```shell\n"
             "curl -s $public_base/comuni-h3.json \\\n"
             "  | jq -r '.[] | select(.nome_comune == \"Roma\") | .h3_cells[]'\n"
@@ -925,6 +1016,26 @@ def human_date(rfc3339: str, lang: str = SOURCE_LANG) -> str:
     """Format an RFC 3339 instant as a date spelled in the language."""
     parsed = datetime.strptime(rfc3339, "%Y-%m-%dT%H:%M:%SZ")
     return f"{parsed.day} {MONTHS[lang][parsed.month - 1]} {parsed.year}"
+
+
+def human_month(month: str, lang: str = SOURCE_LANG) -> str:
+    """Format a YYYY-MM month as its name and year in the language."""
+    parsed = datetime.strptime(month, "%Y-%m")
+    return f"{MONTHS[lang][parsed.month - 1]} {parsed.year}"
+
+
+def months_without_release_paragraph(lang: str) -> str:
+    """One sentence per month ANNCSU skipped, or nothing."""
+    text = TEXTS[lang]["month_without_release"]
+    return " ".join(
+        Template(text).substitute(
+            month=human_month(gap["month"], lang),
+            first_check=human_date(f"{gap['first_check']}T00:00:00Z", lang),
+            last_check=human_date(f"{gap['last_check']}T00:00:00Z", lang),
+            still_served=human_date(f"{gap['still_served']}T00:00:00Z", lang),
+        )
+        for gap in MONTHS_WITHOUT_RELEASE
+    )
 
 
 def human_count(value: int, lang: str = SOURCE_LANG) -> str:
@@ -1295,6 +1406,7 @@ def _thumbnail_asset(facts: dict, lang: str, collection_id: str) -> dict:
         "href": _shared_asset_href(lang, collection_id, "thumbnail.png"),
         "type": "image/png",
         "title": TEXTS[lang]["thumbnail"],
+        "description": TEXTS[lang]["thumbnail_description"],
         "roles": ["thumbnail"],
         **facts["thumbnail"],
     }
@@ -1367,6 +1479,7 @@ def build_indirizzi(facts: dict, lang: str = SOURCE_LANG) -> dict:
                 "href": f"{up}anncsu-indirizzi.parquet",
                 "type": "application/vnd.apache.parquet",
                 "title": text["data_title"],
+                "description": text["data_description"],
                 "roles": ["data"],
                 "proj:code": "OGC:CRS84",
                 **facts["parquet"],
@@ -1375,6 +1488,7 @@ def build_indirizzi(facts: dict, lang: str = SOURCE_LANG) -> dict:
                 "href": f"{up}anncsu-indirizzi.pmtiles",
                 "type": "application/vnd.pmtiles",
                 "title": text["visual_title"],
+                "description": text["visual_description"],
                 "roles": ["visual"],
                 **facts["pmtiles"],
             },
@@ -1399,7 +1513,7 @@ def build_indirizzi_h3(facts: dict, lang: str = SOURCE_LANG) -> dict:
     """
     text = TEXTS[lang]
     up = _to_data(lang, 1)
-    glob = f"{PUBLIC_BASE}/tiles/{facts['tile_key']}=*/*.parquet"
+    glob = f"{BUCKET_URL}/tiles/{facts['tile_key']}=*/*.parquet"
     return {
         "type": "Collection",
         "stac_version": "1.1.0",
@@ -1578,6 +1692,7 @@ def build_release_item(
                 "href": release_asset_url(release, "parquet"),
                 "type": "application/vnd.apache.parquet",
                 "title": text["release_parquet"],
+                "description": text["release_parquet_description"],
                 "roles": ["data"],
                 "file:size": release["parquet"]["size"],
                 "file:checksum": "1220" + release["parquet"]["sha256"],
@@ -1586,6 +1701,7 @@ def build_release_item(
                 "href": release_asset_url(release, "zip"),
                 "type": "application/zip",
                 "title": text["release_zip"],
+                "description": text[f"release_zip_{release['origin']}"],
                 "roles": ["source"],
                 "file:size": release["zip"]["size"],
                 "file:checksum": "1220" + release["zip"]["sha256"],
@@ -1628,11 +1744,18 @@ def build_rilasci(facts: dict, lang: str = SOURCE_LANG) -> dict:
         ],
         "id": "rilasci",
         "title": text["rilasci_title"],
-        "description": Template(text["rilasci_description"]).substitute(
-            first=human_date(_release_datetime(first), lang),
-            last=human_date(_release_datetime(last), lang),
-            portal=SOURCE_PORTAL,
-            diff_anncsu=DIFF_ANNCSU_URL,
+        "description": "\n\n".join(
+            part
+            for part in (
+                Template(text["rilasci_description"]).substitute(
+                    first=human_date(_release_datetime(first), lang),
+                    last=human_date(_release_datetime(last), lang),
+                    portal=SOURCE_PORTAL,
+                    diff_anncsu=DIFF_ANNCSU_URL,
+                ),
+                months_without_release_paragraph(lang),
+            )
+            if part
         ),
         "license": LICENSE_ID,
         "keywords": [*text["keywords"], *text["keywords_rilasci"]],
@@ -1779,7 +1902,10 @@ def _write_tree(data_dir: Path, facts: dict, lang: str) -> None:
     )
     write_text(
         tree / "AGENTS.md",
-        render_template(template_name("catalog.AGENTS.md", lang), {}),
+        render_template(
+            template_name("catalog.AGENTS.md", lang),
+            {"portolan_version": PORTOLAN_VERSION},
+        ),
     )
 
     collections = [
@@ -1787,7 +1913,9 @@ def _write_tree(data_dir: Path, facts: dict, lang: str) -> None:
         ("indirizzi-h3", build_indirizzi_h3(facts, lang), "tile_table_columns"),
     ]
     for collection_id, document, columns_key in collections:
-        usage = Template(USAGE[lang][collection_id]).substitute(public_base=PUBLIC_BASE)
+        usage = Template(USAGE[lang][collection_id]).substitute(
+            public_base=PUBLIC_BASE, bucket_url=BUCKET_URL
+        )
         target = tree / collection_id
         write_json(target / "collection.json", document)
         write_text(
@@ -1809,7 +1937,11 @@ def _write_tree(data_dir: Path, facts: dict, lang: str) -> None:
             target / "AGENTS.md",
             render_template(
                 template_name("collection.AGENTS.md", lang),
-                {"id": collection_id, "usage": usage},
+                {
+                    "id": collection_id,
+                    "usage": usage,
+                    "portolan_version": PORTOLAN_VERSION,
+                },
             ),
         )
 
@@ -1839,7 +1971,10 @@ def _write_tree(data_dir: Path, facts: dict, lang: str) -> None:
     )
     write_text(
         rilasci / "AGENTS.md",
-        render_template(template_name("rilasci.AGENTS.md", lang), {}),
+        render_template(
+            template_name("rilasci.AGENTS.md", lang),
+            {"portolan_version": PORTOLAN_VERSION},
+        ),
     )
     for release in facts["releases"]:
         write_json(

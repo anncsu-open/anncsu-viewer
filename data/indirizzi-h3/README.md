@@ -1,6 +1,6 @@
 # Indirizzi ANNCSU, partizionati per cella H3
 
-Gli stessi indirizzi della collection indirizzi, ripartiti in 1.340 file secondo la cella H3 di risoluzione 5 che li contiene, con struttura Hive tiles/h3_cell=<cella>/<cella>.parquet. Ogni file pesa meno di un megabyte, quindi un client può leggere un comune senza scaricare il file nazionale. Il glob di accesso massivo è https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/tiles/h3_cell=*/*.parquet, ma su HTTPS non esiste il listing: per sapere quali celle servono si usa l'indice comuni-h3.json, registrato come asset di metadati. Su 20.728.959 accessi, 48.527 (0,23%) cadono oltre 110 metri fuori dal confine del comune a cui sono attribuiti secondo i confini Istat, e 0 non hanno un confine di riferimento. Questa collection contiene i 20.728.959 accessi georeferenziati sui 27.413.752 del rilascio del 2 novembre 2026: gli accessi privi di coordinate sono nella collection `rilasci`.
+Gli stessi indirizzi della collection indirizzi, ripartiti in 1.340 file secondo la cella H3 di risoluzione 5 che li contiene, con struttura Hive tiles/h3_cell=<cella>/<cella>.parquet. Ogni file pesa meno di un megabyte, quindi un client può leggere un comune senza scaricare il file nazionale. Il glob di accesso massivo è s3://anncsu-data/tiles/h3_cell=*/*.parquet, sull'API S3 di Cloudflare R2, dove elencare i file richiede credenziali. Ogni file è leggibile via HTTPS senza credenziali, e per sapere quali celle servono si usa l'indice comuni-h3.json, registrato come asset di metadati. Su 20.728.959 accessi, 48.527 (0,23%) cadono oltre 110 metri fuori dal confine del comune a cui sono attribuiti secondo i confini Istat, e 0 non hanno un confine di riferimento. Questa collection contiene i 20.728.959 accessi georeferenziati sui 27.413.752 del rilascio del 2 novembre 2026: gli accessi privi di coordinate sono nella collection `rilasci`.
 
 Aggiornato al 2 novembre 2026, con 20.728.959 indirizzi. I dati si
 vedono sulla mappa nel [visualizzatore web](https://anncsu-open.github.io/anncsu-viewer/).
@@ -15,7 +15,7 @@ vedono sulla mappa nel [visualizzatore web](https://anncsu-open.github.io/anncsu
 
 ## Come si legge
 
-I dati sono divisi per cella H3 di risoluzione 5, con struttura Hive. Il glob di accesso massivo è `https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/tiles/h3_cell=*/*.parquet`, ma su HTTPS non esiste il listing delle directory, quindi un lettore non può espanderlo da solo. Per sapere quali celle servono si legge l'indice `comuni-h3.json`, che mappa ogni comune sulle sue celle.
+I dati sono divisi per cella H3 di risoluzione 5, con struttura Hive. Il glob di accesso massivo è `s3://anncsu-data/tiles/h3_cell=*/*.parquet`, sull'API S3 di Cloudflare R2: elencare i file richiede credenziali R2, che il catalogo non distribuisce. Ogni file è leggibile via HTTPS senza credenziali, e per sapere quali celle servono si legge l'indice `comuni-h3.json`, che mappa ogni comune sulle sue celle.
 
 ```shell
 curl -s https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/comuni-h3.json \

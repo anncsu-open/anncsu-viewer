@@ -1,7 +1,7 @@
 # Istruzioni per agenti
 
 Collection `$id` del catalogo ANNCSU, conforme al profilo
-[Portolan](https://github.com/portolan-sdi/portolan-spec) v0.2.0.
+[Portolan](https://github.com/portolan-sdi/portolan-spec) $portolan_version.
 
 ## Accesso ai dati
 

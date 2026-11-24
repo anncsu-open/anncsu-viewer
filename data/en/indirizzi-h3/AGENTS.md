@@ -1,13 +1,13 @@
 # Instructions for agents
 
 Collection `indirizzi-h3` of the ANNCSU catalog, conforming to the
-[Portolan](https://github.com/portolan-sdi/portolan-spec) profile v0.2.0.
+[Portolan](https://github.com/portolan-sdi/portolan-spec) profile v0.3.0.
 This is the English translation; the Italian source collection is the
 `alternate` link with `hreflang: it`, and the data assets live in that tree.
 
 ## Data access
 
-The data is split by resolution 5 H3 cell, in Hive layout. The bulk-access glob is `https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/tiles/h3_cell=*/*.parquet`, but HTTPS offers no directory listing, so a reader cannot expand it on its own. To know which cells you need, read the `comuni-h3.json` index, which maps every comune to its cells.
+The data is split by resolution 5 H3 cell, in Hive layout. The bulk-access glob is `s3://anncsu-data/tiles/h3_cell=*/*.parquet`, on the S3 API of Cloudflare R2: listing the files needs R2 credentials, which the catalog does not hand out. Every file is readable over HTTPS without credentials. To know which cells you need, read the `comuni-h3.json` index, which maps every comune to its cells.
 
 ```shell
 curl -s https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/comuni-h3.json \

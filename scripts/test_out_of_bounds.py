@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#     "duckdb>=1.5.5",
+#     "duckdb==2.0.0",
 #     "pytest",
 # ]
 # ///
@@ -252,3 +252,7 @@ class TestOutOfBoundsDetection:
         assert total == 3
         assert flagged == 2  # VIA FONTANA and VIA GARIBALDI (Comune B at Comune A coords)
         assert valid == 1  # VIA ROMA (Comune A at Comune A coords)
+
+
+if __name__ == "__main__":
+    raise SystemExit(pytest.main([__file__, "-v"]))

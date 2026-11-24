@@ -18,7 +18,7 @@ Cloudflare R2 bucket that already serves the data. Metadata lives in git, so the
 | Primary language | Italian |
 | Providers | Mixed: `anncsu-open` as processor, Geobeyond as host |
 | Build trigger | A separate GitHub Actions workflow, downstream of "Update ANNCSU Data" |
-| `partition:glob` scheme | HTTPS, with the tile index documented as the expansion path |
+| `partition:glob` scheme | `s3://` on the R2 bucket, without `storage:schemes`; anonymous readers use the HTTPS files and the tile index |
 
 ### Why not the Portolan catalog template
 
@@ -180,7 +180,7 @@ an `updated` field, and these links:
 
 ### Shared by both collections
 
-- Extensions: Portolan v0.2.0, file v2.1.0, table v1.2.0, projection v2.0.0,
+- Extensions: Portolan v0.3.0, file v2.1.0, table v1.2.0, projection v2.0.0,
   web-map-links v1.3.0.
 - `license: CC-BY-4.0` plus a `rel: license` link.
 - Spatial extent from the real parquet bbox; temporal extent open-ended from the
@@ -209,7 +209,8 @@ A partitioned collection using the partition extension v1.0.0
 - `partition:strategy`: `h3`
 - `partition:keys`: one key, `h3_cell`, type `string`
 - `partition:file_count`: the real tile count
-- `partition:glob`: the HTTPS pattern over the published tiles
+- `partition:glob`: `s3://anncsu-data/tiles/h3_cell=*/*.parquet`, the bucket
+  pattern over the published tiles
 
 No items. `PORTO-FMT-022` advises against them for opaque schemes such as H3 and
 for hundreds of partitions. `comuni-h3.json` is registered as a `metadata`
@@ -219,16 +220,30 @@ All tiles come from a single partition run, so they share one parquet schema as
 `PORTO-FMT-021` requires. The tile schema is the main schema plus an `h3_cell`
 VARCHAR column.
 
-### The glob limitation
+### The glob and the R2 account
 
-`partition:glob` is the normative bulk-access path, but a plain HTTPS glob
-cannot be expanded, because HTTPS provides no listing. The spec acknowledges
-this and permits bucket-native schemes.
+`partition:glob` is the normative bulk-access path, and since v0.3.0 it MUST be
+an absolute URL with a scheme that supports listing (`PORTO-FMT-064`). HTTPS
+has no listing, so the HTTPS pattern the catalog used until November 2026 is
+no longer allowed. The glob is now `s3://anncsu-data/tiles/h3_cell=*/*.parquet`.
 
-The catalog uses the HTTPS form. It states the true location of the files and
-stays readable in a browser. The README documents the two ways to expand it: the
-`comuni-h3.json` index, which is how the viewer itself resolves cells without
-listing, and the S3 endpoint for readers holding credentials.
+R2 serves the S3 API only to authenticated clients: there is no anonymous
+listing. A reader without credentials therefore cannot expand the glob, and
+the README says so. It also documents the two paths that need nothing: every
+tile is readable over HTTPS at the public base, and `comuni-h3.json` maps each
+comune to its cells, which is how the viewer resolves cells without listing.
+
+For S3-compatible services other than AWS, `PORTO-FMT-066` says publishers
+SHOULD add a `storage:schemes` entry (STAC storage extension v2.0.0, type
+`custom-s3`) whose `platform` is the S3 endpoint. On R2 that endpoint is
+`https://<account id>.r2.cloudflarestorage.com`. The account id is kept in the
+CI secrets and not published, so the catalog omits `storage:schemes` and does
+not meet this SHOULD. The cost is small: the only readers who can list the
+bucket hold R2 credentials, and they know the endpoint already. Decided on
+2026-11-24. Revisit if the account id stops being treated as private, or if the
+tiles move to a host with anonymous listing. A test in
+`scripts/test_build_catalog.py` fails if the endpoint ever appears in the
+collection.
 
 ### License caveat
 
@@ -317,6 +332,31 @@ now says "fonte originale", which satisfies it without switching language.
 Two `info` findings remain and are expected: `PTL-PRO-002` asks for a
 `canonical` link when the upstream publishes its own STAC catalog. ANNCSU does
 not, so there is nothing to point at.
+
+## Moving to Portolan v0.3.0
+
+Portolan released spec v0.3.0 on 2026-11-17, and rashid 0.4.0 came out the same day. A
+validator may now apply the newest requirements it knows, whatever version an
+object declares (`PORTO-CORE-089`), so rashid 0.4.0 checked this catalog,
+which still declared v0.2.0, against v0.3.0. The workflow pinned
+`rashid>=0.1.8,<0.2.0` and stayed green; 0.4.0 reported two errors and sixty
+warnings.
+
+- `PTL-PRT-002`, an error, once per language tree: the HTTPS partition glob.
+  Fixed as described in "The glob and the R2 account".
+- `PTL-AST-010`, a warning: assets without a `description`
+  (`PORTO-CORE-088`, every asset SHOULD have a title and a description).
+  Every asset now has both, in each language: the GeoParquet, the PMTiles and
+  the thumbnails of the live collections, and the Parquet and ZIP of every
+  release, whose ZIP description says whether it is the portal's own file or
+  a reconstruction.
+- `PTL-CNF-005`, an info: the declared version. The schema URI comes from
+  `PORTOLAN_VERSION` in `scripts/build_catalog.py`, and the AGENTS templates
+  read the same constant, so the prose and the declaration cannot drift apart.
+
+The workflow and the conformance test now pin `rashid>=0.4.0,<0.5.0`. Against
+the regenerated catalog it reports no errors and no warnings, offline and live.
+The six `PTL-PRO-002` infos remain, for the reason given above.
 
 ## Out of scope
 

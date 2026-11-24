@@ -2,7 +2,7 @@
   "type": "Collection",
   "stac_version": "1.1.0",
   "stac_extensions": [
-    "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json",
+    "https://schemas.portolan-sdi.org/portolan/v0.3.0/schema.json",
     "https://stac-extensions.github.io/file/v2.1.0/schema.json",
     "https://stac-extensions.github.io/table/v1.2.0/schema.json",
     "https://stac-extensions.github.io/version/v1.2.0/schema.json",
@@ -10,7 +10,7 @@
   ],
   "id": "rilasci",
   "title": "Rilasci mensili ANNCSU",
-  "description": "Ogni scarico mensile dell'indirizzario nazionale, dal 3 settembre 2025 al 2 novembre 2026, così come pubblicato dal [portale ANNCSU](https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/). Il portale serve solo l'ultimo rilascio: qui restano tutti.\n\nOgni rilascio ha due file:\n\n- l'**archivio ZIP** come lo distribuisce il portale;\n- una **copia Parquet senza perdita** del CSV, con tutte le righe e le 19 colonne originali come testo, coordinate comprese ma senza geometria.\n\nÈ lo storico da cui le collection `indirizzi` e `indirizzi-h3` derivano il rilascio corrente. I rilasci precedenti al 15 settembre 2026 sono ricostruiti dal parquet consolidato di [mfortini/diff_ANNCSU](https://github.com/mfortini/diff_ANNCSU), con un metodo verificato byte per byte sul rilascio di settembre.",
+  "description": "Ogni scarico mensile dell'indirizzario nazionale, dal 3 settembre 2025 al 2 novembre 2026, così come pubblicato dal [portale ANNCSU](https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/). Il portale serve solo l'ultimo rilascio: qui restano tutti.\n\nOgni rilascio ha due file:\n\n- l'**archivio ZIP** come lo distribuisce il portale;\n- una **copia Parquet senza perdita** del CSV, con tutte le righe e le 19 colonne originali come testo, coordinate comprese ma senza geometria.\n\nÈ lo storico da cui le collection `indirizzi` e `indirizzi-h3` derivano il rilascio corrente. I rilasci precedenti al 15 settembre 2026 sono ricostruiti dal parquet consolidato di [mfortini/diff_ANNCSU](https://github.com/mfortini/diff_ANNCSU), con un metodo verificato byte per byte sul rilascio di settembre.\n\nA ottobre 2026 ANNCSU non ha pubblicato alcun rilascio: ai controlli settimanali dal 5 ottobre 2026 al 2 novembre 2026 il portale serviva ancora quello del 15 settembre 2026.",
   "license": "CC-BY-4.0",
   "keywords": [
     "indirizzi",

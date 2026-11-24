@@ -1,7 +1,7 @@
 # Instructions for agents
 
 This is a STAC 1.1.0 catalog conforming to the
-[Portolan](https://github.com/portolan-sdi/portolan-spec) profile v0.2.0. It
+[Portolan](https://github.com/portolan-sdi/portolan-spec) profile $portolan_version. It
 is the English tree of a catalog whose source language is Italian; the Italian
 root is the `alternate` link with `hreflang: it`.
 
@@ -21,10 +21,12 @@ GeoParquet of about a gigabyte, spatially sorted: use it for national
 aggregations. `indirizzi-h3` exposes the same data partitioned into files
 under a megabyte each: use it for a single comune or a single area.
 
-The `partition:glob` field of `indirizzi-h3` cannot be expanded over HTTPS,
-because the protocol offers no directory listing. To know which cells you
-need, read the `cell-index` asset, `comuni-h3.json`, which maps every comune
-to the cells that contain its addresses.
+The `partition:glob` field of `indirizzi-h3` points at the bucket with the
+`s3://` scheme, on the S3 API of Cloudflare R2: listing the files needs R2
+credentials, which the catalog does not hand out. Every file is readable
+over HTTPS. To know which cells you need, read the `cell-index` asset,
+`comuni-h3.json`, which maps every comune to the cells that contain its
+addresses.
 
 Column descriptions are in `table:columns` on every collection.
 

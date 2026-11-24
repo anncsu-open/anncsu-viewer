@@ -128,6 +128,28 @@ the entry is created, and never recomputed, so the generator stays
 deterministic. The monthly workflow appends one entry; the backfill writes
 thirteen.
 
+### Months without a release
+
+A month with no entry in the index is ambiguous: ANNCSU may have skipped it, or
+the pipeline may have missed it. The two need different answers, so the gap is
+never read from the index. A month ANNCSU skipped is written by hand into
+`MONTHS_WITHOUT_RELEASE` in `scripts/build_catalog.py`, after checking, and the
+`rilasci` description states it in both languages.
+
+October 2026 is the first entry. Every weekly run from 5 October to 2 November
+read `INDIR_ITA_20260915.csv` from the portal, so the 15 September release was
+still the one served, and mfortini/diff_ANNCSU also goes from 2026-09-15 to
+2026-11-02.
+
+A missed release is a different case and has happened once. The portal served
+`INDIR_ITA_20260427.csv` for about a week, between the 6 April and 4 May
+releases. A local run of the pipeline downloaded it, as the date marker in
+commit `3caa4f50` records, but the archive did not exist yet and the output was
+never committed. No public copy survives: the Wayback Machine's only 2026
+capture of the national ZIP is from 19 January, and mfortini/diff_ANNCSU,
+ondata/archivio_anncsu and ivandorte/anncsu_dump do not have it either. The
+catalog does not mention it.
+
 ## Catalog modelling
 
 ### The `rilasci` collection

@@ -103,7 +103,7 @@ Validate it with the Portolan validator. This is the same check the workflow
 runs as a gate, so a clean run here means CI will pass:
 
 ```shell
-uv run --with 'rashid>=0.1.8,<0.2.0' rashid check data/ --schema --data-scope local
+uv run --with 'rashid>=0.4.0,<0.5.0' rashid check data/ --schema --data-scope local
 ```
 
 `--data-scope local` verifies the bytes of every asset present in the checkout
@@ -120,7 +120,7 @@ Check the published copy against the live bucket. This verifies range requests
 and CORS on the server rather than the metadata:
 
 ```shell
-uv run --with 'rashid>=0.1.8,<0.2.0' rashid check data/ --live \
+uv run --with 'rashid>=0.4.0,<0.5.0' rashid check data/ --live \
   --live-base-url https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev
 ```
 
@@ -214,7 +214,7 @@ in STAC Browser, which the Portolan Browser derives from: only the English
 locale routes stac-fields strings through the library's own placeholder
 substitution. The date is stated in every README and visible through Source.
 
-**Do not expect the partition glob to expand over HTTPS.** The catalog publishes a glob pattern over the tiles, but plain HTTPS gives no directory listing, so a reader cannot discover the files from the pattern alone. Use `comuni-h3.json` to find the cells you need, or the S3 endpoint if you hold credentials.
+**Do not expect to expand the partition glob without credentials.** The glob is `s3://anncsu-data/tiles/h3_cell=*/*.parquet`, on the S3 API of Cloudflare R2, which lists files only for authenticated clients. Every tile is readable over HTTPS at the public base: use `comuni-h3.json` to find the cells you need.
 
 **The licence is stated but not confirmed at the source.** The catalog declares
 `CC-BY-4.0`. The official ANNCSU pages cite EU implementing regulation 2023/138

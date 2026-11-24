@@ -2,7 +2,7 @@
   "type": "Collection",
   "stac_version": "1.1.0",
   "stac_extensions": [
-    "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json",
+    "https://schemas.portolan-sdi.org/portolan/v0.3.0/schema.json",
     "https://stac-extensions.github.io/file/v2.1.0/schema.json",
     "https://stac-extensions.github.io/table/v1.2.0/schema.json",
     "https://stac-extensions.github.io/version/v1.2.0/schema.json",
@@ -10,7 +10,7 @@
   ],
   "id": "rilasci",
   "title": "ANNCSU monthly releases",
-  "description": "Every monthly download of the national address register, from 3 September 2025 to 2 November 2026, as published by the [ANNCSU portal](https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/). The portal serves only the latest release: all of them are kept here.\n\nEvery release has two files:\n\n- the **ZIP archive** as the portal distributes it;\n- a **lossless Parquet copy** of the CSV, with every row and the 19 original columns as text, coordinates included but no geometry.\n\nIt is the history the `indirizzi` and `indirizzi-h3` collections derive their current release from. Releases before 15 September 2026 are reconstructed from the consolidated parquet of [mfortini/diff_ANNCSU](https://github.com/mfortini/diff_ANNCSU), with a method verified byte for byte on the September release.",
+  "description": "Every monthly download of the national address register, from 3 September 2025 to 2 November 2026, as published by the [ANNCSU portal](https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/). The portal serves only the latest release: all of them are kept here.\n\nEvery release has two files:\n\n- the **ZIP archive** as the portal distributes it;\n- a **lossless Parquet copy** of the CSV, with every row and the 19 original columns as text, coordinates included but no geometry.\n\nIt is the history the `indirizzi` and `indirizzi-h3` collections derive their current release from. Releases before 15 September 2026 are reconstructed from the consolidated parquet of [mfortini/diff_ANNCSU](https://github.com/mfortini/diff_ANNCSU), with a method verified byte for byte on the September release.\n\nANNCSU published no release in October 2026: at the weekly checks from 5 October 2026 to 2 November 2026 the portal was still serving the 15 September 2026 release.",
   "license": "CC-BY-4.0",
   "keywords": [
     "addresses",
