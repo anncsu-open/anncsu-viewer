@@ -316,3 +316,16 @@ COORD_Y_COMUNE:
     Latitude of the access as the portal writes it: decimal degrees with a
     comma as decimal separator, in ETRF2000. The enriched GeoParquet turns it
     into the numeric latitude column.
+
+TOTALE_ACCESSI:
+  type: VARCHAR
+  raw_only: true
+  description: >-
+    Numero di accessi (civici) della strada nello stesso rilascio, calcolato
+    da ANNCSU a partire dai civici. Coincide con il conteggio dei civici del
+    portale strada per strada. Presente solo nello stradario.
+  description_en: >-
+    Number of accesses (house numbers) on the street in the same release,
+    computed by ANNCSU from the house numbers. It equals the count of the
+    portal's house numbers, street by street. Present only in the street
+    register.

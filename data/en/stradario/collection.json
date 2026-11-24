@@ -1,0 +1,217 @@
+{
+  "type": "Collection",
+  "stac_version": "1.1.0",
+  "stac_extensions": [
+    "https://schemas.portolan-sdi.org/portolan/v0.3.0/schema.json",
+    "https://stac-extensions.github.io/file/v2.1.0/schema.json",
+    "https://stac-extensions.github.io/table/v1.2.0/schema.json",
+    "https://stac-extensions.github.io/version/v1.2.0/schema.json",
+    "https://stac-extensions.github.io/language/v1.0.0/schema.json"
+  ],
+  "id": "stradario",
+  "title": "ANNCSU street register",
+  "description": "The releases of the ANNCSU national street register kept here. The [ANNCSU portal](https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/) serves only the latest release, so the archive holds the releases listed, not every month.\n\nA release downloaded from the portal has two files: the **ZIP** as the portal distributes it and a **lossless Parquet copy** of the CSV, with every row and the 9 original columns as text. Releases that come from ondata/archivio_anncsu have only the Parquet and cannot be called lossless: their completeness against the original CSV cannot be verified.\n\n`TOTALE_ACCESSI` is computed by the portal from the house numbers of the same release.\n\nReleases for which no original street register survives are not published. The part that can be derived, the streets with at least one access, comes from grouping the house numbers of the `rilasci` collection.",
+  "license": "CC-BY-4.0",
+  "keywords": [
+    "addresses",
+    "house numbers",
+    "street names",
+    "italy",
+    "anncsu",
+    "street register",
+    "streets",
+    "history"
+  ],
+  "providers": [
+    {
+      "name": "Agenzia delle Entrate",
+      "url": "https://www.agenziaentrate.gov.it/",
+      "roles": [
+        "producer",
+        "licensor"
+      ]
+    },
+    {
+      "name": "Istat",
+      "url": "https://www.istat.it/",
+      "roles": [
+        "producer"
+      ]
+    },
+    {
+      "name": "anncsu-open",
+      "url": "https://github.com/anncsu-open/anncsu-viewer",
+      "roles": [
+        "processor"
+      ]
+    },
+    {
+      "name": "Geobeyond",
+      "url": "https://geobeyond.it/",
+      "roles": [
+        "host"
+      ]
+    }
+  ],
+  "extent": {
+    "spatial": {
+      "bbox": [
+        [
+          6.7003259,
+          35.5017421,
+          18.660009,
+          47.0805336
+        ]
+      ]
+    },
+    "temporal": {
+      "interval": [
+        [
+          "2025-01-28T00:00:00Z",
+          null
+        ]
+      ]
+    }
+  },
+  "language": {
+    "code": "en",
+    "name": "English",
+    "alternate": "Inglese"
+  },
+  "languages": [
+    {
+      "code": "it",
+      "name": "Italiano",
+      "alternate": "Italian"
+    }
+  ],
+  "updated": "2026-11-24T16:00:05Z",
+  "table:columns": [
+    {
+      "name": "CODICE_COMUNE",
+      "type": "varchar",
+      "description": "Administrative code assigned to Italian comuni by the Agenzia delle Entrate and used in composing tax codes."
+    },
+    {
+      "name": "CODICE_ISTAT",
+      "type": "varchar",
+      "description": "Administrative code assigned to Italian comuni by Istat. Six digits. It is the join key with the comuni list and with the Istat boundaries."
+    },
+    {
+      "name": "PROGRESSIVO_NAZIONALE",
+      "type": "varchar",
+      "description": "National unique sequential code identifying the circulation area, that is the street."
+    },
+    {
+      "name": "CODICE_COMUNALE",
+      "type": "varchar",
+      "description": "Street code supplied by the comune. Identifier used by the comune, where present."
+    },
+    {
+      "name": "ODONIMO",
+      "type": "varchar",
+      "description": "Full name of the circulation area, made of DUG and DUF. The DUG is the generic urban denomination, the type such as via or piazza; the DUF is the official denomination assigned by the comune under current rules."
+    },
+    {
+      "name": "LOCALITA'",
+      "type": "varchar",
+      "description": "Locality name, where the comune records one. Present only in the original CSV and in the raw archive Parquet: the enriched GeoParquet does not carry it."
+    },
+    {
+      "name": "TOTALE_ACCESSI",
+      "type": "varchar",
+      "description": "Number of accesses (house numbers) on the street in the same release, computed by ANNCSU from the house numbers. It equals the count of the portal's house numbers, street by street. Present only in the street register."
+    },
+    {
+      "name": "DIZIONE_LINGUA1",
+      "type": "varchar",
+      "description": "Street name recorded in a first language other than Italian, under the rules on bilingualism and on the use of recognised minority languages."
+    },
+    {
+      "name": "DIZIONE_LINGUA2",
+      "type": "varchar",
+      "description": "Street name recorded in a second language other than Italian, under the same rules on bilingualism and recognised minority languages."
+    }
+  ],
+  "assets": {},
+  "links": [
+    {
+      "rel": "root",
+      "href": "../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "parent",
+      "href": "../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "item",
+      "href": "./2025-01-28/2025-01-28.json",
+      "type": "application/geo+json",
+      "title": "Street register of 28 January 2025"
+    },
+    {
+      "rel": "item",
+      "href": "./2025-08-04/2025-08-04.json",
+      "type": "application/geo+json",
+      "title": "Street register of 4 August 2025"
+    },
+    {
+      "rel": "item",
+      "href": "./2026-01-14/2026-01-14.json",
+      "type": "application/geo+json",
+      "title": "Street register of 14 January 2026"
+    },
+    {
+      "rel": "item",
+      "href": "./2026-11-02/2026-11-02.json",
+      "type": "application/geo+json",
+      "title": "Street register of 2 November 2026"
+    },
+    {
+      "rel": "latest-version",
+      "href": "./2026-11-02/2026-11-02.json",
+      "type": "application/geo+json"
+    },
+    {
+      "rel": "alternate",
+      "href": "../../stradario/collection.json",
+      "type": "application/json",
+      "title": "Italian",
+      "hreflang": "it"
+    },
+    {
+      "rel": "alternate",
+      "href": "https://anncsu-open.github.io/anncsu-viewer/",
+      "type": "text/html",
+      "title": "Web viewer"
+    },
+    {
+      "rel": "via",
+      "href": "https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/",
+      "type": "text/html",
+      "title": "ANNCSU open data portal"
+    },
+    {
+      "rel": "license",
+      "href": "https://creativecommons.org/licenses/by/4.0/",
+      "type": "text/html",
+      "title": "Creative Commons Attribution 4.0 International"
+    },
+    {
+      "rel": "agents",
+      "href": "./AGENTS.md",
+      "type": "text/markdown",
+      "title": "Instructions for automated agents",
+      "hreflang": "en"
+    },
+    {
+      "rel": "describedby",
+      "href": "./README.md",
+      "type": "text/markdown",
+      "title": "Human-readable documentation",
+      "hreflang": "en"
+    }
+  ]
+}

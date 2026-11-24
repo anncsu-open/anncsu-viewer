@@ -28,9 +28,9 @@ comparing the date embedded in the CSV filename inside the zip archive
 with the last commit date of the existing GeoParquet file.
 """
 
-import hashlib
 import io
 import json
+import os
 import re
 import shutil
 import time
@@ -41,6 +41,17 @@ from pathlib import Path
 import duckdb
 import httpx
 import typer
+from anncsu_archive import (
+    INDIRIZZARIO,
+    QUOTE,
+    STRADARIO,
+    archive_latest,
+    normalize_csv,
+)
+from anncsu_archive import append_release as archive_append_release
+from anncsu_archive import csv_to_raw_parquet as archive_csv_to_raw_parquet
+from anncsu_archive import release_entry as archive_release_entry
+from anncsu_archive import sha256_of as archive_sha256_of
 
 ANNCSU_URL = (
     "https://anncsu.open.agenziaentrate.gov.it"
@@ -56,7 +67,6 @@ BOUNDARIES_FILE = OUTPUT_DIR / "istat-boundaries.parquet"
 MARKER_FILE = OUTPUT_DIR / ".last_remote_date"
 RELEASES_DIR = OUTPUT_DIR / "rilasci"
 RELEASES_FILE = RELEASES_DIR / "releases.json"
-RELEASE_ORIGINS = ("original", "reconstructed")
 H3_RESOLUTION = 5
 TAIL_SIZE = 65536
 DOWNLOAD_TIMEOUT = 600
@@ -230,47 +240,13 @@ def download_and_extract() -> tuple[Path, bytes]:
 
 
 def csv_to_raw_parquet(csv_path: Path, parquet_path: Path) -> int:
-    """Convert the raw ANNCSU CSV to Parquet without losing anything.
-
-    Every column stays text exactly as the portal writes it: Italian decimal
-    commas, leading-zero codes, quotes inside odonyms. Empty fields become
-    NULL, which is what they mean in the CSV. Rows are ordered by the three
-    identifying columns so the output does not depend on the CSV's order,
-    which the portal does not fix and a reconstruction cannot reproduce.
-    Returns the row count.
-    """
-    con = duckdb.connect()
-    # Same bounds as enhance_parquet: the sort spills to disk instead of
-    # OOMing the runner. ORDER BY still fixes the output order.
-    con.execute("SET memory_limit='4GB'")
-    con.execute("SET preserve_insertion_order=false")
-    con.execute(f"""
-        COPY (
-            SELECT *
-            FROM read_csv(
-                '{csv_path}',
-                delim=';', header=true, quote='', escape='', all_varchar=true
-            )
-            ORDER BY
-                CODICE_ISTAT,
-                TRY_CAST(PROGRESSIVO_NAZIONALE AS BIGINT),
-                TRY_CAST(PROGRESSIVO_ACCESSO AS BIGINT)
-        ) TO '{parquet_path}' (FORMAT PARQUET, COMPRESSION ZSTD)
-    """)
-    rows = con.execute(
-        f"SELECT count(*) FROM read_parquet('{parquet_path}')"
-    ).fetchone()[0]
-    con.close()
-    return rows
+    """Write the lossless raw Parquet of the civici CSV. Returns the row count."""
+    return archive_csv_to_raw_parquet(csv_path, parquet_path, INDIRIZZARIO)
 
 
 def sha256_of(path: Path) -> str:
     """Plain hex sha256 of a file. The catalog adds the multihash prefix."""
-    digest = hashlib.sha256()
-    with open(path, "rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    return archive_sha256_of(path)
 
 
 def release_entry(
@@ -283,43 +259,14 @@ def release_entry(
     archived: str,
 ) -> dict:
     """One entry of releases.json."""
-    return {
-        "date": date,
-        "origin": origin,
-        "note": note,
-        "zip": {
-            "name": zip_path.name,
-            "size": zip_path.stat().st_size,
-            "sha256": sha256_of(zip_path),
-        },
-        "parquet": {
-            "name": parquet_path.name,
-            "size": parquet_path.stat().st_size,
-            "sha256": sha256_of(parquet_path),
-            "rows": rows,
-        },
-        "archived": archived,
-    }
+    return archive_release_entry(
+        date, zip_path, parquet_path, rows, origin, note, archived
+    )
 
 
 def append_release(index_path: Path, entry: dict) -> None:
     """Add or replace the entry for one date, keeping the index sorted."""
-    if entry.get("origin") not in RELEASE_ORIGINS:
-        raise ValueError(
-            f"origin must be one of {RELEASE_ORIGINS}, got {entry.get('origin')!r}"
-        )
-    releases = []
-    if index_path.exists():
-        releases = json.loads(index_path.read_text(encoding="utf-8")).get(
-            "releases", []
-        )
-    releases = [r for r in releases if r["date"] != entry["date"]] + [entry]
-    releases.sort(key=lambda r: r["date"])
-    index_path.parent.mkdir(parents=True, exist_ok=True)
-    index_path.write_text(
-        json.dumps({"releases": releases}, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
+    archive_append_release(index_path, entry, INDIRIZZARIO)
 
 
 def archive_release(zip_bytes: bytes, csv_path: Path, release_date: datetime) -> Path:
@@ -375,23 +322,30 @@ def _validate_row_count(csv_path: Path, parquet_path: Path) -> None:
     CSV count uses the same type overrides as ``csv_to_parquet`` so that
     the validator itself doesn't suffer from the bug it's meant to detect.
     """
-    con = duckdb.connect()
-    csv_count = con.execute(f"""
-        SELECT COUNT(*)
-        FROM read_csv(
-            '{csv_path}',
-            header=true,
-            auto_detect=true,
-            ignore_errors=true,
-            {_csv_types_clause()}
-        )
-        WHERE COORD_X_COMUNE IS NOT NULL
-          AND COORD_Y_COMUNE IS NOT NULL
-    """).fetchone()[0]
-    parquet_count = con.execute(
-        f"SELECT COUNT(*) FROM read_parquet('{parquet_path}')"
-    ).fetchone()[0]
-    con.close()
+    read_path, repaired = normalize_csv(csv_path)
+    try:
+        con = duckdb.connect()
+        csv_count = con.execute(f"""
+            SELECT COUNT(*)
+            FROM read_csv(
+                '{read_path}',
+                header=true,
+                auto_detect=true,
+                ignore_errors=true,
+                quote='{QUOTE}',
+                escape='{QUOTE}',
+                {_csv_types_clause()}
+            )
+            WHERE COORD_X_COMUNE IS NOT NULL
+              AND COORD_Y_COMUNE IS NOT NULL
+        """).fetchone()[0]
+        parquet_count = con.execute(
+            f"SELECT COUNT(*) FROM read_parquet('{parquet_path}')"
+        ).fetchone()[0]
+        con.close()
+    finally:
+        if repaired:
+            read_path.unlink(missing_ok=True)
 
     if csv_count != parquet_count:
         delta = csv_count - parquet_count
@@ -405,7 +359,21 @@ def _validate_row_count(csv_path: Path, parquet_path: Path) -> None:
 
 
 def csv_to_parquet(csv_path: Path) -> Path:
-    """Load CSV into DuckDB, join with comuni, create geometries, and export as Parquet."""
+    """Load CSV into DuckDB, join with comuni, create geometries, and export as Parquet.
+
+    Records split by a raw line feed are rejoined first. The repaired copy sits
+    next to the CSV, inside data/ where git does not ignore it, so it is
+    deleted before returning.
+    """
+    read_path, repaired = normalize_csv(csv_path)
+    try:
+        return _csv_to_parquet(read_path, csv_path)
+    finally:
+        if repaired:
+            read_path.unlink(missing_ok=True)
+
+
+def _csv_to_parquet(csv_path: Path, source_path: Path) -> Path:
     if not COMUNI_FILE.exists():
         raise RuntimeError(
             f"{COMUNI_FILE} not found. Run generate_comuni.py first: "
@@ -458,6 +426,8 @@ def csv_to_parquet(csv_path: Path) -> Path:
             header=true,
             auto_detect=true,
             ignore_errors=true,
+            quote='{QUOTE}',
+            escape='{QUOTE}',
             {_csv_types_clause()}
         ) a
         LEFT JOIN comuni c ON a.CODICE_ISTAT = c.codice_istat
@@ -519,7 +489,7 @@ def csv_to_parquet(csv_path: Path) -> Path:
 
     con.close()
 
-    _validate_row_count(csv_path, OUTPUT_FILE)
+    _validate_row_count(source_path, OUTPUT_FILE)
     return OUTPUT_FILE
 
 
@@ -771,7 +741,18 @@ def main(
     force: bool = typer.Option(
         False, "--force", help="Skip freshness check and force re-download"
     ),
+    stradario: bool = typer.Option(
+        False,
+        "--stradario",
+        help="Archive the latest stradario release and exit; skip the civici",
+    ),
 ) -> None:
+    if stradario:
+        if os.environ.get("ANNCSU_FORCE_STRADARIO_FAILURE") == "1":
+            raise SystemExit("forced stradario failure")
+        archive_latest(STRADARIO, OUTPUT_DIR)
+        return
+
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     _check_tippecanoe()
     _check_server_available()

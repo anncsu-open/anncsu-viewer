@@ -44,3 +44,8 @@ __pycache__/
 data/rilasci/**/*.zip
 data/rilasci/**/*.parquet
 data/rilasci/**/*.csv
+
+# Stradario archive: same rule as the release archive above.
+data/stradario/**/*.zip
+data/stradario/**/*.parquet
+data/stradario/**/*.csv

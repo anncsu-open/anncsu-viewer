@@ -1,0 +1,150 @@
+{
+  "type": "Feature",
+  "stac_version": "1.1.0",
+  "stac_extensions": [
+    "https://schemas.portolan-sdi.org/portolan/v0.3.0/schema.json",
+    "https://stac-extensions.github.io/file/v2.1.0/schema.json",
+    "https://stac-extensions.github.io/table/v1.2.0/schema.json",
+    "https://stac-extensions.github.io/version/v1.2.0/schema.json",
+    "https://stac-extensions.github.io/language/v1.0.0/schema.json"
+  ],
+  "id": "2025-08-04",
+  "collection": "stradario",
+  "geometry": null,
+  "properties": {
+    "datetime": "2025-08-04T00:00:00Z",
+    "title": "Street register of 4 August 2025",
+    "description": "Street register of the 4 August 2025 release, 1,214,161 streets, from the original ZIP of the [ANNCSU portal](https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/).",
+    "version": "2025-08-04",
+    "table:columns": [
+      {
+        "name": "CODICE_COMUNE",
+        "type": "varchar",
+        "description": "Administrative code assigned to Italian comuni by the Agenzia delle Entrate and used in composing tax codes."
+      },
+      {
+        "name": "CODICE_ISTAT",
+        "type": "varchar",
+        "description": "Administrative code assigned to Italian comuni by Istat. Six digits. It is the join key with the comuni list and with the Istat boundaries."
+      },
+      {
+        "name": "PROGRESSIVO_NAZIONALE",
+        "type": "varchar",
+        "description": "National unique sequential code identifying the circulation area, that is the street."
+      },
+      {
+        "name": "CODICE_COMUNALE",
+        "type": "varchar",
+        "description": "Street code supplied by the comune. Identifier used by the comune, where present."
+      },
+      {
+        "name": "ODONIMO",
+        "type": "varchar",
+        "description": "Full name of the circulation area, made of DUG and DUF. The DUG is the generic urban denomination, the type such as via or piazza; the DUF is the official denomination assigned by the comune under current rules."
+      },
+      {
+        "name": "LOCALITA'",
+        "type": "varchar",
+        "description": "Locality name, where the comune records one. Present only in the original CSV and in the raw archive Parquet: the enriched GeoParquet does not carry it."
+      },
+      {
+        "name": "TOTALE_ACCESSI",
+        "type": "varchar",
+        "description": "Number of accesses (house numbers) on the street in the same release, computed by ANNCSU from the house numbers. It equals the count of the portal's house numbers, street by street. Present only in the street register."
+      },
+      {
+        "name": "DIZIONE_LINGUA1",
+        "type": "varchar",
+        "description": "Street name recorded in a first language other than Italian, under the rules on bilingualism and on the use of recognised minority languages."
+      },
+      {
+        "name": "DIZIONE_LINGUA2",
+        "type": "varchar",
+        "description": "Street name recorded in a second language other than Italian, under the same rules on bilingualism and recognised minority languages."
+      }
+    ],
+    "table:row_count": 1214161,
+    "language": {
+      "code": "en",
+      "name": "English",
+      "alternate": "Inglese"
+    },
+    "languages": [
+      {
+        "code": "it",
+        "name": "Italiano",
+        "alternate": "Italian"
+      }
+    ]
+  },
+  "assets": {
+    "data": {
+      "href": "https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/stradario/2025-08-04/STRAD_ITA_20250804.parquet",
+      "type": "application/vnd.apache.parquet",
+      "title": "Street register CSV as Parquet, lossless",
+      "description": "The street register CSV as lossless Parquet: every row and the 9 original columns as text.",
+      "roles": [
+        "data"
+      ],
+      "file:size": 11328153,
+      "file:checksum": "1220d94fcd0f2f1e532a5a4c0cb4f5273793edc6164d381f75d58ba47c6676146e98"
+    },
+    "source": {
+      "href": "https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev/stradario/2025-08-04/stradarioItalia_20250804.zip",
+      "type": "application/zip",
+      "title": "ZIP archive of the street register",
+      "description": "The ZIP as the ANNCSU portal served it, holding the street register CSV.",
+      "roles": [
+        "source"
+      ],
+      "file:size": 13781868,
+      "file:checksum": "1220b5cf479154fde61c723e0165ad532529e5bcf46e7baf0da001f5d2034e72fafe"
+    }
+  },
+  "links": [
+    {
+      "rel": "root",
+      "href": "../../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "parent",
+      "href": "../collection.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "collection",
+      "href": "../collection.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "predecessor-version",
+      "href": "../2025-01-28/2025-01-28.json",
+      "type": "application/geo+json"
+    },
+    {
+      "rel": "successor-version",
+      "href": "../2026-01-14/2026-01-14.json",
+      "type": "application/geo+json"
+    },
+    {
+      "rel": "alternate",
+      "href": "../../../stradario/2025-08-04/2025-08-04.json",
+      "type": "application/geo+json",
+      "title": "Italian",
+      "hreflang": "it"
+    },
+    {
+      "rel": "via",
+      "href": "https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/",
+      "type": "text/html",
+      "title": "ANNCSU open data portal"
+    },
+    {
+      "rel": "license",
+      "href": "https://creativecommons.org/licenses/by/4.0/",
+      "type": "text/html",
+      "title": "Creative Commons Attribution 4.0 International"
+    }
+  ]
+}

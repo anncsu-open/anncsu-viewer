@@ -1,9 +1,12 @@
 name: Build Portolan Catalog
 
 on:
-  workflow_run:
-    workflows: ["Update ANNCSU Data"]
-    types: [completed]
+  workflow_call:
+    inputs:
+      force_upload:
+        description: "Upload the catalog to R2 even when nothing changed"
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       force_upload:
@@ -14,21 +17,21 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: build-catalog
-  cancel-in-progress: false
-
 jobs:
   build-catalog:
-    # A failed data update must not publish a catalog describing stale data.
-    # workflow_dispatch has no triggering run, so it always proceeds.
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
+    # On the job, not the workflow, so it applies both when update-data.yml
+    # calls this workflow and when it is dispatched by hand.
+    concurrency:
+      group: build-catalog
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
+          # A called workflow checks out the commit that started the caller,
+          # which this run's data commits have already moved past. Build from
+          # the tip of the branch instead.
+          ref: ${{ github.ref }}
           lfs: true
 
       # `updated` is read from the last commit that touched the parquet. The
@@ -65,7 +68,7 @@ jobs:
         id: changes
         run: |
           git add data/catalog.json data/README.md data/AGENTS.md \
-            data/indirizzi data/indirizzi-h3 data/rilasci data/en
+            data/indirizzi data/indirizzi-h3 data/rilasci data/stradario data/en
           if git diff --cached --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
@@ -114,6 +117,9 @@ jobs:
           # and a sync would delete them. en/rilasci/ is all metadata and is
           # covered by the en/ sync below.
           rclone copy data/rilasci/ r2:anncsu-data/rilasci/ \
+            --include "*.json" --include "*.md" -P
+          # Same for the stradario: metadata only, copy with a filter.
+          rclone copy data/stradario/ r2:anncsu-data/stradario/ \
             --include "*.json" --include "*.md" -P
           rclone sync data/en/ r2:anncsu-data/en/ -P
 

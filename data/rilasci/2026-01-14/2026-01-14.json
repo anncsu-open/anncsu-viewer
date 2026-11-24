@@ -195,6 +195,12 @@
       "href": "https://creativecommons.org/licenses/by/4.0/deed.it",
       "type": "text/html",
       "title": "Creative Commons Attribuzione 4.0 Internazionale"
+    },
+    {
+      "rel": "related",
+      "href": "../../stradario/2026-01-14/2026-01-14.json",
+      "type": "application/geo+json",
+      "title": "Stradario dello stesso rilascio"
     }
   ]
 }

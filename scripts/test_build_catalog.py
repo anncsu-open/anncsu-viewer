@@ -35,6 +35,8 @@ from build_catalog import (
     PUBLIC_BASE,
     RAW_COLUMNS,
     SOURCE_PORTAL,
+    STRAD_COLUMNS,
+    STRADARIO_ORIGINS,
     VERSION_SCHEMA,
     VIEWER_URL,
     build,
@@ -43,6 +45,8 @@ from build_catalog import (
     build_release_item,
     build_rilasci,
     build_root,
+    build_stradario,
+    build_stradario_item,
     data_updated,
     dataset_statistics,
     dataset_stats,
@@ -62,6 +66,7 @@ from build_catalog import (
     schema_table,
     stac_type,
     statistics_table,
+    stradario_table_columns,
     table_columns,
     tile_inventory,
 )
@@ -415,6 +420,14 @@ def fake_facts():
             {"name": "h3_cell", "type": "varchar", "description": "y en"},
         ],
         "releases": fake_releases(),
+        "stradario": fake_stradario(),
+        "stradario_table_columns": [
+            {"name": n, "type": "varchar", "description": "x"} for n in STRAD_COLUMNS
+        ],
+        "stradario_table_columns_en": [
+            {"name": n, "type": "varchar", "description": "x en"}
+            for n in STRAD_COLUMNS
+        ],
         "raw_table_columns": [
             {"name": n, "type": "varchar", "description": "x"} for n in RAW_COLUMNS
         ],
@@ -464,6 +477,42 @@ def fake_releases():
                 "rows": 27_415_954,
             },
             "archived": "2026-09-20T10:00:00Z",
+        },
+    ]
+
+
+def fake_stradario():
+    """Two stradario releases shaped like stradario/releases.json entries."""
+    return [
+        {
+            "date": "2025-01-28",
+            "origin": "third-party",
+            "note": "Copia Parquet di ondata/archivio_anncsu.",
+            "zip": None,
+            "parquet": {
+                "name": "STRAD_ITA_20250128.parquet",
+                "size": 30_000_000,
+                "sha256": "e" * 64,
+                "rows": 1_050_000,
+            },
+            "archived": "2026-11-20T09:00:00Z",
+        },
+        {
+            "date": "2026-09-15",
+            "origin": "original",
+            "note": "Scarico dal portale ANNCSU.",
+            "zip": {
+                "name": "stradarioItalia_20260915.zip",
+                "size": 20_000_000,
+                "sha256": "f" * 64,
+            },
+            "parquet": {
+                "name": "STRAD_ITA_20260915.parquet",
+                "size": 31_000_000,
+                "sha256": "1" * 64,
+                "rows": 1_057_710,
+            },
+            "archived": "2026-11-24T08:00:00Z",
         },
     ]
 
@@ -523,6 +572,7 @@ class TestBuildRoot:
             "./indirizzi/collection.json",
             "./indirizzi-h3/collection.json",
             "./rilasci/collection.json",
+            "./stradario/collection.json",
         }
         for child in children:
             assert child["title"].strip()
@@ -796,6 +846,7 @@ def fixture_data_dir(tmp_path):
     # checkout, and the generator reads facts from the index alone.
     (data / "rilasci").mkdir()
     write_releases(data / "rilasci" / "releases.json", fake_releases())
+    write_releases(data / "stradario" / "releases.json", fake_stradario())
 
     build_pmtiles_fixture(
         data / "anncsu-indirizzi.parquet", data / "anncsu-indirizzi.pmtiles"
@@ -880,6 +931,7 @@ def fixture_columns(tmp_path, monkeypatch):
                 "PROGRESSIVO_NAZIONALE",
                 "CODICE_COMUNALE",
                 "LOCALITA'",
+                "TOTALE_ACCESSI",
                 "DIZIONE_LINGUA1",
                 "DIZIONE_LINGUA2",
                 "PROGRESSIVO_ACCESSO",
@@ -939,7 +991,7 @@ class TestBuild:
     ):
         build(fixture_data_dir)
         agents = sorted(fixture_data_dir.rglob("AGENTS.md"))
-        assert len(agents) == 8
+        assert len(agents) == 10
         for path in agents:
             text = path.read_text(encoding="utf-8")
             assert "v0.3.0" in text and "v0.2.0" not in text, path
@@ -1184,6 +1236,7 @@ class TestLanguageTrees:
             "./indirizzi/collection.json",
             "./indirizzi-h3/collection.json",
             "./rilasci/collection.json",
+            "./stradario/collection.json",
         }
         assert root["title"] == "ANNCSU addresses"
 
@@ -1733,8 +1786,8 @@ class TestDescriptionFormatting:
         description = build_root("2026-09-15T00:00:00Z", lang=lang)["description"]
 
         assert "$" not in description, "an unsubstituted placeholder reached the output"
-        assert description.count("\n- ") == 3, "one bullet per collection"
-        for name in ("indirizzi", "indirizzi-h3", "rilasci"):
+        assert description.count("\n- ") == 4, "one bullet per collection"
+        for name in ("indirizzi", "indirizzi-h3", "rilasci", "stradario"):
             assert f"`{name}`" in description
         assert f"]({SOURCE_PORTAL})" in description
 
@@ -1806,7 +1859,12 @@ class TestArchiveBuild:
         build(fixture_data_dir)
         for tree in ("", "en/"):
             readme = (fixture_data_dir / tree / "README.md").read_text()
-            for target in ("./indirizzi/", "./indirizzi-h3/", "./rilasci/"):
+            for target in (
+                "./indirizzi/",
+                "./indirizzi-h3/",
+                "./rilasci/",
+                "./stradario/",
+            ):
                 assert target in readme, f"{tree}README.md does not link {target}"
 
     def test_writes_the_archive_in_both_trees(self, fixture_data_dir, fixture_columns):
@@ -1847,6 +1905,348 @@ class TestArchiveBuild:
                     continue
                 target = (item_path.parent / link["href"]).resolve()
                 assert target.exists(), f"{item_path} {link['rel']} -> {link['href']}"
+
+
+@pytest.mark.skipif(
+    shutil.which("tippecanoe") is None, reason="tippecanoe not installed"
+)
+class TestStradarioBuild:
+    def test_writes_the_stradario_in_both_trees(
+        self, fixture_data_dir, fixture_columns
+    ):
+        build(fixture_data_dir)
+        for tree in ("", "en/"):
+            for relative in [
+                "stradario/collection.json",
+                "stradario/README.md",
+                "stradario/AGENTS.md",
+                "stradario/2025-01-28/2025-01-28.json",
+                "stradario/2026-09-15/2026-09-15.json",
+            ]:
+                assert (fixture_data_dir / tree / relative).exists(), tree + relative
+        assert not list(fixture_data_dir.rglob("stradario/**/*.parquet"))
+        assert not list(fixture_data_dir.rglob("stradario/**/*.zip"))
+
+    def test_root_links_the_stradario_in_both_trees(self):
+        for lang in ("it", "en"):
+            root = build_root("2026-09-15T00:00:00Z", lang=lang)
+            children = {c["href"]: c for c in links_by_rel(root, "child")}
+            link = children["./stradario/collection.json"]
+            assert link["title"] == build_catalog.TEXTS[lang]["stradario_title"]
+
+    def test_stradario_readme_gives_the_derivation_query(
+        self, fixture_data_dir, fixture_columns
+    ):
+        build(fixture_data_dir)
+        italian = (fixture_data_dir / "stradario" / "README.md").read_text()
+        english = (fixture_data_dir / "en" / "stradario" / "README.md").read_text()
+        for readme in (italian, english):
+            assert "count(*)::VARCHAR AS TOTALE_ACCESSI" in readme
+            assert f"{PUBLIC_BASE}/rilasci/" in readme
+            assert "2026-09-15" in readme
+            assert "third-party" in readme or "terza parte" in readme
+            assert "$" not in readme, "a placeholder reached the output"
+            assert "| `TOTALE_ACCESSI` |" in readme
+        assert "15 settembre 2026" in italian and "persa" in italian
+        assert "15 September 2026" in english and "lost" in english
+        assert "originale" in italian and "original" in english
+        for italian_word in ("rilascio", "strade", "Licenza"):
+            assert italian_word not in english
+
+    def test_stradario_agents_file_states_the_modelling(
+        self, fixture_data_dir, fixture_columns
+    ):
+        build(fixture_data_dir)
+        for tree in ("", "en/"):
+            text = (fixture_data_dir / tree / "stradario" / "AGENTS.md").read_text()
+            assert "v0.3.0" in text and "source" in text
+            assert "$" not in text
+
+    def test_relative_links_of_stradario_items_resolve(
+        self, fixture_data_dir, fixture_columns
+    ):
+        import json
+
+        build(fixture_data_dir)
+        item_paths = sorted(fixture_data_dir.rglob("stradario/*/*.json"))
+        assert len(item_paths) == 4, "two releases in two trees"
+        for item_path in item_paths:
+            item = json.loads(item_path.read_text())
+            assert item["geometry"] is None and "bbox" not in item
+            for link in item["links"]:
+                if link["href"].startswith("http"):
+                    continue
+                target = (item_path.parent / link["href"]).resolve()
+                assert target.exists(), f"{item_path} {link['rel']} -> {link['href']}"
+
+    def test_a_missing_stradario_index_stops_the_build(
+        self, fixture_data_dir, fixture_columns
+    ):
+        (fixture_data_dir / "stradario" / "releases.json").unlink()
+        with pytest.raises(SystemExit, match="stradario"):
+            build(fixture_data_dir)
+
+    def test_an_empty_stradario_index_stops_the_build(
+        self, fixture_data_dir, fixture_columns
+    ):
+        write_releases(fixture_data_dir / "stradario" / "releases.json", [])
+        with pytest.raises(SystemExit, match="stradario"):
+            build(fixture_data_dir)
+
+
+class TestStradarioDescription:
+    def test_does_not_promise_a_zip_or_every_release(self):
+        english = build_stradario(fake_facts(), lang="en")["description"]
+        italian = build_stradario(fake_facts())["description"]
+
+        assert "all of them are kept" not in english
+        assert "each as the **ZIP archive**" not in english
+        assert "the releases listed, not every month" in english
+        assert "serve solo l'ultimo rilascio" in italian
+        assert "restano tutti" not in italian
+        assert "i rilasci elencati e non tutti i mesi" in italian
+        assert "$" not in english and "$" not in italian
+
+    def test_lossless_covers_the_portal_releases_not_the_third_party_one(self):
+        english = build_stradario(fake_facts(), lang="en")["description"]
+        italian = build_stradario(fake_facts())["description"]
+        portal_en = english.split("downloaded from the portal")[1].split(".")[0]
+        portal_it = italian.split("scaricato dal portale")[1].split(".")[0]
+        assert "ZIP" in portal_en and "lossless" in portal_en
+        assert "ZIP" in portal_it and "senza perdita" in portal_it
+        assert "ondata/archivio_anncsu" in english
+        assert "cannot be called lossless" in english
+        assert "non si può dire che siano senza perdita" in italian
+
+
+THIRD_PARTY = frozenset({"third-party"})
+
+
+class TestStradarioIndex:
+    def test_origins(self):
+        assert STRADARIO_ORIGINS == ("original", "third-party")
+
+    def test_third_party_without_zip_is_accepted(self, tmp_path):
+        path = tmp_path / "releases.json"
+        write_releases(path, fake_stradario())
+
+        releases = load_releases(
+            path, origins=STRADARIO_ORIGINS, zip_optional=THIRD_PARTY
+        )
+
+        assert [r["date"] for r in releases] == ["2025-01-28", "2026-09-15"]
+        assert releases[0]["zip"] is None
+
+    def test_original_without_zip_is_rejected(self, tmp_path):
+        bad = fake_stradario()[1]
+        bad["zip"] = None
+        path = tmp_path / "releases.json"
+        write_releases(path, [bad])
+
+        with pytest.raises(SystemExit, match="zip"):
+            load_releases(path, origins=STRADARIO_ORIGINS, zip_optional=THIRD_PARTY)
+
+    def test_third_party_is_not_a_civici_origin(self, tmp_path):
+        path = tmp_path / "releases.json"
+        write_releases(path, [fake_stradario()[0]])
+
+        with pytest.raises(SystemExit, match="origin"):
+            load_releases(path)
+
+
+class TestStradarioTableColumns:
+    def test_lists_the_nine_columns_as_varchar_in_both_languages(self):
+        italian = stradario_table_columns(COLUMNS_YAML)
+        english = stradario_table_columns(COLUMNS_YAML, lang="en")
+
+        assert [c["name"] for c in italian] == STRAD_COLUMNS
+        assert len(italian) == 9
+        assert {c["type"] for c in italian} == {"varchar"}
+        by_name = {c["name"]: c["description"] for c in english}
+        assert by_name["TOTALE_ACCESSI"].strip()
+        assert by_name["TOTALE_ACCESSI"] != {
+            c["name"]: c["description"] for c in italian
+        }["TOTALE_ACCESSI"]
+
+
+class TestBuildStradario:
+    def test_is_tabular(self):
+        collection = build_stradario(fake_facts())
+        assert collection["id"] == "stradario"
+        assert "table:primary_geometry" not in collection
+        names = {c["name"].lower() for c in collection["table:columns"]}
+        assert "geometry" not in names and "geom" not in names
+        assert collection["assets"] == {}
+        assert collection["extent"]["spatial"]["bbox"] == [
+            [6.7003, 35.5017, 18.66, 47.0805]
+        ]
+        assert collection["extent"]["temporal"]["interval"] == [
+            ["2025-01-28T00:00:00Z", None]
+        ]
+
+    def test_updated_comes_from_the_stradario_index(self):
+        collection = build_stradario(fake_facts())
+        assert collection["updated"] == "2026-11-24T08:00:00Z"
+        assert collection["updated"] != fake_facts()["updated"]
+
+    def test_links_every_release_and_the_latest(self):
+        collection = build_stradario(fake_facts())
+        items = links_by_rel(collection, "item")
+        assert [l["href"] for l in items] == [
+            "./2025-01-28/2025-01-28.json",
+            "./2026-09-15/2026-09-15.json",
+        ]
+        assert all(
+            l["title"].strip() and l["type"] == "application/geo+json" for l in items
+        )
+        assert links_by_rel(collection, "latest-version")[0]["href"] == (
+            "./2026-09-15/2026-09-15.json"
+        )
+        alternate = [
+            l for l in links_by_rel(collection, "alternate") if l.get("hreflang")
+        ]
+        assert [l["href"] for l in alternate] == ["../en/stradario/collection.json"]
+
+    def test_has_the_common_mirror_and_documentation_links(self):
+        collection = build_stradario(fake_facts())
+        assert collection["license"] == "CC-BY-4.0"
+        assert collection["providers"][-1]["roles"] == ["host"]
+        assert links_by_rel(collection, "via")[0]["type"] == "text/html"
+        assert {"stradario", "strade", "storico"} <= set(collection["keywords"])
+
+    def test_description_states_the_caveats(self):
+        description = build_stradario(fake_facts())["description"]
+        assert "TOTALE_ACCESSI" in description
+        assert "rilasci" in description
+
+    def test_english_collection(self):
+        collection = build_stradario(fake_facts(), lang="en")
+        assert collection["language"]["code"] == "en"
+        assert collection["table:columns"][0]["description"] == "x en"
+        assert "street register" in collection["keywords"]
+        assert "TOTALE_ACCESSI" in collection["description"]
+        assert "portale" not in collection["description"].lower()
+        assert links_by_rel(collection, "alternate")[0]["hreflang"] == "it"
+        assert links_by_rel(collection, "item")[0]["title"].startswith("Street register of")
+
+
+class TestBuildStradarioItem:
+    def item(self, index, lang="it"):
+        releases = fake_stradario()
+        return build_stradario_item(releases[index], releases, fake_facts(), lang)
+
+    def test_assets_point_at_r2_under_stradario(self):
+        item = self.item(1)
+        assert item["collection"] == "stradario"
+        assert item["id"] == item["properties"]["version"] == "2026-09-15"
+        assert item["geometry"] is None and "bbox" not in item
+        assert item["properties"]["datetime"] == "2026-09-15T00:00:00Z"
+        assert item["properties"]["table:row_count"] == 1_057_710
+        data, source = item["assets"]["data"], item["assets"]["source"]
+        assert data["href"] == (
+            f"{PUBLIC_BASE}/stradario/2026-09-15/STRAD_ITA_20260915.parquet"
+        )
+        assert data["type"] == "application/vnd.apache.parquet"
+        assert data["roles"] == ["data"]
+        assert data["file:checksum"] == "1220" + "1" * 64
+        assert data["file:size"] == 31_000_000
+        assert source["href"] == (
+            f"{PUBLIC_BASE}/stradario/2026-09-15/stradarioItalia_20260915.zip"
+        )
+        assert source["type"] == "application/zip"
+        assert source["roles"] == ["source"]
+        assert source["file:checksum"] == "1220" + "f" * 64
+
+    def test_third_party_item_has_no_source_asset(self):
+        item = self.item(0)
+        assert list(item["assets"]) == ["data"]
+        assert "ondata/archivio_anncsu" in item["properties"]["description"]
+        assert "28 gennaio 2025" in item["properties"]["description"]
+
+    def test_only_the_original_data_asset_claims_to_be_lossless(self):
+        for lang, claim in (("it", "senza perdita"), ("en", "lossless")):
+            third_party = self.item(0, lang)["assets"]["data"]
+            original = self.item(1, lang)["assets"]["data"]
+            for key in ("title", "description"):
+                assert claim not in third_party[key].lower()
+            assert claim in original["title"].lower()
+            assert claim in original["description"].lower()
+            assert "ondata/archivio_anncsu" in third_party["title"]
+            assert "BIGINT" in third_party["description"]
+
+    def test_version_chain_and_alternates(self):
+        first, last = self.item(0), self.item(1)
+        assert links_by_rel(first, "predecessor-version") == []
+        assert links_by_rel(first, "successor-version")[0]["href"] == (
+            "../2026-09-15/2026-09-15.json"
+        )
+        assert links_by_rel(last, "predecessor-version")[0]["href"] == (
+            "../2025-01-28/2025-01-28.json"
+        )
+        assert links_by_rel(last, "root")[0]["href"] == "../../catalog.json"
+        alternate = links_by_rel(last, "alternate")[0]
+        assert alternate["href"] == "../../en/stradario/2026-09-15/2026-09-15.json"
+        assert links_by_rel(last, "via") and links_by_rel(last, "license")
+        assert VERSION_SCHEMA in last["stac_extensions"]
+
+    def test_related_link_to_the_civici_of_the_same_date(self):
+        related = links_by_rel(self.item(1), "related")
+        assert related == [
+            {
+                "rel": "related",
+                "href": "../../rilasci/2026-09-15/2026-09-15.json",
+                "type": "application/geo+json",
+                "title": build_catalog.TEXTS["it"]["related_civici"],
+            }
+        ]
+
+    def test_no_related_link_when_the_dates_differ(self):
+        assert links_by_rel(self.item(0), "related") == []
+
+    def test_every_asset_has_a_title_and_a_description_in_both_languages(self):
+        for index in (0, 1):
+            italian, english = self.item(index)["assets"], self.item(index, "en")["assets"]
+            for key in italian:
+                for asset in (italian[key], english[key]):
+                    assert asset.get("title", "").strip(), key
+                    assert asset.get("description", "").strip(), key
+                assert italian[key]["description"] != english[key]["description"]
+
+    def test_english_item_is_english(self):
+        item = self.item(1, "en")
+        assert item["properties"]["language"]["code"] == "en"
+        assert item["properties"]["title"] == "Street register of 15 September 2026"
+        assert item["properties"]["table:columns"][0]["description"] == "x en"
+        assert "street" in item["properties"]["description"]
+        assert links_by_rel(item, "related")[0]["title"] == (
+            build_catalog.TEXTS["en"]["related_civici"]
+        )
+
+
+class TestReleaseItemLinksTheStradario:
+    def test_civici_item_links_the_stradario_of_the_same_date(self):
+        releases = fake_releases()
+        item = build_release_item(releases[1], releases, fake_facts())
+        assert links_by_rel(item, "related") == [
+            {
+                "rel": "related",
+                "href": "../../stradario/2026-09-15/2026-09-15.json",
+                "type": "application/geo+json",
+                "title": build_catalog.TEXTS["it"]["related_stradario"],
+            }
+        ]
+
+    def test_no_link_when_the_stradario_has_no_such_date(self):
+        releases = fake_releases()
+        item = build_release_item(releases[0], releases, fake_facts())
+        assert links_by_rel(item, "related") == []
+
+    def test_no_link_when_there_is_no_stradario(self):
+        releases = fake_releases()
+        facts = fake_facts()
+        del facts["stradario"]
+        item = build_release_item(releases[1], releases, facts)
+        assert links_by_rel(item, "related") == []
 
 
 if __name__ == "__main__":

@@ -14,10 +14,10 @@ Cloudflare R2 bucket that already serves the data. Metadata lives in git, so the
 |---|---|
 | Where the catalog lives | Generated into `data/`, inside `anncsu-viewer`, not a separate repo from the Portolan template |
 | Href style | Relative, with an absolute `self` link on the root |
-| Collections | Two: `indirizzi` (single-file) and `indirizzi-h3` (partitioned) |
+| Collections | Four: `indirizzi` (single-file), `indirizzi-h3` (partitioned), `rilasci` (monthly civici archive) and `stradario` (street register archive) |
 | Primary language | Italian |
 | Providers | Mixed: `anncsu-open` as processor, Geobeyond as host |
-| Build trigger | A separate GitHub Actions workflow, downstream of "Update ANNCSU Data" |
+| Build trigger | A separate GitHub Actions workflow, called by "Update ANNCSU Data" |
 | `partition:glob` scheme | `s3://` on the R2 bucket, without `storage:schemes`; anonymous readers use the HTTPS files and the tile index |
 
 ### Why not the Portolan catalog template
@@ -59,7 +59,12 @@ data/                                  = https://pub-1e760dc850cb4a5aa5f8afb7771
 │   ├── AGENTS.md
 │   ├── thumbnail.png
 │   └── styles/indirizzi-h3.json
-└── rilasci/                           the monthly release archive
+├── rilasci/                           the monthly release archive
+│   ├── collection.json                generated
+│   ├── README.md, AGENTS.md           generated
+│   ├── releases.json                  the index, written by the pipeline
+│   └── <date>/<date>.json             one item per release, generated
+└── stradario/                         the street register archive, same shape as rilasci
     ├── collection.json                generated
     ├── README.md, AGENTS.md           generated
     ├── releases.json                  the index, written by the pipeline
@@ -252,10 +257,11 @@ The catalog declares `CC-BY-4.0` with a `rel: license` link to the open data pag
 
 ## Workflow
 
-A new `.github/workflows/build-catalog.yml`, triggered by `workflow_run` on
-completion of "Update ANNCSU Data" and by `workflow_dispatch` for manual runs.
-The job runs only when the triggering run concluded successfully, so a failure
-upstream cannot produce a catalog describing stale data.
+`.github/workflows/build-catalog.yml` is started in two ways. `update-data.yml`
+calls it with `workflow_call` after the civici part succeeded, whatever
+happened to the stradario, so a failure upstream cannot produce a catalog
+describing stale data and a green run does not build the catalog twice.
+`workflow_dispatch` remains for manual runs.
 
 Checkout is `actions/checkout` at its default depth of 1, with LFS, followed by
 a step that runs `git fetch --unshallow --filter=blob:none`: the whole commit

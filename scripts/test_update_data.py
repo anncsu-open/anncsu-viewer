@@ -501,6 +501,49 @@ class TestCsvToParquet:
         con.close()
         assert count == 2, f"Expected 2 rows (one without coords), got {count}"
 
+    def test_enrichment_keeps_a_split_record(self, tmp_path, monkeypatch):
+        """A record split by a raw line feed keeps its row and leaves no
+        repaired copy behind."""
+        import duckdb
+
+        output_path = self._setup_paths(tmp_path, monkeypatch)
+        csv_path = tmp_path / "input.csv"
+        _write_csv(
+            csv_path,
+            [
+                "001001;010001;1;001001;VIA A;;;;1;001001;1;;;;0;7,684;45,066;200;1",
+                "001001;010001;2;001001;VIA\nB;;;;1;001001;2;;;;0;7,684;45,066;"
+                "100;1",
+                "001001;010001;3;001001;VIA C;;;;1;001001;3;;;;0;7,684;45,066;50;1",
+            ],
+        )
+
+        result = csv_to_parquet(csv_path)
+
+        assert result == output_path
+        count = (
+            duckdb.connect()
+            .execute(f"SELECT COUNT(*) FROM read_parquet('{output_path}')")
+            .fetchone()[0]
+        )
+        assert count == 3
+        assert list(tmp_path.glob("*.repaired.csv")) == []
+
+    def test_validator_leaves_no_repaired_copy(self, tmp_path):
+        csv_path = tmp_path / "input.csv"
+        _write_csv(
+            csv_path,
+            [
+                "001001;010001;1;001001;VIA\nA;;;;1;001001;1;;;;0;7,684;45,066;200;1",
+            ],
+        )
+        parquet = tmp_path / "out.parquet"
+        _make_parquet(parquet, 1)
+
+        _validate_row_count(csv_path, parquet)
+
+        assert list(tmp_path.glob("*.repaired.csv")) == []
+
 
 class TestCleanTilesDir:
     """Tests for _clean_tiles_dir() removing stale files before re-partitioning.
@@ -1237,6 +1280,43 @@ class TestArchiveRelease:
         assert entry["origin"] == "original"
         assert entry["parquet"]["rows"] == 3
         assert entry["archived"].endswith("Z")
+
+
+class TestStradarioMode:
+    """`--stradario` archives the stradario and leaves the civici alone."""
+
+    def test_stradario_mode_skips_the_civici(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("ANNCSU_FORCE_STRADARIO_FAILURE", raising=False)
+        monkeypatch.setattr(update_data, "OUTPUT_DIR", tmp_path)
+        calls = []
+        monkeypatch.setattr(
+            update_data,
+            "archive_latest",
+            lambda dataset, data_dir: calls.append((dataset, data_dir)),
+        )
+        for name in (
+            "_check_tippecanoe",
+            "_check_server_available",
+            "get_remote_date",
+            "download_and_extract",
+        ):
+            monkeypatch.setattr(
+                update_data,
+                name,
+                lambda *a, _n=name, **k: pytest.fail(f"{_n} must not run"),
+            )
+        update_data.main(force=False, stradario=True)
+        assert calls == [(update_data.STRADARIO, tmp_path)]
+
+    def test_forced_failure_exits_non_zero(self, monkeypatch):
+        monkeypatch.setenv("ANNCSU_FORCE_STRADARIO_FAILURE", "1")
+        monkeypatch.setattr(
+            update_data,
+            "archive_latest",
+            lambda *a: pytest.fail("no request may be made"),
+        )
+        with pytest.raises(SystemExit, match="forced stradario failure"):
+            update_data.main(force=False, stradario=True)
 
 
 if __name__ == "__main__":

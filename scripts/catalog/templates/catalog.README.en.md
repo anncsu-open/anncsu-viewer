@@ -15,10 +15,12 @@ a map in the [web viewer]($viewer_url).
 | [ANNCSU addresses, single file](./indirizzi/) | Analysis over the whole country |
 | [ANNCSU addresses, partitioned by H3 cell](./indirizzi-h3/) | Reading one comune without downloading everything |
 | [ANNCSU monthly releases](./rilasci/) | Fetching a past download, or comparing two releases |
+| [ANNCSU street register](./stradario/) | The streets with their number of accesses, for every release kept |
 
 The first two describe the same data in two access shapes, and hold only the
 georeferenced addresses of the current release. The third keeps every monthly
-download whole, rows without coordinates included. This is the English
+download whole, rows without coordinates included. The fourth keeps the
+national street register. This is the English
 translation of the catalog; the Italian source tree is one level up, at
 [`../`](../).
 
