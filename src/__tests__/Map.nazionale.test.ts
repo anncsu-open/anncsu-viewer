@@ -4,55 +4,60 @@ import { createPinia, setActivePinia } from 'pinia'
 
 // Mock pmtiles
 vi.mock('pmtiles', () => ({
-  Protocol: vi.fn().mockImplementation(() => ({
-    tile: vi.fn(),
-  })),
-  PMTiles: vi.fn().mockImplementation(() => ({
-    getHeader: vi.fn().mockResolvedValue({
-      minLon: 6.63,
-      minLat: 35.49,
-      maxLon: 18.52,
-      maxLat: 47.09,
-    }),
-  })),
+  Protocol: vi.fn().mockImplementation(function () {
+    return {
+      tile: vi.fn(),
+    }
+  }),
+  PMTiles: vi.fn().mockImplementation(function () {
+    return {
+      getHeader: vi.fn().mockResolvedValue({
+        minLon: 6.63,
+        minLat: 35.49,
+        maxLon: 18.52,
+        maxLat: 47.09,
+      }),
+    }
+  }),
 }))
 
 let mockMapInstance: any
 
 // Mock maplibre-gl
 vi.mock('maplibre-gl', () => ({
-  default: {
-    Map: vi.fn().mockImplementation((opts: any) => {
-      mockMapInstance = {
-        _opts: opts,
-        _onHandlers: {} as Record<string, Function>,
-        flyTo: vi.fn(),
-        fitBounds: vi.fn(),
-        addControl: vi.fn(),
-        addSource: vi.fn(),
-        addLayer: vi.fn(),
-        getLayer: vi.fn(() => false),
-        getSource: vi.fn(() => false),
-        removeLayer: vi.fn(),
-        removeSource: vi.fn(),
-        getCanvas: vi.fn(() => ({ style: {} })),
-        on: vi.fn((event: string, layerOrCb: string | Function, cb?: Function) => {
-          const key = cb ? `${event}:${layerOrCb}` : event
-          const handler = cb || layerOrCb
-          mockMapInstance._onHandlers[key] = handler
-        }),
-      }
-      return mockMapInstance
-    }),
-    NavigationControl: vi.fn(),
-    Popup: vi.fn().mockImplementation(() => ({
+  Map: vi.fn().mockImplementation(function (opts: any) {
+    mockMapInstance = {
+      _opts: opts,
+      _onHandlers: {} as Record<string, Function>,
+      flyTo: vi.fn(),
+      fitBounds: vi.fn(),
+      addControl: vi.fn(),
+      addSource: vi.fn(),
+      addLayer: vi.fn(),
+      getLayer: vi.fn(() => false),
+      getSource: vi.fn(() => false),
+      removeLayer: vi.fn(),
+      removeSource: vi.fn(),
+      getCanvas: vi.fn(() => ({ style: {} })),
+      on: vi.fn((event: string, layerOrCb: string | Function, cb?: Function) => {
+        const key = cb ? `${event}:${layerOrCb}` : event
+        const handler = cb || layerOrCb
+        mockMapInstance._onHandlers[key] = handler
+      }),
+    }
+    return mockMapInstance
+  }),
+  NavigationControl: vi.fn(),
+  Popup: vi.fn().mockImplementation(function () {
+    return {
       setLngLat: vi.fn().mockReturnThis(),
       setHTML: vi.fn().mockReturnThis(),
       addTo: vi.fn().mockReturnThis(),
       remove: vi.fn(),
-    })),
-    addProtocol: vi.fn(),
-  },
+    }
+  }),
+  addProtocol: vi.fn(),
+  setWorkerUrl: vi.fn(),
 }))
 
 // Mock config to nazionale mode
@@ -154,7 +159,7 @@ describe('Map (nazionale mode)', () => {
     mousemoveHandler(mockEvent)
 
     const popupInstance = vi.mocked(
-      (await import('maplibre-gl')).default.Popup
+      (await import('maplibre-gl')).Popup
     ).mock.results[0].value
     const setHTMLCall = popupInstance.setHTML.mock.calls[0][0]
     expect(setHTMLCall).toContain('VIA FONTANA')
@@ -188,7 +193,7 @@ describe('Map (nazionale mode)', () => {
     mousemoveHandler(mockEvent)
 
     const popupInstance = vi.mocked(
-      (await import('maplibre-gl')).default.Popup
+      (await import('maplibre-gl')).Popup
     ).mock.results[0].value
     const setHTMLCall = popupInstance.setHTML.mock.calls[0][0]
     expect(setHTMLCall).toContain('Fuori confine comunale')
@@ -222,7 +227,7 @@ describe('Map (nazionale mode)', () => {
     mousemoveHandler(mockEvent)
 
     const popupInstance = vi.mocked(
-      (await import('maplibre-gl')).default.Popup
+      (await import('maplibre-gl')).Popup
     ).mock.results[0].value
     const setHTMLCall = popupInstance.setHTML.mock.calls[0][0]
     expect(setHTMLCall).toContain('VIA ROMA')

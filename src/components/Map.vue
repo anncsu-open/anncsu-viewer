@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import maplibregl from 'maplibre-gl'
+import * as maplibregl from 'maplibre-gl'
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { Protocol } from 'pmtiles'
 import { onMounted, watch, watchEffect } from 'vue'
@@ -71,6 +72,10 @@ async function getBounds(): Promise<Bounds> {
 }
 
 onMounted(async () => {
+  // MapLibre looks for its worker next to its own module, which the bundle
+  // does not keep.
+  maplibregl.setWorkerUrl(maplibreWorkerUrl)
+
   // Register PMTiles protocol for nazionale mode
   if (appConfig.isNazionale) {
     const protocol = new Protocol()
