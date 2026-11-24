@@ -168,7 +168,9 @@ async function loadAddressesForComune(comune: ComuneEntry) {
       return
     }
 
-    const tileNames = comune.h3Cells.map((_, i) => `tile_${i}.parquet`)
+    // One name per downloaded tile: loadH3Tiles skips the missing ones, and
+    // naming them would make DuckDB read a file it never received.
+    const tileNames = buffers.map((_, i) => `tile_${i}.parquet`)
     const unionQuery = tileNames.map((name) => `SELECT * FROM read_parquet('${name}')`).join(' UNION ALL ')
 
     const loadQuery = anncsuAddressesQuery.replace(

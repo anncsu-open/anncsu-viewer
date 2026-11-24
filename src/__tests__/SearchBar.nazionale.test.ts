@@ -838,3 +838,43 @@ describe('SearchBar (nazionale mode) - typing before the data arrives', () => {
     expect(addressTexts(wrapper)).toEqual(['VIA ROMA 1', 'VIA ROMA 1 A', 'VIA ROMA 1 B'])
   })
 })
+
+describe('SearchBar (nazionale mode) - a comune with a missing tile', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+  })
+
+  it('queries only the tiles it could download', async () => {
+    const comuni = [
+      { codice_istat: '057072', nome_comune: 'Vacone', h3_cells: ['missing', 'present'] },
+    ]
+    globalThis.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('comuni-h3.json')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(comuni) })
+      }
+      if (url.includes('h3_cell=missing')) return Promise.resolve({ ok: false, status: 404 })
+      return Promise.resolve({ ok: true, arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)) })
+    }) as unknown as typeof fetch
+    mockedExecuteQueryWithBuffers.mockResolvedValueOnce(
+      mockAddressFeatures as unknown as Awaited<ReturnType<typeof executeQueryWithBuffers>>,
+    )
+
+    const wrapper = mount(SearchBar, { global: { plugins: [createPinia()] } })
+    await flushPromises()
+    const input = wrapper.find('[data-testid="unified-search-input"]')
+    await input.setValue('Vacone')
+    await flushPromises()
+    await wrapper.findAll('[data-testid="comune-suggestion"]')[0].trigger('click')
+    await flushPromises()
+
+    const [query, buffers, names] = mockedExecuteQueryWithBuffers.mock.calls[0]
+    expect(names).toHaveLength(buffers.length)
+    const read = [...query.matchAll(/read_parquet\('([^']+)'\)/g)].map((m) => m[1])
+    expect(read).toEqual(names)
+
+    await input.setValue('VIA ROMA')
+    await flushPromises()
+    expect(wrapper.findAll('[data-testid="address-suggestion"]').length).toBeGreaterThan(0)
+  })
+})

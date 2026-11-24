@@ -52,3 +52,24 @@ test('suggests addresses typed while the comune is loading', async ({ page }) =>
   await expect(page.getByTestId('address-suggestion').first()).toHaveText('VIA SAN GIOVANNI 1')
   expect(errors).toEqual([])
 })
+
+test('finds addresses in a comune with a tile that is missing', async ({ page }) => {
+  const errors = queryErrors(page)
+  // Vacone gets a second cell whose tile the server does not have.
+  const missing = '851e8000fffffff'
+  await page.route('**/comuni-h3.json', async (route) => {
+    const response = await route.fetch()
+    const comuni = await response.json()
+    comuni[0].h3_cells.unshift(missing)
+    await route.fulfill({ response, json: comuni })
+  })
+  await page.route(`**/tiles/h3_cell=${missing}/**`, (route) => route.fulfill({ status: 404 }))
+  await page.goto('/')
+  const input = page.getByTestId('unified-search-input')
+
+  await input.fill('Vacone')
+  await page.getByTestId('comune-suggestion').filter({ hasText: 'Vacone' }).click()
+  await input.fill('VIA SAN GIOVANNI 1')
+  await expect(page.getByTestId('address-suggestion').first()).toHaveText('VIA SAN GIOVANNI 1')
+  expect(errors).toEqual([])
+})
