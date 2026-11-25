@@ -89,6 +89,27 @@ describe('SearchBar', () => {
     fetchSpy.mockRestore()
   })
 
+  it('suggests addresses typed before the list has loaded, once it does', async () => {
+    type QueryResult = Awaited<ReturnType<typeof executeQuery>>
+    let resolve!: (value: QueryResult) => void
+    mockedExecuteQuery.mockReturnValueOnce(new Promise<QueryResult>((r) => (resolve = r)))
+    const store = useAppStore()
+    const wrapper = mount(SearchBar, { global: { plugins: [pinia] } })
+    await flushPromises()
+
+    await wrapper.find('input').trigger('focus')
+    store.setSearchFilter('ROMA')
+    await flushPromises()
+    expect(wrapper.findAll('.cursor-pointer')).toHaveLength(0)
+
+    resolve(mockAddressFeatures as unknown as QueryResult)
+    await flushPromises()
+    expect(wrapper.findAll('.cursor-pointer').map((i) => i.text())).toEqual([
+      'VIA ROMA 1',
+      'VIA ROMA 15',
+    ])
+  })
+
   it('does not show autocomplete initially', () => {
     const wrapper = mount(SearchBar, { global: { plugins: [pinia] } })
     expect(wrapper.find('.cursor-pointer').exists()).toBe(false)

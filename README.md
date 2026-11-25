@@ -88,6 +88,23 @@ VITE_APP_MODE=comunale
 npx vitest run
 ```
 
+The end-to-end tests drive the production build of both modes in Chromium
+with [Playwright](https://playwright.dev/). Each mode is built into
+`dist-e2e/` and serves Vacone's addresses from `e2e/fixtures/data` instead of
+the bucket. DuckDB still downloads its extensions from extensions.duckdb.org,
+so the tests need a network connection.
+
+```shell
+npx playwright install chromium   # once
+npm run test:e2e
+```
+
+To rebuild the fixtures from the published catalog:
+
+```shell
+uv run e2e/fixtures/make_fixtures.py
+```
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
