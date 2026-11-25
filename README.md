@@ -64,14 +64,21 @@ The application is configurable via Vite environment variables in a `.env` file:
 | `VITE_COMUNE_NAME` | Municipality name displayed in header and info panel | `del territorio nazionale` |
 | `VITE_DATA_BASE_URL` | Base URL for data files (R2 bucket or local) | `https://pub-1e760dc850cb4a5aa5f8afb77713f8cd.r2.dev` |
 | `VITE_APP_MODE` | `nazionale` (PMTiles + H3 tiles) or `comunale` (GeoParquet only) | `nazionale` |
+| `VITE_LOGO_URL` | Absolute URL of the header logo, shown 40px high on the blue header | The viewer's own logo |
+| `VITE_ISTITUZIONALE` | `true` hides the line "Non è un sito istituzionale · gestito da …" at the bottom of the panel. Set it only when the site belongs to the administration that publishes it; any other value keeps the line | not set |
+| `VITE_GESTORE` | Who runs the site, named in that line | `anncsu-open` |
 
-Example for a municipal deployment:
+Example for a municipality publishing its own viewer:
 
 ```shell
 VITE_COMUNE_NAME=del Comune di Vacone
 VITE_DATA_BASE_URL=https://your-r2-bucket.r2.dev
 VITE_APP_MODE=comunale
+VITE_LOGO_URL=https://www.comune.example.it/stemma.svg
+VITE_ISTITUZIONALE=true
 ```
+
+Without `VITE_ISTITUZIONALE`, someone other than the municipality who publishes the same data sets `VITE_GESTORE` to their own name instead.
 
 ## Tech stack
 

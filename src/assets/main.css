@@ -1,12 +1,51 @@
 @import 'tailwindcss';
 
+/* Titillium Web, the font of the Italian public administration design
+   system, served from this site (latin subset). Its licence is published
+   with the site, from public/fonts/OFL-titillium-web.txt. */
+@font-face {
+  font-family: 'Titillium Web';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url('./fonts/titillium-web-latin-300-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Titillium Web';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/titillium-web-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Titillium Web';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./fonts/titillium-web-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Titillium Web';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./fonts/titillium-web-latin-700-normal.woff2') format('woff2');
+}
+
+/* Bootstrap Italia 2.18.3 values, the same as Portolan Browser Italia's
+   theme/variables-it.scss. */
 @theme {
-  --font-titillium: 'Titillium Web', sans-serif;
-  --font-lora: 'Lora', serif;
+  --font-sans: 'Titillium Web', Geneva, Tahoma, sans-serif;
+  --color-primary: #0066cc;
+  --color-primary-hover: #0052a3;
+  --color-primary-light: #f2f7fc;
+  --color-body: #1a1a1a;
+  --color-secondary: #5d7083;
+  --color-input: #a3a3a3;
 }
 
 html,
 body {
-  color: var(--color-gray-800);
-  font-family: var(--font-titillium);
+  color: var(--color-body);
+  font-family: var(--font-sans);
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { afterEach, describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import QueryForm from '@/components/QueryForm.vue'
 import { appConfig } from '@/config'
@@ -55,5 +55,37 @@ describe('QueryForm (info panel)', () => {
     } else {
       expect(wrapper.text()).not.toContain('Digita il nome di un comune')
     }
+  })
+})
+
+describe('QueryForm notice', () => {
+  // The notice depends on the build-time variables, so each test reloads
+  // the config and the component with its own values.
+  async function mountWith(env: Record<string, string>) {
+    for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value)
+    vi.resetModules()
+    const { default: Panel } = await import('@/components/QueryForm.vue')
+    return mount(Panel)
+  }
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('says the site is not institutional', async () => {
+    const wrapper = await mountWith({ VITE_ISTITUZIONALE: '', VITE_GESTORE: '' })
+    expect(wrapper.find('[data-testid="notice"]').text()).toBe(
+      'Non è un sito istituzionale · gestito da anncsu-open',
+    )
+  })
+
+  it('names the configured operator', async () => {
+    const wrapper = await mountWith({ VITE_GESTORE: 'Comune di Test' })
+    expect(wrapper.find('[data-testid="notice"]').text()).toMatch(/gestito da Comune di Test$/)
+  })
+
+  it('hides the notice on an institutional site', async () => {
+    const wrapper = await mountWith({ VITE_ISTITUZIONALE: 'true' })
+    expect(wrapper.find('[data-testid="notice"]').exists()).toBe(false)
   })
 })
