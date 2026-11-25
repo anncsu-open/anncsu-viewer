@@ -4,15 +4,17 @@ import { createPinia, setActivePinia } from 'pinia'
 
 // Mock pmtiles
 vi.mock('pmtiles', () => ({
-  Protocol: vi.fn().mockImplementation(() => ({
-    tile: vi.fn(),
-  })),
+  Protocol: vi.fn().mockImplementation(function () {
+    return {
+      tile: vi.fn(),
+    }
+  }),
 }))
 
 // Mock maplibre-gl
 vi.mock('maplibre-gl', () => ({
-  default: {
-    Map: vi.fn().mockImplementation((opts: any) => ({
+  Map: vi.fn().mockImplementation(function (opts: any) {
+    return {
       _opts: opts,
       flyTo: vi.fn(),
       fitBounds: vi.fn(),
@@ -25,16 +27,19 @@ vi.mock('maplibre-gl', () => ({
       removeSource: vi.fn(),
       getCanvas: vi.fn(() => ({ style: {} })),
       on: vi.fn(),
-    })),
-    NavigationControl: vi.fn(),
-    Popup: vi.fn().mockImplementation(() => ({
+    }
+  }),
+  NavigationControl: vi.fn(),
+  Popup: vi.fn().mockImplementation(function () {
+    return {
       setLngLat: vi.fn().mockReturnThis(),
       setHTML: vi.fn().mockReturnThis(),
       addTo: vi.fn().mockReturnThis(),
       remove: vi.fn(),
-    })),
-    addProtocol: vi.fn(),
-  },
+    }
+  }),
+  addProtocol: vi.fn(),
+  setWorkerUrl: vi.fn(),
 }))
 
 // Mock config to comunale mode (uses parquet for bounds)
@@ -59,7 +64,7 @@ vi.mock('@/services/layer', () => ({
 
 import { executeQuery } from '@/services/duckdb'
 import { useAppStore } from '@/store/app.store'
-import maplibregl from 'maplibre-gl'
+import * as maplibregl from 'maplibre-gl'
 
 const mockedExecuteQuery = vi.mocked(executeQuery)
 const MockedMap = vi.mocked(maplibregl.Map)
@@ -111,8 +116,24 @@ describe('Map', () => {
     vi.clearAllMocks()
   })
 
+  // MapLibre 6 looks for its worker next to its own module, which the
+  // bundle does not keep; the worker has to be passed in.
+  it('points MapLibre at its bundled worker before creating the map', async () => {
+    mockedExecuteQuery.mockResolvedValue(undefined)
+
+    const MapComponent = (await import('@/components/Map.vue')).default
+    mount(MapComponent, { global: { plugins: [createPinia()] } })
+    await flushPromises()
+
+    const setWorkerUrl = vi.mocked(maplibregl.setWorkerUrl)
+    expect(setWorkerUrl).toHaveBeenCalledWith(expect.stringMatching(/maplibre-gl-worker\.mjs/))
+    expect(setWorkerUrl.mock.invocationCallOrder[0]).toBeLessThan(
+      MockedMap.mock.invocationCallOrder[0],
+    )
+  })
+
   it('reads bbox from GeoParquet metadata to set initial bounds', async () => {
-    const bbox: [number, number, number, number] = [6.70, 35.50, 18.51, 47.08]
+    const bbox: [number, number, number, number] = [6.7, 35.5, 18.51, 47.08]
 
     mockedExecuteQuery.mockImplementation(async (query: string) => {
       if (query.includes('parquet_kv_metadata')) {
@@ -125,12 +146,13 @@ describe('Map', () => {
     mount(MapComponent, { global: { plugins: [createPinia()] } })
     await flushPromises()
 
-    expect(mockedExecuteQuery).toHaveBeenCalledWith(
-      expect.stringContaining('parquet_kv_metadata'),
-    )
+    expect(mockedExecuteQuery).toHaveBeenCalledWith(expect.stringContaining('parquet_kv_metadata'))
 
     const mapOpts = MockedMap.mock.calls[0]?.[0] as any
-    expect(mapOpts.bounds).toEqual([[6.70, 35.50], [18.51, 47.08]])
+    expect(mapOpts.bounds).toEqual([
+      [6.7, 35.5],
+      [18.51, 47.08],
+    ])
   })
 
   it('adapts bounds when GeoParquet bbox changes', async () => {
@@ -148,7 +170,10 @@ describe('Map', () => {
     await flushPromises()
 
     const mapOpts = MockedMap.mock.calls[0]?.[0] as any
-    expect(mapOpts.bounds).toEqual([[9.0, 44.0], [11.0, 46.0]])
+    expect(mapOpts.bounds).toEqual([
+      [9.0, 44.0],
+      [11.0, 46.0],
+    ])
   })
 
   it('falls back to MIN/MAX query when metadata read fails', async () => {
@@ -167,11 +192,14 @@ describe('Map', () => {
     await flushPromises()
 
     const mapOpts = MockedMap.mock.calls[0]?.[0] as any
-    expect(mapOpts.bounds).toEqual([[7.0, 36.0], [18.0, 47.0]])
+    expect(mapOpts.bounds).toEqual([
+      [7.0, 36.0],
+      [18.0, 47.0],
+    ])
   })
 
   it('adds a highlighted point layer when an address is selected', async () => {
-    const bbox: [number, number, number, number] = [6.70, 35.50, 18.51, 47.08]
+    const bbox: [number, number, number, number] = [6.7, 35.5, 18.51, 47.08]
 
     mockedExecuteQuery.mockImplementation(async (query: string) => {
       if (query.includes('parquet_kv_metadata')) {
@@ -210,7 +238,7 @@ describe('Map', () => {
   })
 
   it('removes the highlighted point when selectedCoordinates becomes null', async () => {
-    const bbox: [number, number, number, number] = [6.70, 35.50, 18.51, 47.08]
+    const bbox: [number, number, number, number] = [6.7, 35.5, 18.51, 47.08]
 
     mockedExecuteQuery.mockImplementation(async (query: string) => {
       if (query.includes('parquet_kv_metadata')) {
@@ -244,7 +272,7 @@ describe('Map', () => {
   })
 
   it('resets map view to default bounds when resetView is triggered', async () => {
-    const bbox: [number, number, number, number] = [6.70, 35.50, 18.51, 47.08]
+    const bbox: [number, number, number, number] = [6.7, 35.5, 18.51, 47.08]
 
     mockedExecuteQuery.mockImplementation(async (query: string) => {
       if (query.includes('parquet_kv_metadata')) {
@@ -271,7 +299,10 @@ describe('Map', () => {
 
     // Should call fitBounds with the default bounds
     expect(mapInstance.fitBounds).toHaveBeenCalledWith(
-      [[6.70, 35.50], [18.51, 47.08]],
+      [
+        [6.7, 35.5],
+        [18.51, 47.08],
+      ],
       { padding: 20 },
     )
   })

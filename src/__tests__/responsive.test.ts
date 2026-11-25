@@ -4,13 +4,15 @@ import { createPinia, setActivePinia } from 'pinia'
 
 // Mock pmtiles
 vi.mock('pmtiles', () => ({
-  Protocol: vi.fn().mockImplementation(() => ({ tile: vi.fn() })),
+  Protocol: vi.fn().mockImplementation(function () {
+    return { tile: vi.fn() }
+  }),
 }))
 
 // Mock maplibre-gl
 vi.mock('maplibre-gl', () => ({
-  default: {
-    Map: vi.fn().mockImplementation(() => ({
+  Map: vi.fn().mockImplementation(function () {
+    return {
       flyTo: vi.fn(),
       fitBounds: vi.fn(),
       addControl: vi.fn(),
@@ -22,16 +24,19 @@ vi.mock('maplibre-gl', () => ({
       removeSource: vi.fn(),
       getCanvas: vi.fn(() => ({ style: {} })),
       on: vi.fn(),
-    })),
-    NavigationControl: vi.fn(),
-    Popup: vi.fn().mockImplementation(() => ({
+    }
+  }),
+  NavigationControl: vi.fn(),
+  Popup: vi.fn().mockImplementation(function () {
+    return {
       setLngLat: vi.fn().mockReturnThis(),
       setHTML: vi.fn().mockReturnThis(),
       addTo: vi.fn().mockReturnThis(),
       remove: vi.fn(),
-    })),
-    addProtocol: vi.fn(),
-  },
+    }
+  }),
+  addProtocol: vi.fn(),
+  setWorkerUrl: vi.fn(),
 }))
 
 // Mock config to nazionale mode

@@ -16,7 +16,7 @@ export default defineConfig({
     {
       name: 'serve-data',
       configureServer(server) {
-        const dataDir = path.resolve(__dirname, 'data')
+        const dataDir = path.resolve(import.meta.dirname, 'data')
         server.middlewares.use('/data', sirv(dataDir, { single: false }))
       },
     },

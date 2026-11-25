@@ -35,6 +35,7 @@ const filteredAddresses = ref<AddressEntry[]>([])
 const showAutocomplete = ref(false)
 const searchCache = new SearchCache<AddressEntry[]>()
 const unifiedInputRef = ref<HTMLInputElement | null>(null)
+const inputFocused = ref(false)
 
 // Nazionale mode state
 const unifiedSearch = ref('')
@@ -78,6 +79,29 @@ function transformQuery(filter?: string, codiceIstat?: string): string {
   }
 
   return anncsuAddressesQuery.replace('FROM addresses', `FROM ${addressesParquet} as addresses`)
+}
+
+function toAddressEntries(features: Feature[]): AddressEntry[] {
+  const seen = new Set<string>()
+  return features
+    .map((f) => {
+      const name = (f.properties as any).name as string
+      const coordinates = (f.geometry as Point).coordinates as [number, number]
+      return { name, coordinates }
+    })
+    .filter((entry) => {
+      if (!entry.name || seen.has(entry.name)) return false
+      seen.add(entry.name)
+      return true
+    })
+    .sort((a, b) => a.name.localeCompare(b.name))
+}
+
+// The cache is keyed by the text alone, so its results hold for one list:
+// a search typed while the list was loading would otherwise stay empty.
+function setAddressList(entries: AddressEntry[]) {
+  searchCache.clear()
+  addressList.value = entries
 }
 
 async function loadComuni() {
@@ -144,7 +168,9 @@ async function loadAddressesForComune(comune: ComuneEntry) {
       return
     }
 
-    const tileNames = comune.h3Cells.map((_, i) => `tile_${i}.parquet`)
+    // One name per downloaded tile: loadH3Tiles skips the missing ones, and
+    // naming them would make DuckDB read a file it never received.
+    const tileNames = buffers.map((_, i) => `tile_${i}.parquet`)
     const unionQuery = tileNames.map((name) => `SELECT * FROM read_parquet('${name}')`).join(' UNION ALL ')
 
     const loadQuery = anncsuAddressesQuery.replace(
@@ -154,19 +180,7 @@ async function loadAddressesForComune(comune: ComuneEntry) {
 
     const data = await executeQueryWithBuffers(loadQuery, buffers, tileNames)
     if (data) {
-      const seen = new Set<string>()
-      addressList.value = data.features
-        .map((f: Feature) => {
-          const name = (f.properties as any).name as string
-          const coordinates = (f.geometry as Point).coordinates as [number, number]
-          return { name, coordinates }
-        })
-        .filter((entry) => {
-          if (!entry.name || seen.has(entry.name)) return false
-          seen.add(entry.name)
-          return true
-        })
-        .sort((a, b) => a.name.localeCompare(b.name))
+      setAddressList(toAddressEntries(data.features))
     }
   } catch (error) {
     console.error('Error loading addresses for comune:', error)
@@ -247,10 +261,9 @@ async function selectCombined(comune: ComuneEntry, address: string) {
 function clearComune() {
   selectedComune.value = null
   unifiedSearch.value = ''
-  addressList.value = []
+  setAddressList([])
   filteredAddresses.value = []
   showSuggestions.value = false
-  searchCache.clear()
   onClear()
 }
 
@@ -285,19 +298,7 @@ onMounted(async () => {
     )
     const data = await executeQuery(loadQuery)
     if (data) {
-      const seen = new Set<string>()
-      addressList.value = data.features
-        .map((f: Feature) => {
-          const name = (f.properties as any).name as string
-          const coordinates = (f.geometry as Point).coordinates as [number, number]
-          return { name, coordinates }
-        })
-        .filter((entry) => {
-          if (!entry.name || seen.has(entry.name)) return false
-          seen.add(entry.name)
-          return true
-        })
-        .sort((a, b) => a.name.localeCompare(b.name))
+      setAddressList(toAddressEntries(data.features))
     }
   } catch (error) {
     console.error('Error loading addresses:', error)
@@ -306,7 +307,20 @@ onMounted(async () => {
 
 let blurTimeout: number | null = null
 
+function onFocus() {
+  inputFocused.value = true
+  if (appConfig.isNazionale) {
+    showSuggestions.value =
+      filteredComuni.value.length > 0 ||
+      filteredAddresses.value.length > 0 ||
+      combinedSuggestion.value !== null
+  } else {
+    showAutocomplete.value = filteredAddresses.value.length > 0
+  }
+}
+
 function onBlur() {
+  inputFocused.value = false
   blurTimeout = window.setTimeout(() => {
     showSuggestions.value = false
     showAutocomplete.value = false
@@ -321,10 +335,8 @@ function cancelBlur() {
   }
 }
 
-// Unified search watcher (nazionale mode)
-watch(unifiedSearch, (newValue) => {
-  if (!appConfig.isNazionale) return
-
+// Unified search (nazionale mode)
+function updateUnifiedSuggestions(newValue: string) {
   if (newValue.length < 2) {
     showSuggestions.value = false
     filteredComuni.value = []
@@ -416,12 +428,10 @@ watch(unifiedSearch, (newValue) => {
   combinedTotalCount.value = 0
   suggestionType.value = 'comuni'
   showSuggestions.value = filteredComuni.value.length > 0
-})
+}
 
 // Filter addresses with multi-term matching + Jaccard similarity ranking (LRU cached)
-watch(searchFilter, (newValue) => {
-  if (appConfig.isNazionale) return // Handled by unifiedSearch watcher
-
+function updateAddressSuggestions(newValue: string) {
   if (newValue.length >= 2) {
     const cached = searchCache.get(newValue)
     if (cached) {
@@ -436,6 +446,23 @@ watch(searchFilter, (newValue) => {
     showAutocomplete.value = false
     filteredAddresses.value = []
   }
+}
+
+watch(unifiedSearch, (newValue) => {
+  if (appConfig.isNazionale) updateUnifiedSuggestions(newValue)
+})
+
+watch(searchFilter, (newValue) => {
+  if (!appConfig.isNazionale) updateAddressSuggestions(newValue)
+})
+
+// The comuni and the addresses arrive after the page and the comune, and the
+// text may come first: search it again when they arrive, unless the user has
+// left the input.
+watch([comuniList, addressList], () => {
+  if (!inputFocused.value) return
+  if (appConfig.isNazionale) updateUnifiedSuggestions(unifiedSearch.value)
+  else updateAddressSuggestions(searchFilter.value)
 })
 
 function selectAddress(entry: AddressEntry) {
@@ -508,7 +535,7 @@ function onClear() {
             data-testid="unified-search-input"
             type="text"
             v-model="unifiedSearch"
-            @focus="showSuggestions = (filteredComuni.length > 0 || filteredAddresses.length > 0 || combinedSuggestion !== null)"
+            @focus="onFocus"
             @blur="onBlur"
             :placeholder="selectedComune ? 'es. VIA ROMA 15' : 'es. Vacone o Vacone Via Roma 15'"
             class="w-full border-b-2 border-gray-300 bg-gray-50 py-3 pl-10 pr-10 text-sm font-titillium transition-colors placeholder:text-gray-400 focus:border-[#0066CC] focus:bg-white focus:outline-none"
@@ -627,7 +654,7 @@ function onClear() {
             data-testid="address-input"
             type="text"
             v-model="searchFilter"
-            @focus="showAutocomplete = filteredAddresses.length > 0"
+            @focus="onFocus"
             @blur="onBlur"
             placeholder="es. VIA ROMA 15"
             class="w-full border-b-2 border-gray-300 bg-gray-50 py-3 pl-10 pr-10 text-sm font-titillium transition-colors placeholder:text-gray-400 focus:border-[#0066CC] focus:bg-white focus:outline-none"
@@ -651,6 +678,7 @@ function onClear() {
           <div
             v-for="(entry, index) in filteredAddresses"
             :key="index"
+            data-testid="address-suggestion"
             @click="selectAddress(entry)"
             class="cursor-pointer border-b border-gray-100 px-4 py-3 text-sm transition-colors last:border-b-0 hover:bg-[#0066CC]/10 hover:text-[#0066CC]"
           >

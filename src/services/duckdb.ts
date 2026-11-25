@@ -1,18 +1,14 @@
 import * as duckdb from '@duckdb/duckdb-wasm'
-import duckdb_wasm from '@duckdb/duckdb-wasm/dist/duckdb-mvp.wasm?url'
-import mvp_worker from '@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url'
-import duckdb_wasm_next from '@duckdb/duckdb-wasm/dist/duckdb-eh.wasm?url'
-import eh_worker from '@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url'
-import type { FeatureCollection, Polygon } from 'geojson'
+import base_wasm from '@duckdb/duckdb-wasm/dist/duckdb-base.wasm?url'
+import base_worker from '@duckdb/duckdb-wasm/dist/duckdb-browser-base.worker.js?url'
+import type { FeatureCollection, Geometry } from 'geojson'
 
-const MANUAL_BUNDLES = {
-  mvp: {
-    mainModule: duckdb_wasm,
-    mainWorker: mvp_worker,
-  },
-  eh: {
-    mainModule: duckdb_wasm_next,
-    mainWorker: eh_worker,
+// Only the single-threaded bundle: the threads one needs cross-origin
+// isolation, which GitHub Pages cannot provide.
+const MANUAL_BUNDLES: duckdb.DuckDBBundles = {
+  base: {
+    mainModule: base_wasm,
+    mainWorker: base_worker,
   },
 }
 
@@ -25,9 +21,17 @@ interface DuckResponseObject extends DuckResponseProperties {
 
 const logger = new duckdb.ConsoleLogger()
 
+// duckdb-wasm#2199: if spatial loads before DuckDB has read its coordinate
+// systems, every later read of an OGC:CRS84 geometry column, as in our
+// GeoParquet files, fails with "stoi: no conversion".
+async function loadSpatial(conn: duckdb.AsyncDuckDBConnection) {
+  await conn.query('SELECT count(*) FROM duckdb_coordinate_systems()')
+  await conn.query('INSTALL spatial;LOAD spatial;')
+}
+
 export async function executeQuery(
   queryInput: string,
-): Promise<FeatureCollection<Polygon, DuckResponseProperties> | undefined> {
+): Promise<FeatureCollection<Geometry, DuckResponseProperties> | undefined> {
   let query = queryInput
   const bundle = await duckdb.selectBundle(MANUAL_BUNDLES)
   const worker = new Worker(bundle.mainWorker)
@@ -35,8 +39,7 @@ export async function executeQuery(
   await db.instantiate(bundle.mainModule, bundle.pthreadWorker)
   const conn = await db.connect()
 
-  await conn.query('INSTALL spatial;LOAD spatial;')
-  await conn.query('INSTALL h3 FROM community;LOAD h3;')
+  await loadSpatial(conn)
 
   // Register HTTP URLs found in the query so DuckDB WASM can fetch them
   const httpUrls = query.match(/https?:\/\/[^\s'")]+/g) || []
@@ -44,7 +47,7 @@ export async function executeQuery(
     await db.registerFileURL(url, url, duckdb.DuckDBDataProtocol.HTTP, false)
   }
 
-  let featureCollection: FeatureCollection<Polygon, DuckResponseProperties>
+  let featureCollection: FeatureCollection<Geometry, DuckResponseProperties>
   try {
     const res = await conn.query(query)
 
@@ -54,7 +57,7 @@ export async function executeQuery(
         const { geometry, ...properties } = d
         return {
           type: 'Feature',
-          geometry: JSON.parse(geometry) as Polygon,
+          geometry: JSON.parse(geometry) as Geometry,
           properties,
         }
       }),
@@ -73,7 +76,7 @@ export async function executeQueryWithBuffers(
   query: string,
   buffers: ArrayBuffer[],
   fileNames: string[],
-): Promise<FeatureCollection<Polygon, DuckResponseProperties> | undefined> {
+): Promise<FeatureCollection<Geometry, DuckResponseProperties> | undefined> {
   const bundle = await duckdb.selectBundle(MANUAL_BUNDLES)
   const worker = new Worker(bundle.mainWorker)
   const db = new duckdb.AsyncDuckDB(logger, worker)
@@ -85,9 +88,9 @@ export async function executeQueryWithBuffers(
   }
 
   const conn = await db.connect()
-  await conn.query('INSTALL spatial;LOAD spatial;')
+  await loadSpatial(conn)
 
-  let featureCollection: FeatureCollection<Polygon, DuckResponseProperties>
+  let featureCollection: FeatureCollection<Geometry, DuckResponseProperties>
   try {
     const res = await conn.query(query)
 
@@ -97,7 +100,7 @@ export async function executeQueryWithBuffers(
         const { geometry, ...properties } = d
         return {
           type: 'Feature',
-          geometry: JSON.parse(geometry) as Polygon,
+          geometry: JSON.parse(geometry) as Geometry,
           properties,
         }
       }),
