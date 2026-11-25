@@ -87,4 +87,58 @@ describe('appConfig', () => {
     expect(appConfig.isNazionale).toBe(false)
     vi.unstubAllEnvs()
   })
+
+  it('reads logoUrl from VITE_LOGO_URL', async () => {
+    vi.stubEnv('VITE_LOGO_URL', 'https://example.it/stemma.svg')
+    vi.resetModules()
+    const { appConfig } = await import('@/config')
+    expect(appConfig.logoUrl).toBe('https://example.it/stemma.svg')
+    vi.unstubAllEnvs()
+  })
+
+  it('defaults logoUrl to the viewer logo', async () => {
+    vi.stubEnv('VITE_LOGO_URL', '')
+    vi.resetModules()
+    const { appConfig } = await import('@/config')
+    // Vite may inline the SVG as a data URL, so compare with the import.
+    const { default: viewerLogo } = await import('@/assets/logo.svg')
+    expect(appConfig.logoUrl).toBe(viewerLogo)
+    vi.unstubAllEnvs()
+  })
+
+  it('is institutional when VITE_ISTITUZIONALE is true', async () => {
+    vi.stubEnv('VITE_ISTITUZIONALE', 'true')
+    vi.resetModules()
+    const { appConfig } = await import('@/config')
+    expect(appConfig.istituzionale).toBe(true)
+    vi.unstubAllEnvs()
+  })
+
+  // The notice stays on unless the publisher says exactly "true".
+  it.each(['', 'false', '1', 'yes'])(
+    'is not institutional when VITE_ISTITUZIONALE is %j',
+    async (value) => {
+      vi.stubEnv('VITE_ISTITUZIONALE', value)
+      vi.resetModules()
+      const { appConfig } = await import('@/config')
+      expect(appConfig.istituzionale).toBe(false)
+      vi.unstubAllEnvs()
+    },
+  )
+
+  it('reads gestore from VITE_GESTORE', async () => {
+    vi.stubEnv('VITE_GESTORE', 'Comune di Test')
+    vi.resetModules()
+    const { appConfig } = await import('@/config')
+    expect(appConfig.gestore).toBe('Comune di Test')
+    vi.unstubAllEnvs()
+  })
+
+  it('defaults gestore to anncsu-open', async () => {
+    vi.stubEnv('VITE_GESTORE', '')
+    vi.resetModules()
+    const { appConfig } = await import('@/config')
+    expect(appConfig.gestore).toBe('anncsu-open')
+    vi.unstubAllEnvs()
+  })
 })

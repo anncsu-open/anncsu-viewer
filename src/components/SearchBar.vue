@@ -494,7 +494,7 @@ function onClear() {
     <div class="relative flex flex-col gap-1 rounded bg-white p-4 shadow-lg ring-1 ring-gray-200">
       <!-- Nazionale mode: unified search -->
       <template v-if="appConfig.isNazionale">
-        <label class="mb-1 text-xs font-semibold uppercase tracking-wide text-[#0066CC]">
+        <label class="mb-1 text-xs font-semibold uppercase tracking-wide text-primary">
           Cerca comune e indirizzo
         </label>
 
@@ -502,7 +502,7 @@ function onClear() {
         <div
           v-if="selectedComune"
           data-testid="comune-chip"
-          class="mb-1 flex items-center gap-1 rounded-full bg-[#0066CC]/10 px-3 py-1 text-sm text-[#0066CC]"
+          class="mb-1 flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-sm text-primary"
         >
           <svg class="h-4 w-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
             <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clip-rule="evenodd" />
@@ -511,7 +511,8 @@ function onClear() {
           <button
             data-testid="comune-chip-close"
             @click="clearComune"
-            class="ml-1 rounded-full p-0.5 transition-colors hover:bg-[#0066CC]/20"
+            class="ml-1 flex min-h-6 min-w-6 items-center justify-center rounded-full transition-colors hover:bg-primary/20"
+            title="Rimuovi comune"
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5">
               <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -526,7 +527,7 @@ function onClear() {
             viewBox="0 0 24 24"
             stroke-width="2"
             stroke="currentColor"
-            class="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400"
+            class="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-secondary"
           >
             <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
           </svg>
@@ -538,14 +539,14 @@ function onClear() {
             @focus="onFocus"
             @blur="onBlur"
             :placeholder="selectedComune ? 'es. VIA ROMA 15' : 'es. Vacone o Vacone Via Roma 15'"
-            class="w-full border-b-2 border-gray-300 bg-gray-50 py-3 pl-10 pr-10 text-sm font-titillium transition-colors placeholder:text-gray-400 focus:border-[#0066CC] focus:bg-white focus:outline-none"
+            class="w-full rounded-none border-0 border-b border-input bg-white py-3 pl-10 pr-10 text-sm transition-colors placeholder:text-secondary focus:border-primary focus:shadow-[inset_0_-1px_0_var(--color-primary)] focus:outline-none"
           />
           <button
             v-if="unifiedSearch || selectedComune"
             data-testid="clear-search"
             @click="clearAll"
-            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-[#0066CC]"
-            title="Clear search"
+            class="absolute right-2 top-1/2 flex min-h-6 min-w-6 -translate-y-1/2 items-center justify-center text-secondary transition-colors hover:text-primary"
+            title="Cancella ricerca"
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-5 w-5">
               <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -562,16 +563,16 @@ function onClear() {
               v-if="suggestionType === 'combined' && combinedSuggestion"
               data-testid="combined-suggestion"
               @click="selectCombined(combinedSuggestion.comune, combinedSuggestion.address)"
-              class="cursor-pointer border-b border-gray-100 px-4 py-3 text-sm transition-colors hover:bg-[#0066CC]/10"
+              class="cursor-pointer border-b border-gray-100 px-4 py-3 text-sm transition-colors hover:bg-primary/10"
             >
               <div class="flex items-center gap-2">
-                <svg class="h-4 w-4 flex-shrink-0 text-[#0066CC]" fill="currentColor" viewBox="0 0 20 20">
+                <svg class="h-4 w-4 flex-shrink-0 text-primary" fill="currentColor" viewBox="0 0 20 20">
                   <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clip-rule="evenodd" />
                 </svg>
-                <span class="font-semibold text-[#0066CC]">{{ combinedSuggestion.comune.nome }}</span>
-                <span class="text-gray-400">→</span>
+                <span class="font-semibold text-primary">{{ combinedSuggestion.comune.nome }}</span>
+                <span class="text-secondary">→</span>
                 <span>{{ combinedSuggestion.address }}</span>
-                <span v-if="prefetchLoading" class="ml-auto text-xs text-gray-400">caricamento...</span>
+                <span v-if="prefetchLoading" class="ml-auto text-xs text-secondary">caricamento...</span>
               </div>
               <!-- Address previews -->
               <div v-if="combinedPreview.length > 0" class="ml-6 mt-1.5 space-y-0.5">
@@ -579,7 +580,7 @@ function onClear() {
                   v-for="(entry, index) in combinedPreview"
                   :key="index"
                   data-testid="address-preview"
-                  class="flex items-center gap-1.5 text-xs text-gray-500"
+                  class="flex items-center gap-1.5 text-xs text-secondary"
                 >
                   <svg class="h-3 w-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -590,7 +591,7 @@ function onClear() {
                 <div
                   v-if="combinedTotalCount > combinedPreview.length"
                   data-testid="more-results"
-                  class="ml-4.5 text-xs italic text-gray-400"
+                  class="ml-4.5 text-xs italic text-secondary"
                 >
                   ... e altri {{ combinedTotalCount - combinedPreview.length }} risultati
                 </div>
@@ -604,9 +605,9 @@ function onClear() {
                 :key="index"
                 data-testid="comune-suggestion"
                 @click="selectComune(comune)"
-                class="flex cursor-pointer items-center gap-2 border-b border-gray-100 px-4 py-3 text-sm transition-colors last:border-b-0 hover:bg-[#0066CC]/10 hover:text-[#0066CC]"
+                class="flex cursor-pointer items-center gap-2 border-b border-gray-100 px-4 py-3 text-sm transition-colors last:border-b-0 hover:bg-primary/10 hover:text-primary"
               >
-                <svg class="h-4 w-4 flex-shrink-0 text-[#0066CC]" fill="currentColor" viewBox="0 0 20 20">
+                <svg class="h-4 w-4 flex-shrink-0 text-primary" fill="currentColor" viewBox="0 0 20 20">
                   <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clip-rule="evenodd" />
                 </svg>
                 {{ comune.nome }}
@@ -620,9 +621,9 @@ function onClear() {
                 :key="index"
                 data-testid="address-suggestion"
                 @click="selectAddress(entry)"
-                class="flex cursor-pointer items-center gap-2 border-b border-gray-100 px-4 py-3 text-sm transition-colors last:border-b-0 hover:bg-[#0066CC]/10 hover:text-[#0066CC]"
+                class="flex cursor-pointer items-center gap-2 border-b border-gray-100 px-4 py-3 text-sm transition-colors last:border-b-0 hover:bg-primary/10 hover:text-primary"
               >
-                <svg class="h-4 w-4 flex-shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <svg class="h-4 w-4 flex-shrink-0 text-secondary" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
                   <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
                 </svg>
@@ -635,7 +636,7 @@ function onClear() {
 
       <!-- Comunale mode: address search only -->
       <template v-else>
-        <label for="search-address" class="mb-1 text-xs font-semibold uppercase tracking-wide text-[#0066CC]">
+        <label for="search-address" class="mb-1 text-xs font-semibold uppercase tracking-wide text-primary">
           Cerca indirizzo
         </label>
         <div class="relative">
@@ -645,7 +646,7 @@ function onClear() {
             viewBox="0 0 24 24"
             stroke-width="2"
             stroke="currentColor"
-            class="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400"
+            class="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-secondary"
           >
             <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
           </svg>
@@ -657,13 +658,13 @@ function onClear() {
             @focus="onFocus"
             @blur="onBlur"
             placeholder="es. VIA ROMA 15"
-            class="w-full border-b-2 border-gray-300 bg-gray-50 py-3 pl-10 pr-10 text-sm font-titillium transition-colors placeholder:text-gray-400 focus:border-[#0066CC] focus:bg-white focus:outline-none"
+            class="w-full rounded-none border-0 border-b border-input bg-white py-3 pl-10 pr-10 text-sm transition-colors placeholder:text-secondary focus:border-primary focus:shadow-[inset_0_-1px_0_var(--color-primary)] focus:outline-none"
           />
           <button
             v-if="searchFilter"
             @click="onClear"
-            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-[#0066CC]"
-            title="Clear search"
+            class="absolute right-2 top-1/2 flex min-h-6 min-w-6 -translate-y-1/2 items-center justify-center text-secondary transition-colors hover:text-primary"
+            title="Cancella ricerca"
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-5 w-5">
               <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -680,7 +681,7 @@ function onClear() {
             :key="index"
             data-testid="address-suggestion"
             @click="selectAddress(entry)"
-            class="cursor-pointer border-b border-gray-100 px-4 py-3 text-sm transition-colors last:border-b-0 hover:bg-[#0066CC]/10 hover:text-[#0066CC]"
+            class="cursor-pointer border-b border-gray-100 px-4 py-3 text-sm transition-colors last:border-b-0 hover:bg-primary/10 hover:text-primary"
           >
             {{ entry.name }}
           </div>

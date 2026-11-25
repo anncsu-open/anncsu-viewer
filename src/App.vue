@@ -20,14 +20,14 @@ const { legend, sidebarOpen } = storeToRefs(store)
       <!-- Sidebar overlay (mobile) / inline (desktop) -->
       <aside
         v-if="sidebarOpen"
-        class="fixed inset-0 top-16 z-30 overflow-y-auto bg-white md:relative md:inset-auto md:z-auto md:w-120"
+        class="fixed inset-0 top-18 z-30 overflow-y-auto bg-white md:relative md:inset-auto md:z-auto md:w-120"
       >
         <!-- Close button inside panel -->
         <button
           data-testid="close-panel"
           @click="store.toggleSidebar()"
           class="absolute right-4 top-4 z-10 rounded-full bg-white p-2 shadow-md transition-colors hover:bg-gray-100 md:hidden"
-          title="Close panel"
+          title="Chiudi pannello"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -46,7 +46,7 @@ const { legend, sidebarOpen } = storeToRefs(store)
       <!-- Backdrop overlay on mobile -->
       <div
         v-if="sidebarOpen"
-        class="fixed inset-0 top-16 z-20 bg-black/30 md:hidden"
+        class="fixed inset-0 top-18 z-20 bg-black/30 md:hidden"
         @click="store.toggleSidebar()"
       ></div>
 

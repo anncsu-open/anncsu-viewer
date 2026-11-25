@@ -29,6 +29,10 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 30_000 },
   fullyParallel: true,
+  // With five browsers at once (the default on a 10-core Mac) one of them
+  // sometimes never returns from newContext and the test times out; three
+  // ran clean, and finish sooner than five with a one-minute timeout.
+  workers: 3,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? 'github' : 'list',
   use: {
@@ -41,12 +45,12 @@ export default defineConfig({
   projects: [
     {
       name: 'nazionale',
-      testMatch: 'nazionale.spec.ts',
+      testMatch: ['nazionale.spec.ts', 'theme.spec.ts'],
       use: { baseURL: 'http://localhost:4173' },
     },
     {
       name: 'comunale',
-      testMatch: 'comunale.spec.ts',
+      testMatch: ['comunale.spec.ts', 'theme.spec.ts'],
       use: { baseURL: 'http://localhost:4174' },
     },
   ],

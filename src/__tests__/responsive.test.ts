@@ -207,7 +207,7 @@ describe('Responsive layout', () => {
       const { default: Header } = await import('@/components/Header.vue')
       const wrapper = mount(Header, { global: { plugins: [createPinia()] } })
 
-      const title = wrapper.find('span')
+      const title = wrapper.find('[data-testid="site-name"]')
       const classes = title.classes()
       // Should have responsive text size (text-lg on mobile, text-2xl on md+)
       const hasResponsiveText = classes.some((c) => c.startsWith('md:text-') || c.startsWith('lg:text-'))
