@@ -7,7 +7,7 @@
   ],
   "id": "anncsu",
   "title": "ANNCSU addresses",
-  "description": "The certified addresses of Italian comuni, from the National Archive of House Numbers and Urban Streets (ANNCSU), converted to cloud-native formats from the [ANNCSU open data portal](https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/).\n\nThe catalog publishes four collections:\n\n- `indirizzi`: one GeoParquet file, for country-wide analysis.\n- `indirizzi-h3`: the same data partitioned into H3 cells, to read one comune at a time without downloading everything.\n- `rilasci`: the archive of monthly downloads, which the other two derive their current release from.\n- `stradario`: the archive of the national street register, the list of streets with their number of accesses.",
+  "description": "The certified addresses of Italian comuni, from the National Archive of House Numbers and Urban Streets (ANNCSU), converted to cloud-native formats from the [ANNCSU open data portal](https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/).\n\nThe catalog publishes six collections:\n\n- `indirizzi`: one GeoParquet file, for country-wide analysis.\n- `indirizzi-h3`: the same data partitioned into H3 cells, to read one comune at a time without downloading everything.\n- `rilasci`: the archive of monthly downloads, which the other two derive their current release from.\n- `stradario`: the archive of the national street register, the list of streets with their number of accesses.\n- `gazetteer`: the names of the comuni, to find a comune by typing its name.\n- `indirizzi-index`: the streets and access points sorted by comune, to find an address inside a comune.",
   "language": {
     "code": "en",
     "name": "English",
@@ -55,6 +55,18 @@
       "href": "./stradario/collection.json",
       "type": "application/json",
       "title": "ANNCSU street register"
+    },
+    {
+      "rel": "child",
+      "href": "./gazetteer/collection.json",
+      "type": "application/json",
+      "title": "ANNCSU comuni gazetteer"
+    },
+    {
+      "rel": "child",
+      "href": "./indirizzi-index/collection.json",
+      "type": "application/json",
+      "title": "ANNCSU address index"
     },
     {
       "rel": "alternate",

@@ -1,0 +1,23 @@
+{
+  "release": "2026-11-02",
+  "files": {
+    "vie": {
+      "href": "./2026-11-02/vie.parquet",
+      "size": 42730958,
+      "checksum": "1220b981fd822c452d68dd873aa06a1781e89bde16d782ea451795bd6766bfcb9b3f",
+      "rows": 786969,
+      "row_groups": 193,
+      "row_group_rows": 4096,
+      "footer_metadata_bytes": 332699
+    },
+    "civici": {
+      "href": "./2026-11-02/civici.parquet",
+      "size": 425296173,
+      "checksum": "1220637458c540a3db34f4b764066b935b61c59ec154ff6b0d97c7104301fca1b5c8",
+      "rows": 20728959,
+      "row_groups": 633,
+      "row_group_rows": 32768,
+      "footer_metadata_bytes": 775655
+    }
+  }
+}

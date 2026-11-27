@@ -1,0 +1,267 @@
+# Column documentation for the geocoding index, in Italian and English.
+#
+# One section per file written by scripts/build_geocoding_index.py:
+# `gazetteer` (gazetteer/<release>/comuni.parquet), `streets`
+# (indirizzi-index/<release>/vie.parquet) and `access_points`
+# (indirizzi-index/<release>/civici.parquet). Columns are listed in file
+# order.
+#
+# These columns live apart from columns.yaml because build_catalog.py checks
+# that file against the main Parquet. The Parquet files of the index are not
+# in the checkout, so this file is checked against the builder's own schemas
+# instead, in scripts/test_build_catalog.py. `type` is the DuckDB type, as in
+# columns.yaml.
+
+gazetteer:
+  name:
+    type: VARCHAR
+    description: >-
+      Il nome da mostrare, dall'elenco dei comuni dell'Istat. Su una riga
+      alternativa è il nome in altra lingua, oppure lo stesso nome quando la
+      riga cambia solo name_norm.
+    description_en: >-
+      The name to display, from the Istat list of comuni. On an alternate row
+      it is the name in another language, or the same name when the row only
+      changes name_norm.
+  name_norm:
+    type: VARCHAR
+    description: >-
+      Il nome normalizzato con nfd-strip-marks-lower/1: scomposizione NFD,
+      segni diacritici tolti, minuscole, tolti i caratteri diversi da
+      lettere, cifre, spazi, apostrofi e trattini, spazi ripetuti ridotti a
+      uno. È la colonna di ordinamento, confrontata byte per byte.
+    description_en: >-
+      The name normalized by nfd-strip-marks-lower/1: NFD decomposition,
+      diacritics removed, lowercase, characters other than letters, digits,
+      spaces, apostrophes and hyphens removed, repeated spaces collapsed. It
+      is the sort column, compared byte by byte.
+  level:
+    type: INTEGER
+    description: >-
+      Livello amministrativo, sempre 3: il livello dei comuni in
+      geoBoundaries (ADM3) e in Who's On First (localadmin).
+    description_en: >-
+      Administrative level, always 3: the level of comuni in geoBoundaries
+      (ADM3) and in Who's On First (localadmin).
+  country:
+    type: VARCHAR
+    description: Codice ISO 3166-1 alpha-3 del paese, sempre ITA.
+    description_en: ISO 3166-1 alpha-3 country code, always ITA.
+  feature_id:
+    type: VARCHAR
+    description: >-
+      Codice Istat del comune, sei cifre come testo. Le righe alternative
+      ripetono il codice del loro comune. È il valore della colonna
+      codice_istat nell'indice degli indirizzi.
+    description_en: >-
+      Istat code of the comune, six digits as text. Alternate rows repeat the
+      code of their comune. It is the value of the codice_istat column in the
+      address index.
+  country_name:
+    type: VARCHAR
+    description: Nome del paese, sempre Italia.
+    description_en: Country name, always Italia.
+  parent_name:
+    type: VARCHAR
+    description: >-
+      Nome della provincia, cioè dell'unità territoriale sovracomunale
+      dell'Istat. Distingue i comuni con lo stesso nome.
+    description_en: >-
+      Name of the province, the supra-municipal territorial unit of Istat. It
+      tells apart comuni with the same name.
+  parent_id:
+    type: VARCHAR
+    description: Codice Istat dell'unità territoriale sovracomunale.
+    description_en: Istat code of the supra-municipal territorial unit.
+  name_lang:
+    type: VARCHAR
+    description: >-
+      Lingua del nome in ISO 639-3, per esempio deu o slv, sulle righe in
+      altra lingua. Nulla sulle altre righe.
+    description_en: >-
+      ISO 639-3 language of the name, for example deu or slv, on rows in
+      another language. Null on the other rows.
+  alt_of:
+    type: VARCHAR
+    description: >-
+      Nulla sulla riga principale. Su una riga alternativa, il feature_id del
+      comune di cui la riga è un altro nome.
+    description_en: >-
+      Null on the main row. On an alternate row, the feature_id of the comune
+      the row is another name of.
+  source:
+    type: VARCHAR
+    description: Origine della riga, sempre anncsu.
+    description_en: Source of the row, always anncsu.
+  addresses:
+    type: INTEGER
+    description: >-
+      Numero di accessi georeferenziati del comune nel rilascio, compresi
+      quelli che ANNCSU colloca fuori dal confine comunale.
+    description_en: >-
+      Number of georeferenced access points of the comune in the release,
+      including those ANNCSU places outside the comune boundary.
+  bbox:
+    type: STRUCT(xmin DOUBLE, ymin DOUBLE, xmax DOUBLE, ymax DOUBLE)
+    description: >-
+      Riquadro degli accessi del comune in gradi WGS84, senza quelli fuori
+      dal confine comunale; se lo sono tutti, li comprende tutti. È più
+      stretto del territorio del comune.
+    description_en: >-
+      Bounding box of the comune's access points in WGS84 degrees, leaving
+      out those outside the comune boundary; if all of them are, it covers
+      all of them. It is narrower than the comune's territory.
+
+streets:
+  codice_istat:
+    type: VARCHAR
+    description: >-
+      Codice Istat del comune, sei cifre come testo: il feature_id del
+      gazetteer. Prima colonna di ordinamento.
+    description_en: >-
+      Istat code of the comune, six digits as text: the feature_id of the
+      gazetteer. First sort column.
+  comune:
+    type: VARCHAR
+    description: >-
+      Nome del comune dall'elenco Istat, per mostrare un risultato senza
+      leggere il gazetteer.
+    description_en: >-
+      Name of the comune from the Istat list, to display a result without
+      reading the gazetteer.
+  street_id:
+    type: BIGINT
+    description: >-
+      Identificativo stabile della strada, il PROGRESSIVO_NAZIONALE di
+      ANNCSU.
+    description_en: Stable identifier of the street, the PROGRESSIVO_NAZIONALE of ANNCSU.
+  name:
+    type: VARCHAR
+    description: >-
+      Il nome della strada da mostrare: l'ODONIMO come pubblicato, o il nome
+      in altra lingua su una riga alternativa.
+    description_en: >-
+      The street name to display: the ODONIMO as published, or the name in
+      another language on an alternate row.
+  name_norm:
+    type: VARCHAR
+    description: >-
+      Il nome normalizzato con anncsu-odonimo/1: scomposizione NFD, segni
+      diacritici tolti, minuscole, ogni carattere diverso da lettere, cifre,
+      spazi e trattini sostituito da uno spazio, spazi ripetuti ridotti a
+      uno. Così LIBERTA' e libertà danno entrambi liberta.
+    description_en: >-
+      The name normalized by anncsu-odonimo/1: NFD decomposition, diacritics
+      removed, lowercase, every character other than letters, digits, spaces
+      and hyphens replaced by a space, repeated spaces collapsed. So LIBERTA'
+      and libertà both give liberta.
+  name_lang:
+    type: VARCHAR
+    description: >-
+      Lingua ISO 639-3 del nome sulle righe in altra lingua, quando è nota.
+      Nulla sulla riga principale.
+    description_en: >-
+      ISO 639-3 language of the name on rows in another language, when it is
+      known. Null on the main row.
+  alt_of:
+    type: BIGINT
+    description: >-
+      Nulla sulla riga principale. Su una riga in altra lingua, lo street_id
+      della strada.
+    description_en: Null on the main row. On a row in another language, the street_id of the street.
+  numbers:
+    type: INTEGER
+    description: Numero di accessi della strada.
+    description_en: Number of access points on the street.
+  number_min:
+    type: INTEGER
+    description: >-
+      Il numero civico più basso della strada. Nullo se nessun accesso ha un
+      numero.
+    description_en: >-
+      The lowest house number on the street. Null if no access point has a
+      number.
+  number_max:
+    type: INTEGER
+    description: >-
+      Il numero civico più alto della strada. Con number_min distingue strade
+      con lo stesso nome.
+    description_en: >-
+      The highest house number on the street. With number_min it tells apart
+      streets with the same name.
+  bbox:
+    type: STRUCT(xmin DOUBLE, ymin DOUBLE, xmax DOUBLE, ymax DOUBLE)
+    description: >-
+      Riquadro degli accessi della strada in gradi WGS84, senza quelli fuori
+      dal confine comunale; se lo sono tutti, li comprende tutti.
+    description_en: >-
+      Bounding box of the street's access points in WGS84 degrees, leaving
+      out those outside the comune boundary; if all of them are, it covers
+      all of them.
+
+access_points:
+  codice_istat:
+    type: VARCHAR
+    description: >-
+      Codice Istat del comune, sei cifre come testo: il feature_id del
+      gazetteer. Prima colonna di ordinamento.
+    description_en: >-
+      Istat code of the comune, six digits as text: the feature_id of the
+      gazetteer. First sort column.
+  street_id:
+    type: BIGINT
+    description: >-
+      La strada dell'accesso: lo street_id del file delle strade, cioè il
+      PROGRESSIVO_NAZIONALE di ANNCSU.
+    description_en: >-
+      The street of the access point: the street_id of the streets file, the
+      PROGRESSIVO_NAZIONALE of ANNCSU.
+  id:
+    type: BIGINT
+    description: Identificativo stabile dell'accesso, il PROGRESSIVO_ACCESSO di ANNCSU.
+    description_en: Stable identifier of the access point, the PROGRESSIVO_ACCESSO of ANNCSU.
+  number:
+    type: INTEGER
+    description: Il numero civico, il CIVICO di ANNCSU. Nullo dove la fonte non lo ha.
+    description_en: The house number, the CIVICO of ANNCSU. Null where the source has none.
+  suffix:
+    type: VARCHAR
+    description: >-
+      L'ESPONENTE di ANNCSU, la parte letterale del civico: A, B, BIS, 1.
+    description_en: >-
+      The ESPONENTE of ANNCSU, the letter part of the house number: A, B,
+      BIS, 1.
+  specificita:
+    type: VARCHAR
+    description: >-
+      La SPECIFICITA di ANNCSU, che contiene tra l'altro la numerazione rossa
+      e nera di Genova, Firenze e Savona.
+    description_en: >-
+      The SPECIFICITA of ANNCSU, which holds among other things the red and
+      black numbering of Genova, Firenze and Savona.
+  metrico:
+    type: VARCHAR
+    description: >-
+      Il METRICO di ANNCSU: il civico espresso in metri, nei comuni che usano
+      la numerazione metrica. Testo, come nella fonte.
+    description_en: >-
+      The METRICO of ANNCSU: the house number in metres, in comuni that use
+      metric numbering. Text, as in the source.
+  out_of_bounds:
+    type: BOOLEAN
+    description: >-
+      Vero quando l'accesso cade oltre 110 metri fuori dal confine del suo
+      comune secondo i confini Istat. Nullo quando il comune non ha un
+      confine corrispondente.
+    description_en: >-
+      True when the access point falls more than 110 metres outside the
+      boundary of its comune, according to Istat boundaries. Null when the
+      comune has no matching boundary.
+  lon:
+    type: DOUBLE
+    description: Longitudine dell'accesso in gradi, WGS84 (EPSG:4326).
+    description_en: Longitude of the access point in degrees, WGS84 (EPSG:4326).
+  lat:
+    type: DOUBLE
+    description: Latitudine dell'accesso in gradi, WGS84 (EPSG:4326).
+    description_en: Latitude of the access point in degrees, WGS84 (EPSG:4326).

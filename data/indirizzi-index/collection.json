@@ -1,0 +1,311 @@
+{
+  "type": "Collection",
+  "stac_version": "1.1.0",
+  "stac_extensions": [
+    "https://schemas.portolan-sdi.org/portolan/v0.3.0/schema.json",
+    "https://raw.githubusercontent.com/anncsu-open/anncsu-viewer/main/geocoding/address-index/v0.1.0/schema.json",
+    "https://stac-extensions.github.io/file/v2.1.0/schema.json",
+    "https://stac-extensions.github.io/table/v1.2.0/schema.json",
+    "https://stac-extensions.github.io/version/v1.2.0/schema.json",
+    "https://stac-extensions.github.io/language/v1.0.0/schema.json"
+  ],
+  "id": "indirizzi-index",
+  "title": "Indice degli indirizzi ANNCSU",
+  "description": "Le strade e gli accessi di ANNCSU in due file Parquet ordinati per comune. Un client legge le righe di un comune con richieste HTTP range, senza un server, e ci cerca prima la strada e poi il numero civico. Il formato è descritto da una [bozza di estensione STAC](https://github.com/anncsu-open/anncsu-viewer/blob/main/geocoding/address-index/v0.1.0/README.md) tenuta in questo repository.\n\nLa colonna `codice_istat` contiene il `feature_id` della collection `gazetteer`: con il gazetteer si trova il comune, con questo indice l'indirizzo. Un'applicazione che lavora sempre in un solo comune può usare questo indice da solo, con il codice del comune. I dati sono quelli del rilascio ANNCSU del 2 novembre 2026.",
+  "license": "CC-BY-4.0",
+  "keywords": [
+    "indirizzi",
+    "numeri civici",
+    "toponomastica",
+    "italia",
+    "anncsu",
+    "geocodifica",
+    "strade",
+    "ricerca"
+  ],
+  "providers": [
+    {
+      "name": "Agenzia delle Entrate",
+      "url": "https://www.agenziaentrate.gov.it/",
+      "roles": [
+        "producer",
+        "licensor"
+      ]
+    },
+    {
+      "name": "Istat",
+      "url": "https://www.istat.it/",
+      "roles": [
+        "producer"
+      ]
+    },
+    {
+      "name": "anncsu-open",
+      "url": "https://github.com/anncsu-open/anncsu-viewer",
+      "roles": [
+        "processor"
+      ]
+    },
+    {
+      "name": "Geobeyond",
+      "url": "https://geobeyond.it/",
+      "roles": [
+        "host"
+      ]
+    }
+  ],
+  "extent": {
+    "spatial": {
+      "bbox": [
+        [
+          6.7003259,
+          35.5017421,
+          18.660009,
+          47.0805336
+        ]
+      ]
+    },
+    "temporal": {
+      "interval": [
+        [
+          "2026-11-02T00:00:00Z",
+          null
+        ]
+      ]
+    }
+  },
+  "language": {
+    "code": "it",
+    "name": "Italiano",
+    "alternate": "Italian"
+  },
+  "languages": [
+    {
+      "code": "en",
+      "name": "English",
+      "alternate": "Inglese"
+    }
+  ],
+  "updated": "2026-11-02T00:00:00Z",
+  "version": "2026-11-02",
+  "address_index:normalization": "anncsu-odonimo/1",
+  "address_index:place_column": "codice_istat",
+  "assets": {
+    "streets": {
+      "href": "./2026-11-02/vie.parquet",
+      "type": "application/vnd.apache.parquet",
+      "title": "Strade",
+      "description": "Una riga per strada e una per ogni suo nome in altra lingua, ordinate per `codice_istat`, `name_norm` e `street_id`.",
+      "roles": [
+        "data",
+        "address-streets"
+      ],
+      "file:size": 42730958,
+      "file:checksum": "1220b981fd822c452d68dd873aa06a1781e89bde16d782ea451795bd6766bfcb9b3f",
+      "table:row_count": 786969,
+      "table:columns": [
+        {
+          "name": "codice_istat",
+          "type": "varchar",
+          "description": "Codice Istat del comune, sei cifre come testo: il feature_id del gazetteer. Prima colonna di ordinamento."
+        },
+        {
+          "name": "comune",
+          "type": "varchar",
+          "description": "Nome del comune dall'elenco Istat, per mostrare un risultato senza leggere il gazetteer."
+        },
+        {
+          "name": "street_id",
+          "type": "bigint",
+          "description": "Identificativo stabile della strada, il PROGRESSIVO_NAZIONALE di ANNCSU."
+        },
+        {
+          "name": "name",
+          "type": "varchar",
+          "description": "Il nome della strada da mostrare: l'ODONIMO come pubblicato, o il nome in altra lingua su una riga alternativa."
+        },
+        {
+          "name": "name_norm",
+          "type": "varchar",
+          "description": "Il nome normalizzato con anncsu-odonimo/1: scomposizione NFD, segni diacritici tolti, minuscole, ogni carattere diverso da lettere, cifre, spazi e trattini sostituito da uno spazio, spazi ripetuti ridotti a uno. Così LIBERTA' e libertà danno entrambi liberta."
+        },
+        {
+          "name": "name_lang",
+          "type": "varchar",
+          "description": "Lingua ISO 639-3 del nome sulle righe in altra lingua, quando è nota. Nulla sulla riga principale."
+        },
+        {
+          "name": "alt_of",
+          "type": "bigint",
+          "description": "Nulla sulla riga principale. Su una riga in altra lingua, lo street_id della strada."
+        },
+        {
+          "name": "numbers",
+          "type": "integer",
+          "description": "Numero di accessi della strada."
+        },
+        {
+          "name": "number_min",
+          "type": "integer",
+          "description": "Il numero civico più basso della strada. Nullo se nessun accesso ha un numero."
+        },
+        {
+          "name": "number_max",
+          "type": "integer",
+          "description": "Il numero civico più alto della strada. Con number_min distingue strade con lo stesso nome."
+        },
+        {
+          "name": "bbox",
+          "type": "struct(xmin double, ymin double, xmax double, ymax double)",
+          "description": "Riquadro degli accessi della strada in gradi WGS84, senza quelli fuori dal confine comunale; se lo sono tutti, li comprende tutti."
+        }
+      ],
+      "address_index:sort": [
+        "codice_istat",
+        "name_norm",
+        "street_id"
+      ],
+      "address_index:row_groups": 193,
+      "address_index:row_group_rows": 4096,
+      "address_index:footer_metadata_bytes": 332699
+    },
+    "access-points": {
+      "href": "./2026-11-02/civici.parquet",
+      "type": "application/vnd.apache.parquet",
+      "title": "Accessi",
+      "description": "Una riga per ogni accesso della fonte, ordinate per `codice_istat`, `street_id`, `number`, `suffix`, `specificita` e `id`, con i valori nulli in fondo.",
+      "roles": [
+        "data",
+        "address-points"
+      ],
+      "file:size": 425296173,
+      "file:checksum": "1220637458c540a3db34f4b764066b935b61c59ec154ff6b0d97c7104301fca1b5c8",
+      "table:row_count": 20728959,
+      "table:columns": [
+        {
+          "name": "codice_istat",
+          "type": "varchar",
+          "description": "Codice Istat del comune, sei cifre come testo: il feature_id del gazetteer. Prima colonna di ordinamento."
+        },
+        {
+          "name": "street_id",
+          "type": "bigint",
+          "description": "La strada dell'accesso: lo street_id del file delle strade, cioè il PROGRESSIVO_NAZIONALE di ANNCSU."
+        },
+        {
+          "name": "id",
+          "type": "bigint",
+          "description": "Identificativo stabile dell'accesso, il PROGRESSIVO_ACCESSO di ANNCSU."
+        },
+        {
+          "name": "number",
+          "type": "integer",
+          "description": "Il numero civico, il CIVICO di ANNCSU. Nullo dove la fonte non lo ha."
+        },
+        {
+          "name": "suffix",
+          "type": "varchar",
+          "description": "L'ESPONENTE di ANNCSU, la parte letterale del civico: A, B, BIS, 1."
+        },
+        {
+          "name": "specificita",
+          "type": "varchar",
+          "description": "La SPECIFICITA di ANNCSU, che contiene tra l'altro la numerazione rossa e nera di Genova, Firenze e Savona."
+        },
+        {
+          "name": "metrico",
+          "type": "varchar",
+          "description": "Il METRICO di ANNCSU: il civico espresso in metri, nei comuni che usano la numerazione metrica. Testo, come nella fonte."
+        },
+        {
+          "name": "out_of_bounds",
+          "type": "boolean",
+          "description": "Vero quando l'accesso cade oltre 110 metri fuori dal confine del suo comune secondo i confini Istat. Nullo quando il comune non ha un confine corrispondente."
+        },
+        {
+          "name": "lon",
+          "type": "double",
+          "description": "Longitudine dell'accesso in gradi, WGS84 (EPSG:4326)."
+        },
+        {
+          "name": "lat",
+          "type": "double",
+          "description": "Latitudine dell'accesso in gradi, WGS84 (EPSG:4326)."
+        }
+      ],
+      "address_index:sort": [
+        "codice_istat",
+        "street_id",
+        "number",
+        "suffix",
+        "specificita",
+        "id"
+      ],
+      "address_index:row_groups": 633,
+      "address_index:row_group_rows": 32768,
+      "address_index:footer_metadata_bytes": 775655
+    }
+  },
+  "links": [
+    {
+      "rel": "root",
+      "href": "../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "parent",
+      "href": "../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "derived_from",
+      "href": "../rilasci/2026-11-02/2026-11-02.json",
+      "type": "application/geo+json"
+    },
+    {
+      "rel": "related",
+      "href": "../gazetteer/collection.json",
+      "type": "application/json",
+      "title": "Gazetteer dei comuni, con il codice Istat come feature_id"
+    },
+    {
+      "rel": "alternate",
+      "href": "../en/indirizzi-index/collection.json",
+      "type": "application/json",
+      "title": "Inglese",
+      "hreflang": "en"
+    },
+    {
+      "rel": "alternate",
+      "href": "https://anncsu-open.github.io/anncsu-viewer/",
+      "type": "text/html",
+      "title": "Visualizzatore web"
+    },
+    {
+      "rel": "via",
+      "href": "https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/",
+      "type": "text/html",
+      "title": "Portale open data ANNCSU"
+    },
+    {
+      "rel": "license",
+      "href": "https://creativecommons.org/licenses/by/4.0/deed.it",
+      "type": "text/html",
+      "title": "Creative Commons Attribuzione 4.0 Internazionale"
+    },
+    {
+      "rel": "agents",
+      "href": "./AGENTS.md",
+      "type": "text/markdown",
+      "title": "Istruzioni per agenti automatici",
+      "hreflang": "it"
+    },
+    {
+      "rel": "describedby",
+      "href": "./README.md",
+      "type": "text/markdown",
+      "title": "Documentazione leggibile",
+      "hreflang": "it"
+    }
+  ]
+}

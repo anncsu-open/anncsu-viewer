@@ -28,6 +28,11 @@ over HTTPS. To know which cells you need, read the `cell-index` asset,
 `comuni-h3.json`, which maps every comune to the cells that contain its
 addresses.
 
+To search by name with no server, each index below has an AGENTS.md that explains how to read it:
+
+- `gazetteer` finds a comune by name. Its `feature_id` is the comune's Istat code.
+- `indirizzi-index` finds a street and a house number inside a comune, given its Istat code in the `codice_istat` column.
+
 Column descriptions are in `table:columns` on every collection.
 
 ## What not to do

@@ -23,6 +23,11 @@ che il catalogo non distribuisce. Ogni file è leggibile via HTTPS. Per
 sapere quali celle servono, leggi l'asset `cell-index`, cioè `comuni-h3.json`,
 che mappa ogni comune sulle celle che ne contengono gli indirizzi.
 
+Per cercare per nome senza un server, ogni indice qui sotto ha un AGENTS.md che spiega come leggerlo:
+
+- `gazetteer` trova un comune dal nome. Il suo `feature_id` è il codice Istat del comune.
+- `indirizzi-index` trova una strada e un civico dentro un comune, dato il codice Istat nella colonna `codice_istat`.
+
 Le descrizioni delle colonne sono in `table:columns` su ogni collection.
 
 ## Cosa non fare

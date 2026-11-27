@@ -7,7 +7,7 @@
   ],
   "id": "anncsu",
   "title": "Indirizzi ANNCSU",
-  "description": "Gli indirizzi certificati dei comuni italiani, dall'Archivio Nazionale dei Numeri Civici e delle Strade Urbane, convertiti in formati cloud-native a partire dal [portale open data ANNCSU](https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/).\n\nIl catalogo pubblica quattro collection:\n\n- `indirizzi`: un unico file GeoParquet, per l'analisi sull'intero territorio nazionale.\n- `indirizzi-h3`: gli stessi dati partizionati in celle H3, per leggere un comune alla volta senza scaricare tutto.\n- `rilasci`: l'archivio degli scarichi mensili, da cui le altre due derivano il rilascio corrente.\n- `stradario`: l'archivio dello stradario nazionale, l'elenco delle strade con il numero dei loro accessi.",
+  "description": "Gli indirizzi certificati dei comuni italiani, dall'Archivio Nazionale dei Numeri Civici e delle Strade Urbane, convertiti in formati cloud-native a partire dal [portale open data ANNCSU](https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/).\n\nIl catalogo pubblica sei collection:\n\n- `indirizzi`: un unico file GeoParquet, per l'analisi sull'intero territorio nazionale.\n- `indirizzi-h3`: gli stessi dati partizionati in celle H3, per leggere un comune alla volta senza scaricare tutto.\n- `rilasci`: l'archivio degli scarichi mensili, da cui le altre due derivano il rilascio corrente.\n- `stradario`: l'archivio dello stradario nazionale, l'elenco delle strade con il numero dei loro accessi.\n- `gazetteer`: i nomi dei comuni, per trovare un comune scrivendone il nome.\n- `indirizzi-index`: le strade e gli accessi ordinati per comune, per trovare un indirizzo dentro un comune.",
   "language": {
     "code": "it",
     "name": "Italiano",
@@ -55,6 +55,18 @@
       "href": "./stradario/collection.json",
       "type": "application/json",
       "title": "Stradario ANNCSU"
+    },
+    {
+      "rel": "child",
+      "href": "./gazetteer/collection.json",
+      "type": "application/json",
+      "title": "Gazetteer dei comuni ANNCSU"
+    },
+    {
+      "rel": "child",
+      "href": "./indirizzi-index/collection.json",
+      "type": "application/json",
+      "title": "Indice degli indirizzi ANNCSU"
     },
     {
       "rel": "alternate",

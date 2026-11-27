@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/anncsu-open/anncsu-viewer/main/geocoding/address-index/v0.1.0/schema.json",
+  "title": "Address Index Extension",
+  "description": "STAC Address Index Extension for STAC Collections: streets and access points searchable inside a place, over HTTP range requests.",
+  "type": "object",
+  "required": ["type", "stac_extensions", "address_index:normalization", "assets"],
+  "properties": {
+    "type": {
+      "const": "Collection",
+      "description": "The extension applies to Collections only."
+    },
+    "stac_extensions": {
+      "type": "array",
+      "contains": {
+        "const": "https://raw.githubusercontent.com/anncsu-open/anncsu-viewer/main/geocoding/address-index/v0.1.0/schema.json"
+      }
+    },
+    "address_index:normalization": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Identifier of the normalization that produced the streets' name_norm, e.g. anncsu-odonimo/1."
+    },
+    "address_index:place_column": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The column holding the place id, equal to the feature_id of a gazetteer. Defaults to codice_istat."
+    },
+    "assets": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/asset"
+      }
+    }
+  },
+  "patternProperties": {
+    "^(?!address_index:)": {}
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "asset": {
+      "type": "object",
+      "if": {
+        "properties": {
+          "roles": {
+            "type": "array",
+            "contains": { "enum": ["address-streets", "address-points"] }
+          }
+        },
+        "required": ["roles"]
+      },
+      "then": {
+        "required": ["address_index:sort", "address_index:row_groups"],
+        "properties": {
+          "address_index:sort": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 },
+            "description": "The columns the rows ascend by, the first compared byte-wise on UTF-8."
+          },
+          "address_index:row_groups": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "address_index:row_group_rows": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "address_index:footer_metadata_bytes": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    }
+  }
+}

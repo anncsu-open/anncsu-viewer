@@ -1,0 +1,311 @@
+{
+  "type": "Collection",
+  "stac_version": "1.1.0",
+  "stac_extensions": [
+    "https://schemas.portolan-sdi.org/portolan/v0.3.0/schema.json",
+    "https://raw.githubusercontent.com/anncsu-open/anncsu-viewer/main/geocoding/address-index/v0.1.0/schema.json",
+    "https://stac-extensions.github.io/file/v2.1.0/schema.json",
+    "https://stac-extensions.github.io/table/v1.2.0/schema.json",
+    "https://stac-extensions.github.io/version/v1.2.0/schema.json",
+    "https://stac-extensions.github.io/language/v1.0.0/schema.json"
+  ],
+  "id": "indirizzi-index",
+  "title": "ANNCSU address index",
+  "description": "The streets and access points of ANNCSU in two Parquet files sorted by comune. A client reads the rows of one comune with HTTP range requests and no server, and looks up first the street, then the house number. The format is described by a [draft STAC extension](https://github.com/anncsu-open/anncsu-viewer/blob/main/geocoding/address-index/v0.1.0/README.md) kept in this repository.\n\nThe `codice_istat` column holds the `feature_id` of the `gazetteer` collection: the gazetteer finds the comune, this index finds the address. An application that always works inside a single comune can use this index alone, with the comune's code. The data comes from the ANNCSU release of 2 November 2026.",
+  "license": "CC-BY-4.0",
+  "keywords": [
+    "addresses",
+    "house numbers",
+    "street names",
+    "italy",
+    "anncsu",
+    "geocoding",
+    "streets",
+    "search"
+  ],
+  "providers": [
+    {
+      "name": "Agenzia delle Entrate",
+      "url": "https://www.agenziaentrate.gov.it/",
+      "roles": [
+        "producer",
+        "licensor"
+      ]
+    },
+    {
+      "name": "Istat",
+      "url": "https://www.istat.it/",
+      "roles": [
+        "producer"
+      ]
+    },
+    {
+      "name": "anncsu-open",
+      "url": "https://github.com/anncsu-open/anncsu-viewer",
+      "roles": [
+        "processor"
+      ]
+    },
+    {
+      "name": "Geobeyond",
+      "url": "https://geobeyond.it/",
+      "roles": [
+        "host"
+      ]
+    }
+  ],
+  "extent": {
+    "spatial": {
+      "bbox": [
+        [
+          6.7003259,
+          35.5017421,
+          18.660009,
+          47.0805336
+        ]
+      ]
+    },
+    "temporal": {
+      "interval": [
+        [
+          "2026-11-02T00:00:00Z",
+          null
+        ]
+      ]
+    }
+  },
+  "language": {
+    "code": "en",
+    "name": "English",
+    "alternate": "Inglese"
+  },
+  "languages": [
+    {
+      "code": "it",
+      "name": "Italiano",
+      "alternate": "Italian"
+    }
+  ],
+  "updated": "2026-11-02T00:00:00Z",
+  "version": "2026-11-02",
+  "address_index:normalization": "anncsu-odonimo/1",
+  "address_index:place_column": "codice_istat",
+  "assets": {
+    "streets": {
+      "href": "../../indirizzi-index/2026-11-02/vie.parquet",
+      "type": "application/vnd.apache.parquet",
+      "title": "Streets",
+      "description": "One row per street and one per name it has in another language, sorted by `codice_istat`, `name_norm` and `street_id`.",
+      "roles": [
+        "data",
+        "address-streets"
+      ],
+      "file:size": 42730958,
+      "file:checksum": "1220b981fd822c452d68dd873aa06a1781e89bde16d782ea451795bd6766bfcb9b3f",
+      "table:row_count": 786969,
+      "table:columns": [
+        {
+          "name": "codice_istat",
+          "type": "varchar",
+          "description": "Istat code of the comune, six digits as text: the feature_id of the gazetteer. First sort column."
+        },
+        {
+          "name": "comune",
+          "type": "varchar",
+          "description": "Name of the comune from the Istat list, to display a result without reading the gazetteer."
+        },
+        {
+          "name": "street_id",
+          "type": "bigint",
+          "description": "Stable identifier of the street, the PROGRESSIVO_NAZIONALE of ANNCSU."
+        },
+        {
+          "name": "name",
+          "type": "varchar",
+          "description": "The street name to display: the ODONIMO as published, or the name in another language on an alternate row."
+        },
+        {
+          "name": "name_norm",
+          "type": "varchar",
+          "description": "The name normalized by anncsu-odonimo/1: NFD decomposition, diacritics removed, lowercase, every character other than letters, digits, spaces and hyphens replaced by a space, repeated spaces collapsed. So LIBERTA' and libertà both give liberta."
+        },
+        {
+          "name": "name_lang",
+          "type": "varchar",
+          "description": "ISO 639-3 language of the name on rows in another language, when it is known. Null on the main row."
+        },
+        {
+          "name": "alt_of",
+          "type": "bigint",
+          "description": "Null on the main row. On a row in another language, the street_id of the street."
+        },
+        {
+          "name": "numbers",
+          "type": "integer",
+          "description": "Number of access points on the street."
+        },
+        {
+          "name": "number_min",
+          "type": "integer",
+          "description": "The lowest house number on the street. Null if no access point has a number."
+        },
+        {
+          "name": "number_max",
+          "type": "integer",
+          "description": "The highest house number on the street. With number_min it tells apart streets with the same name."
+        },
+        {
+          "name": "bbox",
+          "type": "struct(xmin double, ymin double, xmax double, ymax double)",
+          "description": "Bounding box of the street's access points in WGS84 degrees, leaving out those outside the comune boundary; if all of them are, it covers all of them."
+        }
+      ],
+      "address_index:sort": [
+        "codice_istat",
+        "name_norm",
+        "street_id"
+      ],
+      "address_index:row_groups": 193,
+      "address_index:row_group_rows": 4096,
+      "address_index:footer_metadata_bytes": 332699
+    },
+    "access-points": {
+      "href": "../../indirizzi-index/2026-11-02/civici.parquet",
+      "type": "application/vnd.apache.parquet",
+      "title": "Access points",
+      "description": "One row per access point of the source, sorted by `codice_istat`, `street_id`, `number`, `suffix`, `specificita` and `id`, nulls last.",
+      "roles": [
+        "data",
+        "address-points"
+      ],
+      "file:size": 425296173,
+      "file:checksum": "1220637458c540a3db34f4b764066b935b61c59ec154ff6b0d97c7104301fca1b5c8",
+      "table:row_count": 20728959,
+      "table:columns": [
+        {
+          "name": "codice_istat",
+          "type": "varchar",
+          "description": "Istat code of the comune, six digits as text: the feature_id of the gazetteer. First sort column."
+        },
+        {
+          "name": "street_id",
+          "type": "bigint",
+          "description": "The street of the access point: the street_id of the streets file, the PROGRESSIVO_NAZIONALE of ANNCSU."
+        },
+        {
+          "name": "id",
+          "type": "bigint",
+          "description": "Stable identifier of the access point, the PROGRESSIVO_ACCESSO of ANNCSU."
+        },
+        {
+          "name": "number",
+          "type": "integer",
+          "description": "The house number, the CIVICO of ANNCSU. Null where the source has none."
+        },
+        {
+          "name": "suffix",
+          "type": "varchar",
+          "description": "The ESPONENTE of ANNCSU, the letter part of the house number: A, B, BIS, 1."
+        },
+        {
+          "name": "specificita",
+          "type": "varchar",
+          "description": "The SPECIFICITA of ANNCSU, which holds among other things the red and black numbering of Genova, Firenze and Savona."
+        },
+        {
+          "name": "metrico",
+          "type": "varchar",
+          "description": "The METRICO of ANNCSU: the house number in metres, in comuni that use metric numbering. Text, as in the source."
+        },
+        {
+          "name": "out_of_bounds",
+          "type": "boolean",
+          "description": "True when the access point falls more than 110 metres outside the boundary of its comune, according to Istat boundaries. Null when the comune has no matching boundary."
+        },
+        {
+          "name": "lon",
+          "type": "double",
+          "description": "Longitude of the access point in degrees, WGS84 (EPSG:4326)."
+        },
+        {
+          "name": "lat",
+          "type": "double",
+          "description": "Latitude of the access point in degrees, WGS84 (EPSG:4326)."
+        }
+      ],
+      "address_index:sort": [
+        "codice_istat",
+        "street_id",
+        "number",
+        "suffix",
+        "specificita",
+        "id"
+      ],
+      "address_index:row_groups": 633,
+      "address_index:row_group_rows": 32768,
+      "address_index:footer_metadata_bytes": 775655
+    }
+  },
+  "links": [
+    {
+      "rel": "root",
+      "href": "../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "parent",
+      "href": "../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "derived_from",
+      "href": "../rilasci/2026-11-02/2026-11-02.json",
+      "type": "application/geo+json"
+    },
+    {
+      "rel": "related",
+      "href": "../gazetteer/collection.json",
+      "type": "application/json",
+      "title": "Comuni gazetteer, with the Istat code as feature_id"
+    },
+    {
+      "rel": "alternate",
+      "href": "../../indirizzi-index/collection.json",
+      "type": "application/json",
+      "title": "Italian",
+      "hreflang": "it"
+    },
+    {
+      "rel": "alternate",
+      "href": "https://anncsu-open.github.io/anncsu-viewer/",
+      "type": "text/html",
+      "title": "Web viewer"
+    },
+    {
+      "rel": "via",
+      "href": "https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/",
+      "type": "text/html",
+      "title": "ANNCSU open data portal"
+    },
+    {
+      "rel": "license",
+      "href": "https://creativecommons.org/licenses/by/4.0/",
+      "type": "text/html",
+      "title": "Creative Commons Attribution 4.0 International"
+    },
+    {
+      "rel": "agents",
+      "href": "./AGENTS.md",
+      "type": "text/markdown",
+      "title": "Instructions for automated agents",
+      "hreflang": "en"
+    },
+    {
+      "rel": "describedby",
+      "href": "./README.md",
+      "type": "text/markdown",
+      "title": "Human-readable documentation",
+      "hreflang": "en"
+    }
+  ]
+}

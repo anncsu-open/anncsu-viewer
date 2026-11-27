@@ -18,6 +18,8 @@ con il tema di Designers Italia. I dati si vedono sulla mappa nel
 | [Indirizzi ANNCSU, partizionati per cella H3](./indirizzi-h3/) | Leggere un comune senza scaricare tutto |
 | [Rilasci mensili ANNCSU](./rilasci/) | Recuperare uno scarico passato, o confrontare due rilasci |
 | [Stradario ANNCSU](./stradario/) | Le strade con il numero dei loro accessi, per ogni rilascio conservato |
+| [Gazetteer dei comuni ANNCSU](./gazetteer/) | Trovare un comune dal nome |
+| [Indice degli indirizzi ANNCSU](./indirizzi-index/) | Trovare una strada o un civico dentro un comune |
 
 Le prime due descrivono gli stessi dati in due forme di accesso, e contengono
 i soli indirizzi georeferenziati del rilascio corrente. La terza conserva ogni

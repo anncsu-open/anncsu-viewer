@@ -26,7 +26,7 @@ The `partition:glob` field of `indirizzi-h3` points at the bucket with the
 credentials, which the catalog does not hand out. Every file is readable
 over HTTPS. To know which cells you need, read the `cell-index` asset,
 `comuni-h3.json`, which maps every comune to the cells that contain its
-addresses.
+addresses.$geocoding_agents
 
 Column descriptions are in `table:columns` on every collection.
 

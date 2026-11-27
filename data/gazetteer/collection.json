@@ -1,0 +1,243 @@
+{
+  "type": "Collection",
+  "stac_version": "1.1.0",
+  "stac_extensions": [
+    "https://schemas.portolan-sdi.org/portolan/v0.3.0/schema.json",
+    "https://cholmes.github.io/stac-gazetteer/gazetteer/v1.0.0/schema.json",
+    "https://stac-extensions.github.io/file/v2.1.0/schema.json",
+    "https://stac-extensions.github.io/table/v1.2.0/schema.json",
+    "https://stac-extensions.github.io/version/v1.2.0/schema.json",
+    "https://stac-extensions.github.io/language/v1.0.0/schema.json"
+  ],
+  "id": "gazetteer",
+  "title": "Gazetteer dei comuni ANNCSU",
+  "description": "I comuni che hanno almeno un indirizzo in ANNCSU, in un file Parquet nel formato indice dell'estensione STAC [gazetteer](https://github.com/cholmes/stac-gazetteer/blob/main/gazetteer/v1.0.0/README.md). Ogni comune ha il nome, la provincia, il codice Istat come `feature_id` e il riquadro dei suoi accessi. I nomi in altra lingua e le grafie con uno spazio al posto dell'apostrofo sono righe in più. Le righe sono ordinate per `name_norm`, quindi un client trova un comune per nome con poche richieste HTTP range, senza un server; [`@cngeo/geocoder-core`](https://github.com/cholmes/cng-map-widgets/tree/main/packages/geocoder-core) legge questa collection così com'è.\n\nIl `feature_id` è la chiave con cui la collection `indirizzi-index` cerca le strade del comune. I dati sono quelli del rilascio ANNCSU del 2 novembre 2026.",
+  "license": "CC-BY-4.0",
+  "keywords": [
+    "indirizzi",
+    "numeri civici",
+    "toponomastica",
+    "italia",
+    "anncsu",
+    "gazetteer",
+    "comuni",
+    "geocodifica"
+  ],
+  "providers": [
+    {
+      "name": "Agenzia delle Entrate",
+      "url": "https://www.agenziaentrate.gov.it/",
+      "roles": [
+        "producer",
+        "licensor"
+      ]
+    },
+    {
+      "name": "Istat",
+      "url": "https://www.istat.it/",
+      "roles": [
+        "producer"
+      ]
+    },
+    {
+      "name": "anncsu-open",
+      "url": "https://github.com/anncsu-open/anncsu-viewer",
+      "roles": [
+        "processor"
+      ]
+    },
+    {
+      "name": "Geobeyond",
+      "url": "https://geobeyond.it/",
+      "roles": [
+        "host"
+      ]
+    }
+  ],
+  "extent": {
+    "spatial": {
+      "bbox": [
+        [
+          6.7003259,
+          35.5017421,
+          18.660009,
+          47.0805336
+        ]
+      ]
+    },
+    "temporal": {
+      "interval": [
+        [
+          "2026-11-02T00:00:00Z",
+          null
+        ]
+      ]
+    }
+  },
+  "language": {
+    "code": "it",
+    "name": "Italiano",
+    "alternate": "Italian"
+  },
+  "languages": [
+    {
+      "code": "en",
+      "name": "English",
+      "alternate": "Inglese"
+    }
+  ],
+  "updated": "2026-11-02T00:00:00Z",
+  "version": "2026-11-02",
+  "gazetteer:levels": [
+    3
+  ],
+  "gazetteer:normalization": "nfd-strip-marks-lower/1",
+  "gazetteer:sort": "name_norm",
+  "assets": {
+    "index": {
+      "href": "./2026-11-02/comuni.parquet",
+      "type": "application/vnd.apache.parquet",
+      "title": "Indice dei nomi dei comuni",
+      "description": "Una riga per comune e una per ogni nome alternativo, ordinate per `name_norm` confrontato byte per byte, con statistiche min/max esatte e l'ordinamento dichiarato nel footer.",
+      "roles": [
+        "data",
+        "gazetteer-index"
+      ],
+      "file:size": 350378,
+      "file:checksum": "12206d90a056d57b1e69853c53b9c39ebdf3a3a586832516ffa30cb865f20bd9a8a2",
+      "table:row_count": 5821,
+      "table:columns": [
+        {
+          "name": "name",
+          "type": "varchar",
+          "description": "Il nome da mostrare, dall'elenco dei comuni dell'Istat. Su una riga alternativa è il nome in altra lingua, oppure lo stesso nome quando la riga cambia solo name_norm."
+        },
+        {
+          "name": "name_norm",
+          "type": "varchar",
+          "description": "Il nome normalizzato con nfd-strip-marks-lower/1: scomposizione NFD, segni diacritici tolti, minuscole, tolti i caratteri diversi da lettere, cifre, spazi, apostrofi e trattini, spazi ripetuti ridotti a uno. È la colonna di ordinamento, confrontata byte per byte."
+        },
+        {
+          "name": "level",
+          "type": "integer",
+          "description": "Livello amministrativo, sempre 3: il livello dei comuni in geoBoundaries (ADM3) e in Who's On First (localadmin)."
+        },
+        {
+          "name": "country",
+          "type": "varchar",
+          "description": "Codice ISO 3166-1 alpha-3 del paese, sempre ITA."
+        },
+        {
+          "name": "feature_id",
+          "type": "varchar",
+          "description": "Codice Istat del comune, sei cifre come testo. Le righe alternative ripetono il codice del loro comune. È il valore della colonna codice_istat nell'indice degli indirizzi."
+        },
+        {
+          "name": "country_name",
+          "type": "varchar",
+          "description": "Nome del paese, sempre Italia."
+        },
+        {
+          "name": "parent_name",
+          "type": "varchar",
+          "description": "Nome della provincia, cioè dell'unità territoriale sovracomunale dell'Istat. Distingue i comuni con lo stesso nome."
+        },
+        {
+          "name": "parent_id",
+          "type": "varchar",
+          "description": "Codice Istat dell'unità territoriale sovracomunale."
+        },
+        {
+          "name": "name_lang",
+          "type": "varchar",
+          "description": "Lingua del nome in ISO 639-3, per esempio deu o slv, sulle righe in altra lingua. Nulla sulle altre righe."
+        },
+        {
+          "name": "alt_of",
+          "type": "varchar",
+          "description": "Nulla sulla riga principale. Su una riga alternativa, il feature_id del comune di cui la riga è un altro nome."
+        },
+        {
+          "name": "source",
+          "type": "varchar",
+          "description": "Origine della riga, sempre anncsu."
+        },
+        {
+          "name": "addresses",
+          "type": "integer",
+          "description": "Numero di accessi georeferenziati del comune nel rilascio, compresi quelli che ANNCSU colloca fuori dal confine comunale."
+        },
+        {
+          "name": "bbox",
+          "type": "struct(xmin double, ymin double, xmax double, ymax double)",
+          "description": "Riquadro degli accessi del comune in gradi WGS84, senza quelli fuori dal confine comunale; se lo sono tutti, li comprende tutti. È più stretto del territorio del comune."
+        }
+      ],
+      "gazetteer:row_groups": 2,
+      "gazetteer:row_group_rows": 4096,
+      "gazetteer:footer_metadata_bytes": 5277
+    }
+  },
+  "links": [
+    {
+      "rel": "root",
+      "href": "../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "parent",
+      "href": "../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "derived_from",
+      "href": "../rilasci/2026-11-02/2026-11-02.json",
+      "type": "application/geo+json"
+    },
+    {
+      "rel": "related",
+      "href": "../indirizzi-index/collection.json",
+      "type": "application/json",
+      "title": "Indice degli indirizzi dei comuni"
+    },
+    {
+      "rel": "alternate",
+      "href": "../en/gazetteer/collection.json",
+      "type": "application/json",
+      "title": "Inglese",
+      "hreflang": "en"
+    },
+    {
+      "rel": "alternate",
+      "href": "https://anncsu-open.github.io/anncsu-viewer/",
+      "type": "text/html",
+      "title": "Visualizzatore web"
+    },
+    {
+      "rel": "via",
+      "href": "https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/",
+      "type": "text/html",
+      "title": "Portale open data ANNCSU"
+    },
+    {
+      "rel": "license",
+      "href": "https://creativecommons.org/licenses/by/4.0/deed.it",
+      "type": "text/html",
+      "title": "Creative Commons Attribuzione 4.0 Internazionale"
+    },
+    {
+      "rel": "agents",
+      "href": "./AGENTS.md",
+      "type": "text/markdown",
+      "title": "Istruzioni per agenti automatici",
+      "hreflang": "it"
+    },
+    {
+      "rel": "describedby",
+      "href": "./README.md",
+      "type": "text/markdown",
+      "title": "Documentazione leggibile",
+      "hreflang": "it"
+    }
+  ]
+}

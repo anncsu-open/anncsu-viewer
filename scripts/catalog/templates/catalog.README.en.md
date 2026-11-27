@@ -17,7 +17,7 @@ with the Designers Italia look, and see the data on a map in the
 | [ANNCSU addresses, single file](./indirizzi/) | Analysis over the whole country |
 | [ANNCSU addresses, partitioned by H3 cell](./indirizzi-h3/) | Reading one comune without downloading everything |
 | [ANNCSU monthly releases](./rilasci/) | Fetching a past download, or comparing two releases |
-| [ANNCSU street register](./stradario/) | The streets with their number of accesses, for every release kept |
+| [ANNCSU street register](./stradario/) | The streets with their number of accesses, for every release kept |$geocoding_rows
 
 The first two describe the same data in two access shapes, and hold only the
 georeferenced addresses of the current release. The third keeps every monthly

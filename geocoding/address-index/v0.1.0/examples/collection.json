@@ -1,0 +1,91 @@
+{
+  "type": "Collection",
+  "stac_version": "1.1.0",
+  "stac_extensions": [
+    "https://raw.githubusercontent.com/anncsu-open/anncsu-viewer/main/geocoding/address-index/v0.1.0/schema.json",
+    "https://stac-extensions.github.io/file/v2.1.0/schema.json",
+    "https://stac-extensions.github.io/table/v1.2.0/schema.json"
+  ],
+  "id": "indirizzi-index",
+  "title": "ANNCSU address index",
+  "description": "Streets and access points of the Italian ANNCSU archive, sorted so that a browser finds those of one comune with HTTP range requests. The place id is the codice ISTAT, the feature_id of the companion comuni gazetteer.",
+  "license": "CC-BY-4.0",
+  "extent": {
+    "spatial": {
+      "bbox": [
+        [
+          6.6,
+          35.4,
+          18.6,
+          47.1
+        ]
+      ]
+    },
+    "temporal": {
+      "interval": [
+        [
+          "2026-11-02T00:00:00Z",
+          null
+        ]
+      ]
+    }
+  },
+  "address_index:normalization": "anncsu-odonimo/1",
+  "address_index:place_column": "codice_istat",
+  "assets": {
+    "streets": {
+      "href": "./2026-11-02/vie.parquet",
+      "type": "application/vnd.apache.parquet",
+      "title": "Streets",
+      "roles": [
+        "data",
+        "address-streets"
+      ],
+      "file:size": 42730958,
+      "table:row_count": 786969,
+      "address_index:sort": [
+        "codice_istat",
+        "name_norm",
+        "street_id"
+      ],
+      "address_index:row_groups": 193,
+      "address_index:row_group_rows": 4096,
+      "address_index:footer_metadata_bytes": 332699
+    },
+    "access-points": {
+      "href": "./2026-11-02/civici.parquet",
+      "type": "application/vnd.apache.parquet",
+      "title": "Access points",
+      "roles": [
+        "data",
+        "address-points"
+      ],
+      "file:size": 420591389,
+      "table:row_count": 20728959,
+      "address_index:sort": [
+        "codice_istat",
+        "street_id",
+        "number",
+        "suffix",
+        "specificita",
+        "id"
+      ],
+      "address_index:row_groups": 2531,
+      "address_index:row_group_rows": 8192,
+      "address_index:footer_metadata_bytes": 3061756
+    }
+  },
+  "links": [
+    {
+      "rel": "self",
+      "href": "./collection.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "related",
+      "href": "../gazetteer/collection.json",
+      "type": "application/json",
+      "title": "The comuni gazetteer whose feature_id is the codice ISTAT"
+    }
+  ]
+}

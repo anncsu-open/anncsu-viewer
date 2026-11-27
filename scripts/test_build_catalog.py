@@ -4,8 +4,10 @@
 #     "duckdb==2.0.0",
 #     "geoparquet-io>=1.8.0",
 #     "httpx",
+#     "jsonschema",
 #     "pillow",
 #     "pmtiles",
+#     "pyarrow",
 #     "pytest",
 #     "pyyaml",
 #     "rashid>=0.4.0,<0.5.0",
@@ -28,7 +30,13 @@ from pathlib import Path
 import pytest
 
 import build_catalog
+import build_geocoding_index
 from build_catalog import (
+    ACCESS_POINTS_SORT,
+    ADDRESS_INDEX_EXTENSION,
+    FILE_SCHEMA,
+    GAZETTEER_EXTENSION,
+    GEOCODING_COLUMNS_FILE,
     PARTITION_SCHEMA,
     PORTOLAN_SCHEMA,
     DIFF_ANNCSU_URL,
@@ -37,11 +45,15 @@ from build_catalog import (
     SOURCE_PORTAL,
     STRAD_COLUMNS,
     STRADARIO_ORIGINS,
+    STREETS_SORT,
+    TABLE_SCHEMA,
     VERSION_SCHEMA,
     VIEWER_URL,
     build,
+    build_gazetteer,
     build_indirizzi,
     build_indirizzi_h3,
+    build_indirizzi_index,
     build_release_item,
     build_rilasci,
     build_root,
@@ -51,10 +63,13 @@ from build_catalog import (
     dataset_statistics,
     dataset_stats,
     file_facts,
+    geocoding_files_table,
+    geocoding_table_columns,
     human_count,
     human_date,
     human_percent,
     load_columns,
+    load_geocoding_index,
     load_releases,
     multihash_sha256,
     providers,
@@ -425,8 +440,7 @@ def fake_facts():
             {"name": n, "type": "varchar", "description": "x"} for n in STRAD_COLUMNS
         ],
         "stradario_table_columns_en": [
-            {"name": n, "type": "varchar", "description": "x en"}
-            for n in STRAD_COLUMNS
+            {"name": n, "type": "varchar", "description": "x en"} for n in STRAD_COLUMNS
         ],
         "raw_table_columns": [
             {"name": n, "type": "varchar", "description": "x"} for n in RAW_COLUMNS
@@ -434,6 +448,65 @@ def fake_facts():
         "raw_table_columns_en": [
             {"name": n, "type": "varchar", "description": "x en"} for n in RAW_COLUMNS
         ],
+        "gazetteer": fake_gazetteer_index(),
+        "indirizzi-index": fake_address_index(),
+        **{
+            f"{section}_columns{suffix}": [
+                {"name": name, "type": "varchar", "description": f"{name}{text}"}
+                for name in names
+            ]
+            for section, names in (
+                ("gazetteer", ["name", "feature_id"]),
+                ("streets", ["codice_istat", "name_norm"]),
+                ("access_points", ["codice_istat", "street_id"]),
+            )
+            for suffix, text in (("", " it"), ("_en", " en"))
+        },
+    }
+
+
+def fake_gazetteer_index():
+    """data/gazetteer/index.json as load_geocoding_index returns it."""
+    return {
+        "release": "2026-09-15",
+        "files": {
+            "comuni": {
+                "href": "./2026-09-15/comuni.parquet",
+                "size": 349_472,
+                "checksum": "1220" + "2" * 64,
+                "rows": 5_821,
+                "row_groups": 2,
+                "row_group_rows": 4096,
+                "footer_metadata_bytes": 5_277,
+            }
+        },
+    }
+
+
+def fake_address_index():
+    """data/indirizzi-index/index.json as load_geocoding_index returns it."""
+    return {
+        "release": "2026-09-15",
+        "files": {
+            "vie": {
+                "href": "./2026-09-15/vie.parquet",
+                "size": 42_730_958,
+                "checksum": "1220" + "3" * 64,
+                "rows": 786_969,
+                "row_groups": 193,
+                "row_group_rows": 4096,
+                "footer_metadata_bytes": 332_699,
+            },
+            "civici": {
+                "href": "./2026-09-15/civici.parquet",
+                "size": 420_591_389,
+                "checksum": "1220" + "4" * 64,
+                "rows": 20_728_959,
+                "row_groups": 2531,
+                "row_group_rows": 8192,
+                "footer_metadata_bytes": 3_061_756,
+            },
+        },
     }
 
 
@@ -951,6 +1024,90 @@ def fixture_columns(tmp_path, monkeypatch):
     return path
 
 
+GEOCODING_RELEASE = "2026-09-15"
+
+
+@pytest.fixture
+def fixture_geocoding(fixture_data_dir):
+    """fixture_data_dir plus the three geocoding files and their index.json.
+
+    Written with build_geocoding_index's own schemas, writer and index
+    writer, so the catalog is tested against what that script produces.
+    """
+    import pyarrow as pa
+
+    bgi = build_geocoding_index
+    bbox = {"xmin": 12.49, "ymin": 41.90, "xmax": 12.51, "ymax": 41.92}
+    gazetteer_dir = fixture_data_dir / "gazetteer"
+    index_dir = fixture_data_dir / "indirizzi-index"
+    files = {
+        "comuni": (
+            gazetteer_dir / GEOCODING_RELEASE / "comuni.parquet",
+            bgi.GAZETTEER_SCHEMA,
+            bgi.GAZETTEER_SORT,
+            {
+                "name": "Roma",
+                "name_norm": "roma",
+                "level": 3,
+                "country": "ITA",
+                "feature_id": "058091",
+                "country_name": "Italia",
+                "parent_name": "Roma",
+                "parent_id": "258",
+                "name_lang": None,
+                "alt_of": None,
+                "source": "anncsu",
+                "addresses": 200,
+                "bbox": bbox,
+            },
+        ),
+        "vie": (
+            index_dir / GEOCODING_RELEASE / "vie.parquet",
+            bgi.STREETS_SCHEMA,
+            bgi.STREETS_SORT,
+            {
+                "codice_istat": "058091",
+                "comune": "Roma",
+                "street_id": 1,
+                "name": "VIA ROMA",
+                "name_norm": "via roma",
+                "name_lang": None,
+                "alt_of": None,
+                "numbers": 200,
+                "number_min": 0,
+                "number_max": 199,
+                "bbox": bbox,
+            },
+        ),
+        "civici": (
+            index_dir / GEOCODING_RELEASE / "civici.parquet",
+            bgi.ACCESS_POINTS_SCHEMA,
+            bgi.ACCESS_POINTS_SORT,
+            {
+                "codice_istat": "058091",
+                "street_id": 1,
+                "id": 10,
+                "number": 1,
+                "suffix": None,
+                "specificita": None,
+                "metrico": None,
+                "out_of_bounds": False,
+                "lon": 12.5,
+                "lat": 41.91,
+            },
+        ),
+    }
+    facts = {}
+    for name, (path, schema, sort, row) in files.items():
+        bgi.write_sorted(pa.Table.from_pylist([row], schema=schema), path, sort, 4096)
+        facts[name] = bgi.parquet_facts(path, 4096)
+    bgi.write_index(gazetteer_dir, GEOCODING_RELEASE, {"comuni": facts["comuni"]})
+    bgi.write_index(
+        index_dir, GEOCODING_RELEASE, {"vie": facts["vie"], "civici": facts["civici"]}
+    )
+    return fixture_data_dir
+
+
 GENERATED_SUFFIXES = {".json", ".md", ".png"}
 
 
@@ -1067,10 +1224,21 @@ class TestConformance:
     """The Portolan validator is the arbiter, not our reading of the spec."""
 
     def test_rashid_reports_no_findings(self, fixture_data_dir, fixture_columns):
+        build(fixture_data_dir)
+        self.assert_rashid_passes(fixture_data_dir)
+
+    def test_rashid_reports_no_findings_on_the_geocoding_collections(
+        self, fixture_geocoding, fixture_columns
+    ):
+        build(fixture_geocoding)
+        assert (fixture_geocoding / "gazetteer" / "collection.json").exists()
+        assert (fixture_geocoding / "indirizzi-index" / "collection.json").exists()
+        self.assert_rashid_passes(fixture_geocoding)
+
+    @staticmethod
+    def assert_rashid_passes(fixture_data_dir):
         import json
         import subprocess
-
-        build(fixture_data_dir)
 
         # rashid ships only as a console script: `python -m rashid` fails
         # with "rashid is a package and cannot be directly executed".
@@ -1682,9 +1850,9 @@ class TestAssetsAreDescribed:
         releases = fake_releases()
         for release in releases:
             italian = build_release_item(release, releases, fake_facts())["assets"]
-            english = build_release_item(
-                release, releases, fake_facts(), lang="en"
-            )["assets"]
+            english = build_release_item(release, releases, fake_facts(), lang="en")[
+                "assets"
+            ]
             for key in italian:
                 for asset in (italian[key], english[key]):
                     assert asset.get("title", "").strip(), key
@@ -2086,9 +2254,10 @@ class TestStradarioTableColumns:
         assert {c["type"] for c in italian} == {"varchar"}
         by_name = {c["name"]: c["description"] for c in english}
         assert by_name["TOTALE_ACCESSI"].strip()
-        assert by_name["TOTALE_ACCESSI"] != {
-            c["name"]: c["description"] for c in italian
-        }["TOTALE_ACCESSI"]
+        assert (
+            by_name["TOTALE_ACCESSI"]
+            != {c["name"]: c["description"] for c in italian}["TOTALE_ACCESSI"]
+        )
 
 
 class TestBuildStradario:
@@ -2149,7 +2318,9 @@ class TestBuildStradario:
         assert "TOTALE_ACCESSI" in collection["description"]
         assert "portale" not in collection["description"].lower()
         assert links_by_rel(collection, "alternate")[0]["hreflang"] == "it"
-        assert links_by_rel(collection, "item")[0]["title"].startswith("Street register of")
+        assert links_by_rel(collection, "item")[0]["title"].startswith(
+            "Street register of"
+        )
 
 
 class TestBuildStradarioItem:
@@ -2227,7 +2398,10 @@ class TestBuildStradarioItem:
 
     def test_every_asset_has_a_title_and_a_description_in_both_languages(self):
         for index in (0, 1):
-            italian, english = self.item(index)["assets"], self.item(index, "en")["assets"]
+            italian, english = (
+                self.item(index)["assets"],
+                self.item(index, "en")["assets"],
+            )
             for key in italian:
                 for asset in (italian[key], english[key]):
                     assert asset.get("title", "").strip(), key
@@ -2240,8 +2414,9 @@ class TestBuildStradarioItem:
         assert item["properties"]["title"] == "Street register of 15 September 2026"
         assert item["properties"]["table:columns"][0]["description"] == "x en"
         assert "street" in item["properties"]["description"]
-        assert links_by_rel(item, "related")[0]["title"] == (
-            build_catalog.TEXTS["en"]["related_civici"]
+        assert (
+            links_by_rel(item, "related")[0]["title"]
+            == (build_catalog.TEXTS["en"]["related_civici"])
         )
 
 
@@ -2269,6 +2444,614 @@ class TestReleaseItemLinksTheStradario:
         del facts["stradario"]
         item = build_release_item(releases[1], releases, facts)
         assert links_by_rel(item, "related") == []
+
+
+# --- the geocoding index: the gazetteer and the address index ---------------
+
+ADDRESS_INDEX_DRAFT = (
+    Path(__file__).resolve().parent.parent
+    / "geocoding"
+    / "address-index"
+    / "v0.1.0"
+    / "schema.json"
+)
+
+
+def write_index_json(path, document):
+    import json
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(document, indent=2), encoding="utf-8")
+
+
+class TestLoadGeocodingIndex:
+    def test_reads_the_release_and_the_files(self, tmp_path):
+        path = tmp_path / "index.json"
+        write_index_json(path, fake_address_index())
+
+        assert load_geocoding_index(path, ("vie", "civici")) == fake_address_index()
+
+    def test_a_missing_index_leaves_the_collection_out_and_says_so(
+        self, tmp_path, capsys
+    ):
+        assert load_geocoding_index(tmp_path / "index.json", ("comuni",)) is None
+        assert "index.json" in capsys.readouterr().out
+
+    def test_a_missing_file_stops_the_build(self, tmp_path):
+        document = fake_address_index()
+        del document["files"]["civici"]
+        path = tmp_path / "index.json"
+        write_index_json(path, document)
+
+        with pytest.raises(SystemExit, match="civici"):
+            load_geocoding_index(path, ("vie", "civici"))
+
+    @pytest.mark.parametrize(
+        "key",
+        ["href", "size", "checksum", "rows", "row_groups", "row_group_rows"],
+    )
+    def test_a_file_without_one_of_its_facts_stops_the_build(self, tmp_path, key):
+        document = fake_gazetteer_index()
+        del document["files"]["comuni"][key]
+        path = tmp_path / "index.json"
+        write_index_json(path, document)
+
+        with pytest.raises(SystemExit, match=key):
+            load_geocoding_index(path, ("comuni",))
+
+    def test_a_file_of_another_release_stops_the_build(self, tmp_path):
+        # Mixing two builds is what the per-release folders exist to prevent.
+        document = fake_gazetteer_index()
+        document["files"]["comuni"]["href"] = "./2026-08-03/comuni.parquet"
+        path = tmp_path / "index.json"
+        write_index_json(path, document)
+
+        with pytest.raises(SystemExit, match="2026-09-15"):
+            load_geocoding_index(path, ("comuni",))
+
+    def test_a_checksum_that_is_not_a_sha256_multihash_stops_the_build(self, tmp_path):
+        document = fake_gazetteer_index()
+        document["files"]["comuni"]["checksum"] = "2" * 64
+        path = tmp_path / "index.json"
+        write_index_json(path, document)
+
+        with pytest.raises(SystemExit, match="multihash"):
+            load_geocoding_index(path, ("comuni",))
+
+    def test_reads_what_build_geocoding_index_writes(self, tmp_path):
+        """The interface between the two scripts, pinned from both ends."""
+        parquet = tmp_path / "gazetteer" / "2026-09-15" / "comuni.parquet"
+        parquet.parent.mkdir(parents=True)
+        write_parquet(parquet, "'roma' AS name_norm")
+        facts = {
+            "path": str(parquet),
+            "rows": 1,
+            "row_groups": 1,
+            "row_group_rows": 4096,
+            "footer_metadata_bytes": 300,
+            "size": parquet.stat().st_size,
+        }
+        build_geocoding_index.write_index(
+            tmp_path / "gazetteer", "2026-09-15", {"comuni": facts}
+        )
+
+        loaded = load_geocoding_index(
+            tmp_path / "gazetteer" / "index.json", ("comuni",)
+        )
+
+        entry = loaded["files"]["comuni"]
+        assert loaded["release"] == "2026-09-15"
+        assert entry["href"] == "./2026-09-15/comuni.parquet"
+        assert entry["size"] == parquet.stat().st_size
+        assert entry["checksum"] == multihash_sha256(parquet)
+
+
+class TestGeocodingColumns:
+    """The column docs cannot be checked against the Parquet in CI, where the
+    files are absent, so they are checked against the builder's schemas."""
+
+    @pytest.mark.parametrize(
+        "section, schema",
+        [
+            ("gazetteer", "GAZETTEER_SCHEMA"),
+            ("streets", "STREETS_SCHEMA"),
+            ("access_points", "ACCESS_POINTS_SCHEMA"),
+        ],
+    )
+    def test_documents_every_column_of_the_builder_with_its_type(
+        self, tmp_path, section, schema
+    ):
+        import pyarrow.parquet as pq
+
+        path = tmp_path / f"{section}.parquet"
+        pq.write_table(getattr(build_geocoding_index, schema).empty_table(), path)
+
+        documented = geocoding_table_columns(GEOCODING_COLUMNS_FILE, section)
+
+        assert [(c["name"], c["type"]) for c in documented] == [
+            (name, stac_type(found)) for name, found in read_parquet_columns(path)
+        ]
+
+    @pytest.mark.parametrize("section", ["gazetteer", "streets", "access_points"])
+    def test_every_column_is_described_in_both_languages(self, section):
+        italian = geocoding_table_columns(GEOCODING_COLUMNS_FILE, section)
+        english = geocoding_table_columns(GEOCODING_COLUMNS_FILE, section, lang="en")
+
+        for it, en in zip(italian, english, strict=True):
+            assert it["name"] == en["name"]
+            assert it["description"].strip() and en["description"].strip()
+            assert it["description"] != en["description"], it["name"]
+
+    def test_fails_when_the_english_description_is_missing(self, tmp_path):
+        path = tmp_path / "geocoding_columns.yaml"
+        path.write_text(
+            "gazetteer:\n  name:\n    type: VARCHAR\n    description: nome\n",
+            encoding="utf-8",
+        )
+
+        with pytest.raises(SystemExit, match="description_en"):
+            geocoding_table_columns(path, "gazetteer")
+
+    def test_the_sorts_match_the_builder(self):
+        assert STREETS_SORT == build_geocoding_index.STREETS_SORT
+        assert ACCESS_POINTS_SORT == build_geocoding_index.ACCESS_POINTS_SORT
+        assert build_geocoding_index.GAZETTEER_SORT[0] == "name_norm"
+
+
+class TestBuildGazetteer:
+    def test_gazetteer_collection_declares_the_extension(self):
+        collection = build_gazetteer(fake_facts())
+
+        assert GAZETTEER_EXTENSION == (
+            "https://cholmes.github.io/stac-gazetteer/gazetteer/v1.0.0/schema.json"
+        )
+        assert collection["id"] == "gazetteer"
+        assert GAZETTEER_EXTENSION in collection["stac_extensions"]
+        assert collection["gazetteer:levels"] == [3]
+        assert collection["gazetteer:normalization"] == "nfd-strip-marks-lower/1"
+        assert collection["gazetteer:sort"] == "name_norm"
+
+    @pytest.mark.parametrize("lang", ["it", "en"])
+    def test_gazetteer_index_asset(self, lang):
+        collection = build_gazetteer(fake_facts(), lang=lang)
+
+        [asset] = [
+            a for a in collection["assets"].values() if "gazetteer-index" in a["roles"]
+        ]
+        assert asset["roles"] == ["data", "gazetteer-index"]
+        assert asset["type"] == "application/vnd.apache.parquet"
+        assert asset["gazetteer:row_groups"] == 2
+        assert asset["gazetteer:row_group_rows"] == 4096
+        assert asset["gazetteer:footer_metadata_bytes"] == 5_277
+        assert asset["file:size"] == 349_472
+        assert asset["file:checksum"] == "1220" + "2" * 64
+        assert asset["table:row_count"] == 5_821
+        assert asset["table:columns"] == [
+            {"name": "name", "type": "varchar", "description": f"name {lang}"},
+            {
+                "name": "feature_id",
+                "type": "varchar",
+                "description": f"feature_id {lang}",
+            },
+        ]
+        # The Parquet lives in the source tree; the English tree points back.
+        assert (
+            asset["href"]
+            == {
+                "it": "./2026-09-15/comuni.parquet",
+                "en": "../../gazetteer/2026-09-15/comuni.parquet",
+            }[lang]
+        )
+
+    def test_is_tabular_and_versioned_by_its_release(self):
+        collection = build_gazetteer(fake_facts())
+
+        assert "table:primary_geometry" not in collection
+        assert not any("thumbnail" in a["roles"] for a in collection["assets"].values())
+        assert collection["version"] == "2026-09-15"
+        assert VERSION_SCHEMA in collection["stac_extensions"]
+        assert collection["updated"] == "2026-09-15T00:00:00Z"
+        assert collection["extent"] == {
+            "spatial": {"bbox": [[6.7003, 35.5017, 18.66, 47.0805]]},
+            "temporal": {"interval": [["2026-09-15T00:00:00Z", None]]},
+        }
+
+    def test_links_the_address_index_as_related(self):
+        related = links_by_rel(build_gazetteer(fake_facts()), "related")
+        assert [l["href"] for l in related] == ["../indirizzi-index/collection.json"]
+        assert related[0]["type"] == "application/json"
+        assert related[0]["title"] == build_catalog.TEXTS["it"]["related_address_index"]
+
+    def test_no_related_link_without_the_address_index(self):
+        facts = fake_facts()
+        facts["indirizzi-index"] = None
+        assert links_by_rel(build_gazetteer(facts), "related") == []
+
+
+class TestBuildAddressIndex:
+    def test_address_index_collection_declares_the_draft_extension(self):
+        collection = build_indirizzi_index(fake_facts())
+
+        assert ADDRESS_INDEX_EXTENSION == (
+            "https://raw.githubusercontent.com/anncsu-open/anncsu-viewer/main/"
+            "geocoding/address-index/v0.1.0/schema.json"
+        )
+        assert collection["id"] == "indirizzi-index"
+        assert ADDRESS_INDEX_EXTENSION in collection["stac_extensions"]
+        assert FILE_SCHEMA in collection["stac_extensions"]
+        assert TABLE_SCHEMA in collection["stac_extensions"]
+        assert collection["address_index:normalization"] == "anncsu-odonimo/1"
+        assert collection["address_index:place_column"] == "codice_istat"
+        # The gazetteer extension stays off: geocoder-core takes any
+        # collection declaring a /gazetteer/ schema for a gazetteer.
+        assert not any("/gazetteer/" in url for url in collection["stac_extensions"])
+
+    @pytest.mark.parametrize("lang", ["it", "en"])
+    def test_address_index_assets(self, lang):
+        assets = build_indirizzi_index(fake_facts(), lang=lang)["assets"]
+        streets, points = assets["streets"], assets["access-points"]
+        prefix = {"it": "./", "en": "../../indirizzi-index/"}[lang]
+
+        assert streets["roles"] == ["data", "address-streets"]
+        assert streets["href"] == f"{prefix}2026-09-15/vie.parquet"
+        assert streets["address_index:sort"] == [
+            "codice_istat",
+            "name_norm",
+            "street_id",
+        ]
+        assert streets["address_index:row_groups"] == 193
+        assert streets["address_index:row_group_rows"] == 4096
+        assert streets["address_index:footer_metadata_bytes"] == 332_699
+        assert streets["file:size"] == 42_730_958
+        assert streets["file:checksum"] == "1220" + "3" * 64
+        assert streets["table:row_count"] == 786_969
+        assert [c["name"] for c in streets["table:columns"]] == [
+            "codice_istat",
+            "name_norm",
+        ]
+
+        assert points["roles"] == ["data", "address-points"]
+        assert points["href"] == f"{prefix}2026-09-15/civici.parquet"
+        assert points["address_index:sort"] == [
+            "codice_istat",
+            "street_id",
+            "number",
+            "suffix",
+            "specificita",
+            "id",
+        ]
+        assert points["address_index:row_groups"] == 2531
+        assert points["address_index:row_group_rows"] == 8192
+        assert points["address_index:footer_metadata_bytes"] == 3_061_756
+        assert points["file:size"] == 420_591_389
+        assert points["file:checksum"] == "1220" + "4" * 64
+        assert points["table:row_count"] == 20_728_959
+        assert points["table:columns"][1]["description"] == f"street_id {lang}"
+        for asset in (streets, points):
+            assert asset["type"] == "application/vnd.apache.parquet"
+
+    def test_links_the_gazetteer_as_related(self):
+        related = links_by_rel(build_indirizzi_index(fake_facts()), "related")
+        assert related == [
+            {
+                "rel": "related",
+                "href": "../gazetteer/collection.json",
+                "type": "application/json",
+                "title": build_catalog.TEXTS["it"]["related_gazetteer"],
+            }
+        ]
+
+    def test_no_related_link_without_the_gazetteer(self):
+        facts = fake_facts()
+        facts["gazetteer"] = None
+        assert links_by_rel(build_indirizzi_index(facts), "related") == []
+
+    @pytest.mark.parametrize("lang", ["it", "en"])
+    def test_validates_against_the_draft_extension_schema(self, lang):
+        import json
+
+        import jsonschema
+
+        schema = json.loads(ADDRESS_INDEX_DRAFT.read_text(encoding="utf-8"))
+        assert schema["$id"] == ADDRESS_INDEX_EXTENSION
+        collection = build_indirizzi_index(fake_facts(), lang=lang)
+
+        errors = list(jsonschema.Draft7Validator(schema).iter_errors(collection))
+
+        assert errors == [], [e.message for e in errors]
+
+
+GEOCODING_BUILDERS = [build_gazetteer, build_indirizzi_index]
+
+
+class TestGeocodingCollections:
+    @pytest.mark.parametrize("builder", GEOCODING_BUILDERS)
+    @pytest.mark.parametrize("lang", ["it", "en"])
+    def test_has_the_structural_mirror_and_documentation_links(self, builder, lang):
+        collection = builder(fake_facts(), lang=lang)
+        cid = collection["id"]
+
+        assert collection["language"]["code"] == lang
+        assert collection["license"] == "CC-BY-4.0"
+        assert collection["providers"] == providers()
+        assert links_by_rel(collection, "root")[0]["href"] == "../catalog.json"
+        assert links_by_rel(collection, "parent")[0]["href"] == "../catalog.json"
+        assert links_by_rel(collection, "agents")[0]["href"] == "./AGENTS.md"
+        assert links_by_rel(collection, "describedby")[0]["href"] == "./README.md"
+        assert links_by_rel(collection, "via")[0]["href"] == SOURCE_PORTAL
+        assert links_by_rel(collection, "license")
+        alternate = [
+            l for l in links_by_rel(collection, "alternate") if l.get("hreflang")
+        ]
+        assert [l["href"] for l in alternate] == [
+            {
+                "it": f"../en/{cid}/collection.json",
+                "en": f"../../{cid}/collection.json",
+            }[lang]
+        ]
+
+    @pytest.mark.parametrize("builder", GEOCODING_BUILDERS)
+    def test_derives_from_the_release_it_was_built_from(self, builder):
+        derived = links_by_rel(builder(fake_facts()), "derived_from")
+        assert [l["href"] for l in derived] == ["../rilasci/2026-09-15/2026-09-15.json"]
+
+    @pytest.mark.parametrize("builder", GEOCODING_BUILDERS)
+    def test_no_derived_from_link_for_a_release_the_archive_lacks(self, builder):
+        facts = fake_facts()
+        facts["releases"] = facts["releases"][:1]
+        assert links_by_rel(builder(facts), "derived_from") == []
+
+    @pytest.mark.parametrize("builder", GEOCODING_BUILDERS)
+    def test_every_asset_has_a_title_and_a_description_in_both_languages(self, builder):
+        italian = builder(fake_facts())["assets"]
+        english = builder(fake_facts(), lang="en")["assets"]
+        assert italian.keys() == english.keys()
+        for key in italian:
+            for asset in (italian[key], english[key]):
+                assert asset.get("title", "").strip(), key
+                assert asset.get("description", "").strip(), key
+            assert italian[key]["description"] != english[key]["description"], key
+
+    @pytest.mark.parametrize("builder", GEOCODING_BUILDERS)
+    @pytest.mark.parametrize("lang", ["it", "en"])
+    def test_description_names_the_release_and_leaves_no_placeholder(
+        self, builder, lang
+    ):
+        description = builder(fake_facts(), lang=lang)["description"]
+        assert "$" not in description
+        assert {"it": "15 settembre 2026", "en": "15 September 2026"}[lang] in (
+            description
+        )
+        assert "`feature_id`" in description
+
+    def test_the_english_collections_are_english(self):
+        for builder in GEOCODING_BUILDERS:
+            italian = builder(fake_facts())
+            english = builder(fake_facts(), lang="en")
+            assert english["title"] != italian["title"]
+            assert english["keywords"] != italian["keywords"]
+            for word in ("rilascio", "strade", " della ", " dei "):
+                assert word not in english["description"]
+
+
+class TestGeocodingFilesTable:
+    def test_one_row_per_file_in_italian(self):
+        table = geocoding_files_table(build_gazetteer(fake_facts()))
+        assert table.splitlines() == [
+            "| File | Righe | Gruppi di righe | Dimensione |",
+            "|---|---|---|---|",
+            (
+                "| [`comuni.parquet`](./2026-09-15/comuni.parquet) | 5.821 | "
+                "2 da 4.096 righe | 0,3 MB |"
+            ),
+        ]
+
+    def test_english_rows_link_the_source_tree(self):
+        table = geocoding_files_table(
+            build_indirizzi_index(fake_facts(), lang="en"), lang="en"
+        )
+        lines = table.splitlines()
+        assert lines[0] == "| File | Rows | Row groups | Size |"
+        assert lines[2] == (
+            "| [`vie.parquet`](../../indirizzi-index/2026-09-15/vie.parquet) | "
+            "786,969 | 193 × 4,096 rows | 42.7 MB |"
+        )
+        assert lines[3].startswith("| [`civici.parquet`]")
+        assert "2,531 × 8,192 rows" in lines[3]
+
+
+class TestRootLinksTheGeocodingIndex:
+    @pytest.mark.parametrize("lang", ["it", "en"])
+    def test_root_links_the_two_collections(self, lang):
+        root = build_root(
+            "2026-09-15T00:00:00Z",
+            lang=lang,
+            geocoding=["gazetteer", "indirizzi-index"],
+        )
+
+        children = {c["href"]: c for c in links_by_rel(root, "child")}
+        texts = build_catalog.TEXTS[lang]
+        assert len(children) == 6
+        assert (
+            children["./gazetteer/collection.json"]["title"]
+            == (texts["gazetteer_title"])
+        )
+        assert (
+            children["./indirizzi-index/collection.json"]["title"]
+            == (texts["indirizzi_index_title"])
+        )
+        description = root["description"]
+        assert description.count("\n- ") == 6
+        assert "`gazetteer`" in description and "`indirizzi-index`" in description
+        assert {"it": "sei collection", "en": "six collections"}[lang] in description
+        assert "$" not in description
+
+    @pytest.mark.parametrize("lang", ["it", "en"])
+    def test_root_leaves_out_a_collection_without_its_index(self, lang):
+        root = build_root("2026-09-15T00:00:00Z", lang=lang, geocoding=["gazetteer"])
+
+        hrefs = {c["href"] for c in links_by_rel(root, "child")}
+        assert "./gazetteer/collection.json" in hrefs
+        assert "./indirizzi-index/collection.json" not in hrefs
+        assert root["description"].count("\n- ") == 5
+        assert {"it": "cinque collection", "en": "five collections"}[lang] in (
+            root["description"]
+        )
+
+    def test_without_geocoding_the_root_is_unchanged(self):
+        root = build_root("2026-09-15T00:00:00Z")
+        assert "quattro collection" in root["description"]
+        assert len(links_by_rel(root, "child")) == 4
+
+
+@pytest.mark.skipif(
+    shutil.which("tippecanoe") is None, reason="tippecanoe not installed"
+)
+class TestGeocodingBuild:
+    COLLECTIONS = ("gazetteer", "indirizzi-index")
+
+    def test_writes_both_collections_in_both_trees(
+        self, fixture_geocoding, fixture_columns
+    ):
+        build(fixture_geocoding)
+        for tree in ("", "en/"):
+            for cid in self.COLLECTIONS:
+                for name in ("collection.json", "README.md", "AGENTS.md"):
+                    path = fixture_geocoding / tree / cid / name
+                    assert path.exists(), f"{tree}{cid}/{name}"
+        assert not list((fixture_geocoding / "en").rglob("*.parquet")), (
+            "the files stay in the source tree; the translation only points at them"
+        )
+
+    def test_assets_resolve_with_matching_sizes_and_checksums(
+        self, fixture_geocoding, fixture_columns
+    ):
+        import json
+
+        build(fixture_geocoding)
+        for tree in ("", "en/"):
+            for cid in self.COLLECTIONS:
+                base = fixture_geocoding / tree / cid
+                collection = json.loads((base / "collection.json").read_text())
+                for key, asset in collection["assets"].items():
+                    target = (base / asset["href"]).resolve()
+                    assert target.exists(), f"{tree}{cid}/{key} -> {asset['href']}"
+                    assert asset["file:size"] == target.stat().st_size, key
+                    assert asset["file:checksum"] == multihash_sha256(target), key
+
+    def test_every_relative_link_resolves(self, fixture_geocoding, fixture_columns):
+        import json
+
+        build(fixture_geocoding)
+        documents = [
+            fixture_geocoding / tree / name
+            for tree in ("", "en/")
+            for name in (
+                "catalog.json",
+                "gazetteer/collection.json",
+                "indirizzi-index/collection.json",
+            )
+        ]
+        for document_path in documents:
+            document = json.loads(document_path.read_text())
+            for link in document["links"]:
+                if link["href"].startswith("http"):
+                    continue
+                target = (document_path.parent / link["href"]).resolve()
+                assert target.exists(), (
+                    f"{document_path} {link['rel']} -> {link['href']}"
+                )
+
+    def test_root_readme_and_agents_point_at_the_two_collections(
+        self, fixture_geocoding, fixture_columns
+    ):
+        build(fixture_geocoding)
+        for tree in ("", "en/"):
+            readme = (fixture_geocoding / tree / "README.md").read_text()
+            agents = (fixture_geocoding / tree / "AGENTS.md").read_text()
+            for cid in self.COLLECTIONS:
+                assert f"(./{cid}/)" in readme, f"{tree}README.md"
+                assert f"`{cid}`" in agents, f"{tree}AGENTS.md"
+            assert "$" not in readme and "$" not in agents
+
+    def test_collection_docs_explain_the_reading_and_the_join(
+        self, fixture_geocoding, fixture_columns
+    ):
+        build(fixture_geocoding)
+        for tree in ("", "en/"):
+            gazetteer = fixture_geocoding / tree / "gazetteer"
+            index = fixture_geocoding / tree / "indirizzi-index"
+            docs = {
+                path: path.read_text(encoding="utf-8")
+                for path in (
+                    gazetteer / "README.md",
+                    gazetteer / "AGENTS.md",
+                    index / "README.md",
+                    index / "AGENTS.md",
+                )
+            }
+            for path, text in docs.items():
+                assert "$" not in text, f"placeholder left in {path}"
+                assert "feature_id" in text and "codice_istat" in text, path
+                assert "v0.3.0" in text or "README" in path.name, path
+            readme = docs[gazetteer / "README.md"]
+            assert "@cngeo/geocoder-core" in readme
+            assert build_catalog.GAZETTEER_SPEC_URL in readme
+            assert "nfd-strip-marks-lower/1" in readme
+            assert f"{PUBLIC_BASE}/gazetteer/2026-09-15/comuni.parquet" in readme
+            assert "| `feature_id` |" in readme
+            readme = docs[index / "README.md"]
+            assert build_catalog.ADDRESS_INDEX_SPEC_URL in readme
+            assert "anncsu-odonimo/1" in readme
+            assert f"{PUBLIC_BASE}/indirizzi-index/2026-09-15/vie.parquet" in readme
+            assert "| `street_id` |" in readme and "| `lon` |" in readme
+            for text in docs.values():
+                assert "Agenzia delle Entrate" in text or "Istat" in text
+
+    def test_english_docs_are_english(self, fixture_geocoding, fixture_columns):
+        build(fixture_geocoding)
+        for cid in self.COLLECTIONS:
+            for name in ("README.md", "AGENTS.md"):
+                text = (fixture_geocoding / "en" / cid / name).read_text()
+                for italian in ("Licenza", "rilascio", " della ", "Come si legge"):
+                    assert italian not in text, f"en/{cid}/{name}: {italian}"
+
+    def test_is_byte_identical_on_a_second_run(
+        self, fixture_geocoding, fixture_columns
+    ):
+        build(fixture_geocoding)
+        first = generated_files(fixture_geocoding)
+        build(fixture_geocoding)
+        second = generated_files(fixture_geocoding)
+        assert first == second
+
+    def test_a_missing_index_leaves_its_collection_out(
+        self, fixture_geocoding, fixture_columns, capsys
+    ):
+        import json
+
+        (fixture_geocoding / "indirizzi-index" / "index.json").unlink()
+        build(fixture_geocoding)
+
+        assert (fixture_geocoding / "gazetteer" / "collection.json").exists()
+        assert not (fixture_geocoding / "indirizzi-index" / "collection.json").exists()
+        root = json.loads((fixture_geocoding / "catalog.json").read_text())
+        hrefs = {l["href"] for l in links_by_rel(root, "child")}
+        assert "./gazetteer/collection.json" in hrefs
+        assert "./indirizzi-index/collection.json" not in hrefs
+        gazetteer = json.loads(
+            (fixture_geocoding / "gazetteer" / "collection.json").read_text()
+        )
+        assert links_by_rel(gazetteer, "related") == []
+        assert "indirizzi-index" in capsys.readouterr().out
+
+    def test_without_any_index_the_catalog_has_only_the_four_collections(
+        self, fixture_data_dir, fixture_columns
+    ):
+        build(fixture_data_dir)
+        for cid in self.COLLECTIONS:
+            assert not (fixture_data_dir / cid).exists(), cid
+            assert not (fixture_data_dir / "en" / cid).exists(), cid
 
 
 if __name__ == "__main__":

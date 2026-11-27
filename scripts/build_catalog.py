@@ -26,6 +26,7 @@ See docs/how-to-portolan.md for the design and CATALOG.md for usage.
 import hashlib
 import json
 import math
+import re
 import shutil
 import subprocess
 from datetime import datetime, timezone
@@ -39,6 +40,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = REPO_ROOT / "data"
 SOURCE_DIR = Path(__file__).resolve().parent / "catalog"
 COLUMNS_FILE = SOURCE_DIR / "columns.yaml"
+GEOCODING_COLUMNS_FILE = SOURCE_DIR / "geocoding_columns.yaml"
 TEMPLATE_DIR = SOURCE_DIR / "templates"
 STYLE_DIR = SOURCE_DIR / "styles"
 
@@ -131,6 +133,60 @@ VERSION_SCHEMA = "https://stac-extensions.github.io/version/v1.2.0/schema.json"
 PROJECTION_SCHEMA = "https://stac-extensions.github.io/projection/v2.0.0/schema.json"
 WEB_MAP_LINKS_SCHEMA = (
     "https://stac-extensions.github.io/web-map-links/v1.3.0/schema.json"
+)
+
+# The geocoding index. The gazetteer extension is cholmes/stac-gazetteer, in
+# the "Proposal" maturity; the address index extension is our own draft, kept
+# in geocoding/address-index/ until a proposal finds it a home. Neither is in
+# Portolan's registry, so rashid reports them only as info PTL-EXT-002.
+GAZETTEER_EXTENSION = (
+    "https://cholmes.github.io/stac-gazetteer/gazetteer/v1.0.0/schema.json"
+)
+GAZETTEER_SPEC_URL = (
+    "https://github.com/cholmes/stac-gazetteer/blob/main/gazetteer/v1.0.0/README.md"
+)
+ADDRESS_INDEX_EXTENSION = (
+    "https://raw.githubusercontent.com/anncsu-open/anncsu-viewer/main/"
+    "geocoding/address-index/v0.1.0/schema.json"
+)
+ADDRESS_INDEX_SPEC_URL = (
+    f"{REPO_URL}/blob/main/geocoding/address-index/v0.1.0/README.md"
+)
+GEOCODER_CORE_URL = (
+    "https://github.com/cholmes/cng-map-widgets/tree/main/packages/geocoder-core"
+)
+ISTAT_COMUNI_URL = (
+    "https://www.istat.it/storage/codici-unita-amministrative/"
+    "Elenco-comuni-italiani.csv"
+)
+GAZETTEER_NORMALIZATION = "nfd-strip-marks-lower/1"
+ADDRESS_NORMALIZATION = "anncsu-odonimo/1"
+COMUNE_LEVEL = 3
+# The order of the rows of each address file, as build_geocoding_index.py
+# writes them. The test suite checks them against that script.
+STREETS_SORT = ["codice_istat", "name_norm", "street_id"]
+ACCESS_POINTS_SORT = [
+    "codice_istat",
+    "street_id",
+    "number",
+    "suffix",
+    "specificita",
+    "id",
+]
+# Collection id -> the files its index.json must list, in asset order. A
+# collection is published only when its index.json exists.
+GEOCODING_FILES = {
+    "gazetteer": ("comuni",),
+    "indirizzi-index": ("vie", "civici"),
+}
+GEOCODING_FILE_KEYS = (
+    "href",
+    "size",
+    "checksum",
+    "rows",
+    "row_groups",
+    "row_group_rows",
+    "footer_metadata_bytes",
 )
 
 H3_RESOLUTION = 5
@@ -300,6 +356,90 @@ def _text_table_columns(
         }
         for name in names
     ]
+
+
+def geocoding_table_columns(path: Path, section: str, lang: str = "it") -> list[dict]:
+    """table:columns for one file of the geocoding index.
+
+    The files are git-ignored and absent in CI, so nothing here reads them:
+    the test suite checks geocoding_columns.yaml against the schemas of
+    build_geocoding_index.py instead. ``section`` is gazetteer, streets or
+    access_points.
+    """
+    with open(path, encoding="utf-8") as handle:
+        raw = yaml.safe_load(handle)
+    if section not in raw:
+        raise SystemExit(f"{path.name} has no {section} section.")
+    columns = raw[section]
+    untranslated = [
+        name
+        for name, spec in columns.items()
+        if not str(spec.get("description_en", "")).strip()
+    ]
+    if untranslated:
+        raise SystemExit(
+            f"Columns without description_en in {path.name}, section {section}: "
+            f"{', '.join(untranslated)}. The English tree needs every column."
+        )
+    description_key = "description" if lang == "it" else f"description_{lang}"
+    return [
+        {
+            "name": name,
+            "type": stac_type(str(spec["type"])),
+            "description": " ".join(str(spec[description_key]).split()),
+        }
+        for name, spec in columns.items()
+    ]
+
+
+def load_geocoding_index(path: Path, names: tuple[str, ...]) -> dict | None:
+    """Load what build_geocoding_index.py recorded about a collection's files.
+
+    The Parquet files are git-ignored, so this committed index.json is all
+    the catalog knows about them, as releases.json is for the archive. A
+    missing index leaves the collection out, which is the state of a checkout
+    before the first build. A malformed one stops the build rather than
+    publish an asset that lies about its file.
+    """
+    if not path.exists():
+        print(
+            f"Note: {path} not found, so the {path.parent.name} collection is "
+            f"left out. scripts/build_geocoding_index.py writes it.",
+            flush=True,
+        )
+        return None
+    with open(path, encoding="utf-8") as handle:
+        document = json.load(handle)
+
+    release = str(document.get("release"))
+    try:
+        datetime.strptime(release, "%Y-%m-%d")
+    except ValueError:
+        raise SystemExit(
+            f"{path}: release must be a YYYY-MM-DD date, got {release!r}."
+        ) from None
+
+    listed = document.get("files", {})
+    files = {}
+    for name in names:
+        if name not in listed:
+            raise SystemExit(f"{path} lists no {name} file.")
+        entry = listed[name]
+        missing = [key for key in GEOCODING_FILE_KEYS if key not in entry]
+        if missing:
+            raise SystemExit(f"{path}: the {name} file lacks {', '.join(missing)}.")
+        # One folder per release keeps two builds from mixing.
+        if not entry["href"].startswith(f"./{release}/"):
+            raise SystemExit(
+                f"{path}: {name} is at {entry['href']}, outside the folder of "
+                f"release {release}."
+            )
+        if not re.fullmatch(r"1220[0-9a-f]{64}", str(entry["checksum"])):
+            raise SystemExit(
+                f"{path}: the {name} checksum is not a sha2-256 multihash."
+            )
+        files[name] = entry
+    return {"release": release, "files": files}
 
 
 def load_releases(
@@ -674,7 +814,7 @@ TEXTS = {
             "formati cloud-native a partire dal [portale open data "
             "ANNCSU]($portal).\n"
             "\n"
-            "Il catalogo pubblica quattro collection:\n"
+            "Il catalogo pubblica $count collection:\n"
             "\n"
             "- `indirizzi`: un unico file GeoParquet, per l'analisi "
             "sull'intero territorio nazionale.\n"
@@ -683,7 +823,81 @@ TEXTS = {
             "- `rilasci`: l'archivio degli scarichi mensili, da cui le altre "
             "due derivano il rilascio corrente.\n"
             "- `stradario`: l'archivio dello stradario nazionale, l'elenco "
-            "delle strade con il numero dei loro accessi."
+            "delle strade con il numero dei loro accessi.$geocoding"
+        ),
+        "gazetteer_title": "Gazetteer dei comuni ANNCSU",
+        "gazetteer_bullet": (
+            "- `gazetteer`: i nomi dei comuni, per trovare un comune "
+            "scrivendone il nome."
+        ),
+        "gazetteer_use": "Trovare un comune dal nome",
+        "gazetteer_agents": (
+            "- `gazetteer` trova un comune dal nome. Il suo `feature_id` è il "
+            "codice Istat del comune."
+        ),
+        "gazetteer_description": (
+            "I comuni che hanno almeno un indirizzo in ANNCSU, in un file "
+            "Parquet nel formato indice dell'estensione STAC "
+            "[gazetteer]($gazetteer_spec). Ogni comune ha il nome, la "
+            "provincia, il codice Istat come `feature_id` e il riquadro dei "
+            "suoi accessi. I nomi in altra lingua e le grafie con uno spazio al "
+            "posto dell'apostrofo sono righe in più. Le righe sono ordinate per "
+            "`name_norm`, quindi un client trova un comune per nome con poche "
+            "richieste HTTP range, senza un server; "
+            "[`@cngeo/geocoder-core`]($geocoder_core) legge questa collection "
+            "così com'è.\n"
+            "\n"
+            "Il `feature_id` è la chiave con cui la collection `indirizzi-index` "
+            "cerca le strade del comune. I dati sono quelli del rilascio ANNCSU "
+            "del $date_human."
+        ),
+        "gazetteer_index_title": "Indice dei nomi dei comuni",
+        "gazetteer_index_description": (
+            "Una riga per comune e una per ogni nome alternativo, ordinate per "
+            "`name_norm` confrontato byte per byte, con statistiche min/max "
+            "esatte e l'ordinamento dichiarato nel footer."
+        ),
+        "keywords_gazetteer": ["gazetteer", "comuni", "geocodifica"],
+        "related_address_index": "Indice degli indirizzi dei comuni",
+        "indirizzi_index_title": "Indice degli indirizzi ANNCSU",
+        "indirizzi_index_bullet": (
+            "- `indirizzi-index`: le strade e gli accessi ordinati per comune, "
+            "per trovare un indirizzo dentro un comune."
+        ),
+        "indirizzi_index_use": "Trovare una strada o un civico dentro un comune",
+        "indirizzi_index_agents": (
+            "- `indirizzi-index` trova una strada e un civico dentro un comune, "
+            "dato il codice Istat nella colonna `codice_istat`."
+        ),
+        "indirizzi_index_description": (
+            "Le strade e gli accessi di ANNCSU in due file Parquet ordinati per "
+            "comune. Un client legge le righe di un comune con richieste HTTP "
+            "range, senza un server, e ci cerca prima la strada e poi il numero "
+            "civico. Il formato è descritto da una [bozza di estensione "
+            "STAC]($address_index_spec) tenuta in questo repository.\n"
+            "\n"
+            "La colonna `codice_istat` contiene il `feature_id` della "
+            "collection `gazetteer`: con il gazetteer si trova il comune, con "
+            "questo indice l'indirizzo. Un'applicazione che lavora sempre in un "
+            "solo comune può usare questo indice da solo, con il codice del "
+            "comune. I dati sono quelli del rilascio ANNCSU del $date_human."
+        ),
+        "streets_title": "Strade",
+        "streets_description": (
+            "Una riga per strada e una per ogni suo nome in altra lingua, "
+            "ordinate per `codice_istat`, `name_norm` e `street_id`."
+        ),
+        "access_points_title": "Accessi",
+        "access_points_description": (
+            "Una riga per ogni accesso della fonte, ordinate per "
+            "`codice_istat`, `street_id`, `number`, `suffix`, `specificita` e "
+            "`id`, con i valori nulli in fondo."
+        ),
+        "keywords_indirizzi_index": ["geocodifica", "strade", "ricerca"],
+        "related_gazetteer": "Gazetteer dei comuni, con il codice Istat come feature_id",
+        "geocoding_agents_intro": (
+            "Per cercare per nome senza un server, ogni indice qui sotto ha un "
+            "AGENTS.md che spiega come leggerlo:"
         ),
         "indirizzi_title": "Indirizzi ANNCSU, file unico",
         "indirizzi_description": (
@@ -883,7 +1097,7 @@ TEXTS = {
             "cloud-native formats from the [ANNCSU open data "
             "portal]($portal).\n"
             "\n"
-            "The catalog publishes four collections:\n"
+            "The catalog publishes $count collections:\n"
             "\n"
             "- `indirizzi`: one GeoParquet file, for country-wide analysis.\n"
             "- `indirizzi-h3`: the same data partitioned into H3 cells, to "
@@ -891,7 +1105,81 @@ TEXTS = {
             "- `rilasci`: the archive of monthly downloads, which the other "
             "two derive their current release from.\n"
             "- `stradario`: the archive of the national street register, the "
-            "list of streets with their number of accesses."
+            "list of streets with their number of accesses.$geocoding"
+        ),
+        "gazetteer_title": "ANNCSU comuni gazetteer",
+        "gazetteer_bullet": (
+            "- `gazetteer`: the names of the comuni, to find a comune by typing "
+            "its name."
+        ),
+        "gazetteer_use": "Finding a comune by name",
+        "gazetteer_agents": (
+            "- `gazetteer` finds a comune by name. Its `feature_id` is the "
+            "comune's Istat code."
+        ),
+        "gazetteer_description": (
+            "The comuni that have at least one address in ANNCSU, in one "
+            "Parquet file in the index format of the STAC "
+            "[gazetteer]($gazetteer_spec) extension. Each comune has its name, "
+            "its province, its Istat code as `feature_id` and the bounding box "
+            "of its access points. Names in another language, and spellings "
+            "with a space in place of the apostrophe, are extra rows. Rows are "
+            "sorted by `name_norm`, so a client finds a comune by name with a "
+            "few HTTP range requests and no server; "
+            "[`@cngeo/geocoder-core`]($geocoder_core) reads this collection as "
+            "it is.\n"
+            "\n"
+            "The `feature_id` is the key the `indirizzi-index` collection uses "
+            "to look up the streets of a comune. The data comes from the ANNCSU "
+            "release of $date_human."
+        ),
+        "gazetteer_index_title": "Index of comuni names",
+        "gazetteer_index_description": (
+            "One row per comune and one per alternate name, sorted by "
+            "`name_norm` compared byte by byte, with exact min/max statistics "
+            "and the sort declared in the footer."
+        ),
+        "keywords_gazetteer": ["gazetteer", "comuni", "geocoding"],
+        "related_address_index": "Address index of the comuni",
+        "indirizzi_index_title": "ANNCSU address index",
+        "indirizzi_index_bullet": (
+            "- `indirizzi-index`: the streets and access points sorted by "
+            "comune, to find an address inside a comune."
+        ),
+        "indirizzi_index_use": "Finding a street or a house number inside a comune",
+        "indirizzi_index_agents": (
+            "- `indirizzi-index` finds a street and a house number inside a "
+            "comune, given its Istat code in the `codice_istat` column."
+        ),
+        "indirizzi_index_description": (
+            "The streets and access points of ANNCSU in two Parquet files "
+            "sorted by comune. A client reads the rows of one comune with HTTP "
+            "range requests and no server, and looks up first the street, then "
+            "the house number. The format is described by a [draft STAC "
+            "extension]($address_index_spec) kept in this repository.\n"
+            "\n"
+            "The `codice_istat` column holds the `feature_id` of the "
+            "`gazetteer` collection: the gazetteer finds the comune, this index "
+            "finds the address. An application that always works inside a "
+            "single comune can use this index alone, with the comune's code. "
+            "The data comes from the ANNCSU release of $date_human."
+        ),
+        "streets_title": "Streets",
+        "streets_description": (
+            "One row per street and one per name it has in another language, "
+            "sorted by `codice_istat`, `name_norm` and `street_id`."
+        ),
+        "access_points_title": "Access points",
+        "access_points_description": (
+            "One row per access point of the source, sorted by `codice_istat`, "
+            "`street_id`, `number`, `suffix`, `specificita` and `id`, nulls "
+            "last."
+        ),
+        "keywords_indirizzi_index": ["geocoding", "streets", "search"],
+        "related_gazetteer": "Comuni gazetteer, with the Istat code as feature_id",
+        "geocoding_agents_intro": (
+            "To search by name with no server, each index below has an "
+            "AGENTS.md that explains how to read it:"
         ),
         "indirizzi_title": "ANNCSU addresses, single file",
         "indirizzi_description": (
@@ -997,8 +1285,7 @@ TEXTS = {
             "The ZIP as the ANNCSU portal served it, holding the release CSV."
         ),
         "release_zip_reconstructed": (
-            "ZIP holding the reconstructed release CSV, in the ANNCSU portal's "
-            "format."
+            "ZIP holding the reconstructed release CSV, in the ANNCSU portal's format."
         ),
         "release_parquet": "CSV of the release as Parquet, lossless",
         "release_parquet_description": (
@@ -1064,8 +1351,7 @@ TEXTS = {
         ),
         "stradario_zip": "ZIP archive of the street register",
         "stradario_zip_description": (
-            "The ZIP as the ANNCSU portal served it, holding the street "
-            "register CSV."
+            "The ZIP as the ANNCSU portal served it, holding the street register CSV."
         ),
         "georeferenced_sentence": (
             "This collection holds the $with_coords georeferenced addresses out "
@@ -1510,13 +1796,29 @@ def _documentation_links(lang: str) -> list[dict]:
     ]
 
 
-def build_root(updated: str, lang: str = SOURCE_LANG) -> dict:
+COLLECTION_COUNT_WORDS = {
+    "it": {4: "quattro", 5: "cinque", 6: "sei"},
+    "en": {4: "four", 5: "five", 6: "six"},
+}
+
+
+def _text_key(collection_id: str) -> str:
+    """indirizzi-index -> indirizzi_index, the prefix of its TEXTS keys."""
+    return collection_id.replace("-", "_")
+
+
+def build_root(
+    updated: str, lang: str = SOURCE_LANG, geocoding: tuple[str, ...] = ()
+) -> dict:
     """Build the root catalog of one language tree.
 
     The source tree's root sits at data/; a translated root has no parent
     either, because each language tree stands on its own (PORTO-CORE-080).
+    ``geocoding`` names the geocoding collections that have an index.json,
+    the only ones the root may link.
     """
     text = TEXTS[lang]
+    geocoding = [cid for cid in GEOCODING_FILES if cid in geocoding]
     return {
         "type": "Catalog",
         "stac_version": "1.1.0",
@@ -1524,7 +1826,11 @@ def build_root(updated: str, lang: str = SOURCE_LANG) -> dict:
         "id": "anncsu",
         "title": text["root_title"],
         "description": Template(text["root_description"]).substitute(
-            portal=SOURCE_PORTAL
+            portal=SOURCE_PORTAL,
+            count=COLLECTION_COUNT_WORDS[lang][4 + len(geocoding)],
+            geocoding="".join(
+                "\n" + text[f"{_text_key(cid)}_bullet"] for cid in geocoding
+            ),
         ),
         **_language_fields(lang),
         "updated": updated,
@@ -1559,6 +1865,15 @@ def build_root(updated: str, lang: str = SOURCE_LANG) -> dict:
                 "type": "application/json",
                 "title": text["stradario_title"],
             },
+            *(
+                {
+                    "rel": "child",
+                    "href": f"./{cid}/collection.json",
+                    "type": "application/json",
+                    "title": text[f"{_text_key(cid)}_title"],
+                }
+                for cid in geocoding
+            ),
             *_tree_alternates(lang, 0, "catalog.json"),
             _viewer_link(lang),
             {
@@ -1594,7 +1909,11 @@ def _style_asset(
 
 
 def _shared_asset_href(lang: str, collection_id: str, tail: str) -> str:
-    """Path to a style or thumbnail, which live in the source tree only."""
+    """Path to a file that lives in the source tree only.
+
+    Styles, thumbnails and the files of the geocoding index sit next to the
+    Italian collection; a translated collection points back at them.
+    """
     if lang == SOURCE_LANG:
         return f"./{tail}"
     return f"{_to_data(lang, 1)}{collection_id}/{tail}"
@@ -2179,6 +2498,238 @@ def build_stradario(facts: dict, lang: str = SOURCE_LANG) -> dict:
     }
 
 
+def _index_asset(
+    facts: dict,
+    lang: str,
+    collection_id: str,
+    name: str,
+    text_key: str,
+    role: str,
+    columns_key: str,
+    fields: dict,
+) -> dict:
+    """One Parquet file of the geocoding index, from its index.json entry.
+
+    Roles include data, or rashid errors PTL-AST-007 "no primary data"; the
+    second role is the one the extension and the clients look for.
+    """
+    text = TEXTS[lang]
+    entry = facts[collection_id]["files"][name]
+    return {
+        "href": _shared_asset_href(lang, collection_id, entry["href"][2:]),
+        "type": "application/vnd.apache.parquet",
+        "title": text[f"{text_key}_title"],
+        "description": text[f"{text_key}_description"],
+        "roles": ["data", role],
+        "file:size": entry["size"],
+        "file:checksum": entry["checksum"],
+        "table:row_count": entry["rows"],
+        "table:columns": _columns_for(facts, columns_key, lang),
+        **fields,
+    }
+
+
+def _geocoding_collection(
+    facts: dict,
+    lang: str,
+    collection_id: str,
+    extension: str,
+    fields: dict,
+    assets: dict,
+    related: tuple[str, str],
+) -> dict:
+    """What the gazetteer and the address index share.
+
+    Both are tabular: no geometry column, so the bbox is the area of interest
+    and no thumbnail or style is owed. ``updated`` and ``version`` are the
+    ANNCSU release the files were built from, the only date index.json
+    carries, which keeps the output independent of git and of the clock.
+    ``related`` is the other geocoding collection and the key of its link
+    title, linked only when it is published too.
+    """
+    text = TEXTS[lang]
+    key = _text_key(collection_id)
+    release = facts[collection_id]["release"]
+    release_datetime = f"{release}T00:00:00Z"
+    links = [
+        {"rel": "root", "href": "../catalog.json", "type": "application/json"},
+        {"rel": "parent", "href": "../catalog.json", "type": "application/json"},
+    ]
+    if any(r["date"] == release for r in facts["releases"]):
+        links.append(
+            {
+                "rel": "derived_from",
+                "href": f"../rilasci/{release}/{release}.json",
+                "type": "application/geo+json",
+            }
+        )
+    related_id, related_title = related
+    if facts.get(related_id):
+        links.append(
+            {
+                "rel": "related",
+                "href": f"../{related_id}/collection.json",
+                "type": "application/json",
+                "title": text[related_title],
+            }
+        )
+    links += [
+        *_tree_alternates(lang, 1, f"{collection_id}/collection.json"),
+        _viewer_link(lang),
+        *_source_links(lang),
+        *_documentation_links(lang),
+    ]
+    return {
+        "type": "Collection",
+        "stac_version": "1.1.0",
+        "stac_extensions": [
+            PORTOLAN_SCHEMA,
+            extension,
+            FILE_SCHEMA,
+            TABLE_SCHEMA,
+            VERSION_SCHEMA,
+            LANGUAGE_SCHEMA,
+        ],
+        "id": collection_id,
+        "title": text[f"{key}_title"],
+        "description": Template(text[f"{key}_description"]).substitute(
+            date_human=human_date(release_datetime, lang),
+            gazetteer_spec=GAZETTEER_SPEC_URL,
+            geocoder_core=GEOCODER_CORE_URL,
+            address_index_spec=ADDRESS_INDEX_SPEC_URL,
+        ),
+        "license": LICENSE_ID,
+        "keywords": [*text["keywords"], *text[f"keywords_{key}"]],
+        "providers": providers(),
+        "extent": {
+            "spatial": {"bbox": [facts["bbox"]]},
+            "temporal": {"interval": [[release_datetime, None]]},
+        },
+        **_language_fields(lang),
+        "updated": release_datetime,
+        "version": release,
+        **fields,
+        "assets": assets,
+        "links": links,
+    }
+
+
+def build_gazetteer(facts: dict, lang: str = SOURCE_LANG) -> dict:
+    """The comuni gazetteer, in the index format of the gazetteer extension.
+
+    @cngeo/geocoder-core takes the asset whose roles include gazetteer-index
+    and plans its range reads with the gazetteer:* fields on it.
+    """
+    entry = facts["gazetteer"]["files"]["comuni"]
+    index = _index_asset(
+        facts,
+        lang,
+        "gazetteer",
+        "comuni",
+        "gazetteer_index",
+        "gazetteer-index",
+        "gazetteer_columns",
+        {
+            "gazetteer:row_groups": entry["row_groups"],
+            "gazetteer:row_group_rows": entry["row_group_rows"],
+            "gazetteer:footer_metadata_bytes": entry["footer_metadata_bytes"],
+        },
+    )
+    return _geocoding_collection(
+        facts,
+        lang,
+        "gazetteer",
+        GAZETTEER_EXTENSION,
+        {
+            "gazetteer:levels": [COMUNE_LEVEL],
+            "gazetteer:normalization": GAZETTEER_NORMALIZATION,
+            "gazetteer:sort": "name_norm",
+        },
+        {"index": index},
+        ("indirizzi-index", "related_address_index"),
+    )
+
+
+def build_indirizzi_index(facts: dict, lang: str = SOURCE_LANG) -> dict:
+    """The address index, in the format of our draft address-index extension.
+
+    address_index:sort sits on each asset, since the two files have different
+    sorts; the place column, shared, sits on the Collection.
+    """
+    files = facts["indirizzi-index"]["files"]
+
+    def fields(name: str, sort: list[str]) -> dict:
+        return {
+            "address_index:sort": list(sort),
+            "address_index:row_groups": files[name]["row_groups"],
+            "address_index:row_group_rows": files[name]["row_group_rows"],
+            "address_index:footer_metadata_bytes": files[name]["footer_metadata_bytes"],
+        }
+
+    assets = {
+        "streets": _index_asset(
+            facts,
+            lang,
+            "indirizzi-index",
+            "vie",
+            "streets",
+            "address-streets",
+            "streets_columns",
+            fields("vie", STREETS_SORT),
+        ),
+        "access-points": _index_asset(
+            facts,
+            lang,
+            "indirizzi-index",
+            "civici",
+            "access_points",
+            "address-points",
+            "access_points_columns",
+            fields("civici", ACCESS_POINTS_SORT),
+        ),
+    }
+    return _geocoding_collection(
+        facts,
+        lang,
+        "indirizzi-index",
+        ADDRESS_INDEX_EXTENSION,
+        {
+            "address_index:normalization": ADDRESS_NORMALIZATION,
+            "address_index:place_column": "codice_istat",
+        },
+        assets,
+        ("gazetteer", "related_gazetteer"),
+    )
+
+
+def geocoding_files_table(document: dict, lang: str = SOURCE_LANG) -> str:
+    """One row per file of a geocoding collection, linked from its README.
+
+    Built from the collection itself, so the hrefs are right in either tree.
+    """
+    it = lang == "it"
+    header = (
+        "| File | Righe | Gruppi di righe | Dimensione |"
+        if it
+        else "| File | Rows | Row groups | Size |"
+    )
+    group_text = "$groups da $rows righe" if it else "$groups × $rows rows"
+    prefix = "gazetteer" if document["id"] == "gazetteer" else "address_index"
+    rows = [header, "|---|---|---|---|"]
+    for asset in document["assets"].values():
+        groups = Template(group_text).substitute(
+            groups=human_count(asset[f"{prefix}:row_groups"], lang),
+            rows=human_count(asset[f"{prefix}:row_group_rows"], lang),
+        )
+        name = asset["href"].rsplit("/", 1)[-1]
+        rows.append(
+            f"| [`{name}`]({asset['href']}) | "
+            f"{human_count(asset['table:row_count'], lang)} | {groups} | "
+            f"{human_size(asset['file:size'], lang)} |"
+        )
+    return "\n".join(rows)
+
+
 def write_json(path: Path, document: dict) -> None:
     """Write a STAC document deterministically and atomically.
 
@@ -2259,6 +2810,17 @@ def collect_facts(data_dir: Path) -> dict:
         facts[f"stradario_table_columns{suffix}"] = stradario_table_columns(
             COLUMNS_FILE, lang
         )
+        for section in ("gazetteer", "streets", "access_points"):
+            facts[f"{section}_columns{suffix}"] = geocoding_table_columns(
+                GEOCODING_COLUMNS_FILE, section, lang
+            )
+
+    # The geocoding index, from the index.json files build_geocoding_index.py
+    # writes. Its Parquet files are not read: they are not in the checkout.
+    for collection_id, names in GEOCODING_FILES.items():
+        facts[collection_id] = load_geocoding_index(
+            data_dir / collection_id / "index.json", names
+        )
     return facts
 
 
@@ -2288,6 +2850,68 @@ def _install_collection_assets(
     return {"style": file_facts(style_target), "thumbnail": file_facts(thumbnail)}
 
 
+def _geocoding_readme_rows(geocoding: tuple[str, ...], lang: str) -> str:
+    """Rows of the root README's collection table, one per geocoding index."""
+    text = TEXTS[lang]
+    return "".join(
+        f"\n| [{text[f'{_text_key(cid)}_title']}](./{cid}/) | "
+        f"{text[f'{_text_key(cid)}_use']} |"
+        for cid in geocoding
+    )
+
+
+def _geocoding_agents_paragraph(geocoding: tuple[str, ...], lang: str) -> str:
+    """The root AGENTS.md lines that point at the geocoding indexes, if any."""
+    if not geocoding:
+        return ""
+    text = TEXTS[lang]
+    bullets = "\n".join(text[f"{_text_key(cid)}_agents"] for cid in geocoding)
+    return f"\n\n{text['geocoding_agents_intro']}\n\n{bullets}"
+
+
+GEOCODING_BUILDERS = {
+    "gazetteer": build_gazetteer,
+    "indirizzi-index": build_indirizzi_index,
+}
+
+
+def _write_geocoding_collection(
+    tree: Path, facts: dict, lang: str, collection_id: str, shared: dict
+) -> None:
+    """Write one geocoding collection with its README and AGENTS.md.
+
+    Only the metadata: the Parquet files stay where build_geocoding_index.py
+    wrote them, in the source tree.
+    """
+    document = GEOCODING_BUILDERS[collection_id](facts, lang)
+    target = tree / collection_id
+    write_json(target / "collection.json", document)
+    values = {
+        **shared,
+        "title": document["title"],
+        "description": document["description"],
+        "files_table": geocoding_files_table(document, lang),
+        "public_base": PUBLIC_BASE,
+        "release": facts[collection_id]["release"],
+        "gazetteer_spec": GAZETTEER_SPEC_URL,
+        "address_index_spec": ADDRESS_INDEX_SPEC_URL,
+        "geocoder_core": GEOCODER_CORE_URL,
+        "istat_comuni": ISTAT_COMUNI_URL,
+        "portolan_version": PORTOLAN_VERSION,
+        **{
+            f"{section}_table": schema_table(
+                _columns_for(facts, f"{section}_columns", lang), lang
+            )
+            for section in ("gazetteer", "streets", "access_points")
+        },
+    }
+    for name in ("README.md", "AGENTS.md"):
+        write_text(
+            target / name,
+            render_template(template_name(f"{collection_id}.{name}", lang), values),
+        )
+
+
 def _write_tree(data_dir: Path, facts: dict, lang: str) -> None:
     """Write one language tree: root catalog, READMEs, both collections."""
     tree = data_dir / _tree_root(lang)
@@ -2303,18 +2927,27 @@ def _write_tree(data_dir: Path, facts: dict, lang: str) -> None:
         "statistics_table": statistics_table(facts, lang),
     }
 
-    write_json(tree / "catalog.json", build_root(facts["updated"], lang))
+    geocoding = tuple(cid for cid in GEOCODING_FILES if facts.get(cid))
+    write_json(tree / "catalog.json", build_root(facts["updated"], lang, geocoding))
     write_text(
         tree / "README.md",
-        render_template(template_name("catalog.README.md", lang), shared),
+        render_template(
+            template_name("catalog.README.md", lang),
+            {**shared, "geocoding_rows": _geocoding_readme_rows(geocoding, lang)},
+        ),
     )
     write_text(
         tree / "AGENTS.md",
         render_template(
             template_name("catalog.AGENTS.md", lang),
-            {"portolan_version": PORTOLAN_VERSION},
+            {
+                "portolan_version": PORTOLAN_VERSION,
+                "geocoding_agents": _geocoding_agents_paragraph(geocoding, lang),
+            },
         ),
     )
+    for collection_id in geocoding:
+        _write_geocoding_collection(tree, facts, lang, collection_id, shared)
 
     collections = [
         ("indirizzi", build_indirizzi(facts, lang), "table_columns"),

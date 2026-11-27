@@ -1,0 +1,14 @@
+{
+  "release": "2026-11-02",
+  "files": {
+    "comuni": {
+      "href": "./2026-11-02/comuni.parquet",
+      "size": 350378,
+      "checksum": "12206d90a056d57b1e69853c53b9c39ebdf3a3a586832516ffa30cb865f20bd9a8a2",
+      "rows": 5821,
+      "row_groups": 2,
+      "row_group_rows": 4096,
+      "footer_metadata_bytes": 5277
+    }
+  }
+}

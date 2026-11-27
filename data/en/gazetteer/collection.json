@@ -1,0 +1,243 @@
+{
+  "type": "Collection",
+  "stac_version": "1.1.0",
+  "stac_extensions": [
+    "https://schemas.portolan-sdi.org/portolan/v0.3.0/schema.json",
+    "https://cholmes.github.io/stac-gazetteer/gazetteer/v1.0.0/schema.json",
+    "https://stac-extensions.github.io/file/v2.1.0/schema.json",
+    "https://stac-extensions.github.io/table/v1.2.0/schema.json",
+    "https://stac-extensions.github.io/version/v1.2.0/schema.json",
+    "https://stac-extensions.github.io/language/v1.0.0/schema.json"
+  ],
+  "id": "gazetteer",
+  "title": "ANNCSU comuni gazetteer",
+  "description": "The comuni that have at least one address in ANNCSU, in one Parquet file in the index format of the STAC [gazetteer](https://github.com/cholmes/stac-gazetteer/blob/main/gazetteer/v1.0.0/README.md) extension. Each comune has its name, its province, its Istat code as `feature_id` and the bounding box of its access points. Names in another language, and spellings with a space in place of the apostrophe, are extra rows. Rows are sorted by `name_norm`, so a client finds a comune by name with a few HTTP range requests and no server; [`@cngeo/geocoder-core`](https://github.com/cholmes/cng-map-widgets/tree/main/packages/geocoder-core) reads this collection as it is.\n\nThe `feature_id` is the key the `indirizzi-index` collection uses to look up the streets of a comune. The data comes from the ANNCSU release of 2 November 2026.",
+  "license": "CC-BY-4.0",
+  "keywords": [
+    "addresses",
+    "house numbers",
+    "street names",
+    "italy",
+    "anncsu",
+    "gazetteer",
+    "comuni",
+    "geocoding"
+  ],
+  "providers": [
+    {
+      "name": "Agenzia delle Entrate",
+      "url": "https://www.agenziaentrate.gov.it/",
+      "roles": [
+        "producer",
+        "licensor"
+      ]
+    },
+    {
+      "name": "Istat",
+      "url": "https://www.istat.it/",
+      "roles": [
+        "producer"
+      ]
+    },
+    {
+      "name": "anncsu-open",
+      "url": "https://github.com/anncsu-open/anncsu-viewer",
+      "roles": [
+        "processor"
+      ]
+    },
+    {
+      "name": "Geobeyond",
+      "url": "https://geobeyond.it/",
+      "roles": [
+        "host"
+      ]
+    }
+  ],
+  "extent": {
+    "spatial": {
+      "bbox": [
+        [
+          6.7003259,
+          35.5017421,
+          18.660009,
+          47.0805336
+        ]
+      ]
+    },
+    "temporal": {
+      "interval": [
+        [
+          "2026-11-02T00:00:00Z",
+          null
+        ]
+      ]
+    }
+  },
+  "language": {
+    "code": "en",
+    "name": "English",
+    "alternate": "Inglese"
+  },
+  "languages": [
+    {
+      "code": "it",
+      "name": "Italiano",
+      "alternate": "Italian"
+    }
+  ],
+  "updated": "2026-11-02T00:00:00Z",
+  "version": "2026-11-02",
+  "gazetteer:levels": [
+    3
+  ],
+  "gazetteer:normalization": "nfd-strip-marks-lower/1",
+  "gazetteer:sort": "name_norm",
+  "assets": {
+    "index": {
+      "href": "../../gazetteer/2026-11-02/comuni.parquet",
+      "type": "application/vnd.apache.parquet",
+      "title": "Index of comuni names",
+      "description": "One row per comune and one per alternate name, sorted by `name_norm` compared byte by byte, with exact min/max statistics and the sort declared in the footer.",
+      "roles": [
+        "data",
+        "gazetteer-index"
+      ],
+      "file:size": 350378,
+      "file:checksum": "12206d90a056d57b1e69853c53b9c39ebdf3a3a586832516ffa30cb865f20bd9a8a2",
+      "table:row_count": 5821,
+      "table:columns": [
+        {
+          "name": "name",
+          "type": "varchar",
+          "description": "The name to display, from the Istat list of comuni. On an alternate row it is the name in another language, or the same name when the row only changes name_norm."
+        },
+        {
+          "name": "name_norm",
+          "type": "varchar",
+          "description": "The name normalized by nfd-strip-marks-lower/1: NFD decomposition, diacritics removed, lowercase, characters other than letters, digits, spaces, apostrophes and hyphens removed, repeated spaces collapsed. It is the sort column, compared byte by byte."
+        },
+        {
+          "name": "level",
+          "type": "integer",
+          "description": "Administrative level, always 3: the level of comuni in geoBoundaries (ADM3) and in Who's On First (localadmin)."
+        },
+        {
+          "name": "country",
+          "type": "varchar",
+          "description": "ISO 3166-1 alpha-3 country code, always ITA."
+        },
+        {
+          "name": "feature_id",
+          "type": "varchar",
+          "description": "Istat code of the comune, six digits as text. Alternate rows repeat the code of their comune. It is the value of the codice_istat column in the address index."
+        },
+        {
+          "name": "country_name",
+          "type": "varchar",
+          "description": "Country name, always Italia."
+        },
+        {
+          "name": "parent_name",
+          "type": "varchar",
+          "description": "Name of the province, the supra-municipal territorial unit of Istat. It tells apart comuni with the same name."
+        },
+        {
+          "name": "parent_id",
+          "type": "varchar",
+          "description": "Istat code of the supra-municipal territorial unit."
+        },
+        {
+          "name": "name_lang",
+          "type": "varchar",
+          "description": "ISO 639-3 language of the name, for example deu or slv, on rows in another language. Null on the other rows."
+        },
+        {
+          "name": "alt_of",
+          "type": "varchar",
+          "description": "Null on the main row. On an alternate row, the feature_id of the comune the row is another name of."
+        },
+        {
+          "name": "source",
+          "type": "varchar",
+          "description": "Source of the row, always anncsu."
+        },
+        {
+          "name": "addresses",
+          "type": "integer",
+          "description": "Number of georeferenced access points of the comune in the release, including those ANNCSU places outside the comune boundary."
+        },
+        {
+          "name": "bbox",
+          "type": "struct(xmin double, ymin double, xmax double, ymax double)",
+          "description": "Bounding box of the comune's access points in WGS84 degrees, leaving out those outside the comune boundary; if all of them are, it covers all of them. It is narrower than the comune's territory."
+        }
+      ],
+      "gazetteer:row_groups": 2,
+      "gazetteer:row_group_rows": 4096,
+      "gazetteer:footer_metadata_bytes": 5277
+    }
+  },
+  "links": [
+    {
+      "rel": "root",
+      "href": "../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "parent",
+      "href": "../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "derived_from",
+      "href": "../rilasci/2026-11-02/2026-11-02.json",
+      "type": "application/geo+json"
+    },
+    {
+      "rel": "related",
+      "href": "../indirizzi-index/collection.json",
+      "type": "application/json",
+      "title": "Address index of the comuni"
+    },
+    {
+      "rel": "alternate",
+      "href": "../../gazetteer/collection.json",
+      "type": "application/json",
+      "title": "Italian",
+      "hreflang": "it"
+    },
+    {
+      "rel": "alternate",
+      "href": "https://anncsu-open.github.io/anncsu-viewer/",
+      "type": "text/html",
+      "title": "Web viewer"
+    },
+    {
+      "rel": "via",
+      "href": "https://www.anncsu.gov.it/it/consultazione-dellarchivio/open-data/",
+      "type": "text/html",
+      "title": "ANNCSU open data portal"
+    },
+    {
+      "rel": "license",
+      "href": "https://creativecommons.org/licenses/by/4.0/",
+      "type": "text/html",
+      "title": "Creative Commons Attribution 4.0 International"
+    },
+    {
+      "rel": "agents",
+      "href": "./AGENTS.md",
+      "type": "text/markdown",
+      "title": "Instructions for automated agents",
+      "hreflang": "en"
+    },
+    {
+      "rel": "describedby",
+      "href": "./README.md",
+      "type": "text/markdown",
+      "title": "Human-readable documentation",
+      "hreflang": "en"
+    }
+  ]
+}

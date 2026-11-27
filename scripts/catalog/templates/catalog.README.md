@@ -17,7 +17,7 @@ con il tema di Designers Italia. I dati si vedono sulla mappa nel
 | [Indirizzi ANNCSU, file unico](./indirizzi/) | Analisi sull'intero territorio nazionale |
 | [Indirizzi ANNCSU, partizionati per cella H3](./indirizzi-h3/) | Leggere un comune senza scaricare tutto |
 | [Rilasci mensili ANNCSU](./rilasci/) | Recuperare uno scarico passato, o confrontare due rilasci |
-| [Stradario ANNCSU](./stradario/) | Le strade con il numero dei loro accessi, per ogni rilascio conservato |
+| [Stradario ANNCSU](./stradario/) | Le strade con il numero dei loro accessi, per ogni rilascio conservato |$geocoding_rows
 
 Le prime due descrivono gli stessi dati in due forme di accesso, e contengono
 i soli indirizzi georeferenziati del rilascio corrente. La terza conserva ogni

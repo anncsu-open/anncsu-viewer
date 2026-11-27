@@ -52,3 +52,7 @@ data/rilasci/**/*.csv
 data/stradario/**/*.zip
 data/stradario/**/*.parquet
 data/stradario/**/*.csv
+
+# Geocoding index: built by scripts/build_geocoding_index.py, on R2 only.
+data/gazetteer/**/*.parquet
+data/indirizzi-index/**/*.parquet

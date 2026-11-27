@@ -1,0 +1,114 @@
+{
+  "nfd-strip-marks-lower/1": [
+    [
+      "Agliè",
+      "aglie"
+    ],
+    [
+      "Forlì",
+      "forli"
+    ],
+    [
+      "Sant'Ambrogio di Torino",
+      "sant'ambrogio di torino"
+    ],
+    [
+      "Sant’Ambrogio di Torino",
+      "santambrogio di torino"
+    ],
+    [
+      "Reggio nell'Emilia",
+      "reggio nell'emilia"
+    ],
+    [
+      "Bolzano/Bozen",
+      "bolzanobozen"
+    ],
+    [
+      "  Castro  ",
+      "castro"
+    ],
+    [
+      "Saint-Rhémy-en-Bosses",
+      "saint-rhemy-en-bosses"
+    ],
+    [
+      "Mühlbach",
+      "muhlbach"
+    ],
+    [
+      "Hauptstraße",
+      "hauptstraße"
+    ],
+    [
+      "Vacone\tRieti",
+      "vaconerieti"
+    ],
+    [
+      "",
+      ""
+    ],
+    [
+      "Castro (BG)",
+      "castro bg"
+    ]
+  ],
+  "anncsu-odonimo/1": [
+    [
+      "VIA DELLA LIBERTA'",
+      "via della liberta"
+    ],
+    [
+      "via della libertà",
+      "via della liberta"
+    ],
+    [
+      "VIA D'ANNUNZIO",
+      "via d annunzio"
+    ],
+    [
+      "VIA D’ANNUNZIO",
+      "via d annunzio"
+    ],
+    [
+      "PIAZZA  XX SETTEMBRE",
+      "piazza xx settembre"
+    ],
+    [
+      "VIA S. GIOVANNI",
+      "via s giovanni"
+    ],
+    [
+      "VIA SANT'ANNA",
+      "via sant anna"
+    ],
+    [
+      "VIA PO'",
+      "via po"
+    ],
+    [
+      "VIA SAN GIOVANNI BOSCO - TRAVERSA I",
+      "via san giovanni bosco - traversa i"
+    ],
+    [
+      "Mühlgasse",
+      "muhlgasse"
+    ],
+    [
+      "Hauptstraße",
+      "hauptstraße"
+    ],
+    [
+      "VIA 4 NOVEMBRE",
+      "via 4 novembre"
+    ],
+    [
+      "",
+      ""
+    ],
+    [
+      "VIA G.MARCONI",
+      "via g marconi"
+    ]
+  ]
+}

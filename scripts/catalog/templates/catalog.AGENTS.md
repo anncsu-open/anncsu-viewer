@@ -21,7 +21,7 @@ Il campo `partition:glob` di `indirizzi-h3` punta al bucket con lo schema
 `s3://`, sull'API S3 di Cloudflare R2: elencare i file richiede credenziali R2,
 che il catalogo non distribuisce. Ogni file è leggibile via HTTPS. Per
 sapere quali celle servono, leggi l'asset `cell-index`, cioè `comuni-h3.json`,
-che mappa ogni comune sulle celle che ne contengono gli indirizzi.
+che mappa ogni comune sulle celle che ne contengono gli indirizzi.$geocoding_agents
 
 Le descrizioni delle colonne sono in `table:columns` su ogni collection.
 
